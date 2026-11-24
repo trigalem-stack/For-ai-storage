@@ -24,7 +24,6 @@ public class FixTest extends JavaPlugin {
             this.build(w);
             this.testKatana(w);
             this.testSky(w);
-            this.log("ALL TESTS DONE");
         }
         catch (Throwable t) {
             this.log("FAILED: " + t);
@@ -101,34 +100,63 @@ public class FixTest extends JavaPlugin {
         }
     }
 
-    private void testSky(World w) throws Exception {
-        Plugin ss = Bukkit.getPluginManager().getPlugin("SkySwordPlugin");
-        Method pm = ss.getClass().getDeclaredMethod("predict", World.class, double.class, double.class, double.class, double.class, double.class, double.class, boolean.class, int.class);
-        pm.setAccessible(true);
-        this.sky(pm, ss, w, "S1 far from edge", 9.0, 250.0, 2.5, 0.28, 0.0, 0.0, true, "supported");
-        this.sky(pm, ss, w, "S2 1 block from edge (sprint)", 13.0, 250.0, 2.5, 0.28, 0.0, 0.0, true, "leaveTick 4, flush possible");
-        this.sky(pm, ss, w, "S3 at edge (sprint)", 13.9, 250.0, 2.5, 0.28, 0.0, 0.0, true, "leaveTick 1, falling into pit");
-        this.sky(pm, ss, w, "S4 at edge over low ground", 13.9, 250.0, 8.5, 0.28, 0.0, 0.0, true, "null (caught by low ground)");
-        this.sky(pm, ss, w, "S5 airborne over pit", 20.5, 252.0, 2.5, 0.28, -0.5, 0.0, false, "falling, needs platform");
-        this.sky(pm, ss, w, "S6 airborne over low ground", 20.5, 249.0, 8.5, 0.0, -0.3, 0.0, false, "null (caught)");
-        this.sky(pm, ss, w, "S7 jump in place", 5.5, 250.0, 2.5, 0.0, 0.42, 0.0, true, "null (jump lands back)");
-        this.sky(pm, ss, w, "S8 jump toward edge (airborne)", 13.0, 250.42, 2.5, 0.28, 0.37, 0.0, false, "falling, needs platform");
-        this.sky(pm, ss, w, "S9 on cloud toward edge", 18.5, 250.0, 3.5, 0.28, 0.0, 0.0, true, "leaveTick 2, falling");
-        this.sky(pm, ss, w, "S10 walking on flat ground", 5.0, 250.0, 2.5, 0.0, 0.0, 0.28, true, "supported (null leaveTick)");
-        this.sky(pm, ss, w, "S11 sprinting on flat ground", 5.0, 250.0, 2.5, 0.28, 0.0, 0.0, true, "leaveTick 13 (edge at 14)");
-        this.sky(pm, ss, w, "S12 falling fast over pit", 20.5, 255.0, 2.5, 0.0, -1.0, 0.0, false, "falling, needs platform");
-        this.sky(pm, ss, w, "S7b jump in place (airborne, vy=0.42)", 5.5, 250.0, 2.5, 0.0, 0.42, 0.0, false, "null (lands back on floor)");
-        this.sky(pm, ss, w, "S13 standing on cloud, sprint toward low-ground side (z-)", 17.5, 250.0, 2.6, 0.0, 0.0, -0.28, true, "leave 1-2, falls 3 -> caught by low ground? (void here z<6 -> platform)");
-        this.sky(pm, ss, w, "S14 sprint toward edge on main floor from x=12", 12.0, 250.0, 2.5, 0.28, 0.0, 0.0, true, "leave 7 (>lead) -> no platform");
+    private int countSnow(World w, int x0, int x1, int y, int z0, int z1) {
+        int n = 0;
+        for (int x = x0; x <= x1; ++x) {
+            for (int z = z0; z <= z1; ++z) {
+                if (w.getBlockAt(x, y, z).getType() == Material.SNOW_BLOCK) ++n;
+            }
+        }
+        return n;
     }
 
-    private void sky(Method m, Plugin ss, World w, String name, double x, double y, double z, double vx, double vy, double vz, boolean sup, String expect) {
-        try {
-            double[] r = (double[])m.invoke(ss, w, x, y, z, vx, vy, vz, sup, 4);
-            this.log(name + " -> " + (r == null ? "null" : String.format("%.2f/%.2f/%.2f leave=%d", r[0], r[1], r[2], (int)r[3])) + "   [" + expect + "]");
+    /* Separate stage for the sky sword: floor top y=246, hole under the future platform. */
+    private void buildSkyStage(World w) {
+        for (int x = 30; x <= 38; ++x) {
+            for (int y = 240; y <= 265; ++y) {
+                for (int z = 0; z <= 4; ++z) {
+                    w.getBlockAt(x, y, z).setType(Material.AIR);
+                }
+            }
         }
-        catch (Exception ex) {
-            this.log(name + " -> EX " + ex);
+        for (int x = 30; x <= 38; ++x) {
+            for (int z = 0; z <= 4; ++z) {
+                w.getBlockAt(x, 245, z).setType(Material.STONE);
+            }
         }
+        for (int x = 33; x <= 35; ++x) {
+            for (int z = 1; z <= 3; ++z) {
+                w.getBlockAt(x, 245, z).setType(Material.AIR);
+            }
+        }
+    }
+
+    private void testSky(World w) throws Exception {
+        this.buildSkyStage(w);
+        Plugin ss = Bukkit.getPluginManager().getPlugin("SkySwordPlugin");
+        Method gen = ss.getClass().getDeclaredMethod("generatePlatform", Location.class);
+        gen.setAccessible(true);
+        Method only = ss.getClass().getDeclaredMethod("onlySnowBlocks", World.class, Location.class, double.class, double.class);
+        only.setAccessible(true);
+        Location center = new Location(w, 34.0, 245.0, 2.0);
+        Object placed = gen.invoke(ss, center);
+        this.log("G1 generatePlatform at (34,245,2) -> " + placed + ", snow in 3x3 = " + this.countSnow(w, 33, 35, 245, 1, 3) + "   [true, 9]");
+        Object again = gen.invoke(ss, center);
+        this.log("G2 generatePlatform again same center -> " + again + "   [false: all 9 already snow]");
+        Object o1 = only.invoke(ss, w, new Location(w, 34.5, 245.4, 2.5), 0.3, 1.8);
+        this.log("O1 onlySnowBlocks feet 0.4 inside snow platform -> " + o1 + "   [true]");
+        w.getBlockAt(34, 247, 2).setType(Material.STONE);
+        Object o2 = only.invoke(ss, w, new Location(w, 34.5, 245.4, 2.5), 0.3, 1.8);
+        this.log("O2 same + stone at head level (34,247,2) -> " + o2 + "   [false]");
+        w.getBlockAt(34, 247, 2).setType(Material.AIR);
+        Object o3 = only.invoke(ss, w, new Location(w, 36.5, 245.5, 2.5), 0.3, 1.8);
+        this.log("O3 onlySnowBlocks feet inside stone floor (36,245,2) -> " + o3 + "   [false]");
+        Object o4 = only.invoke(ss, w, new Location(w, 34.5, 250.0, 2.5), 0.3, 1.8);
+        this.log("O4 onlySnowBlocks in free air -> " + o4 + "   [true]");
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            int left = this.countSnow(w, 33, 35, 245, 1, 3);
+            this.log("G3 105 ticks later snow blocks left = " + left + "   [0: platform removed itself]");
+            this.log("ALL TESTS DONE");
+        }, 105L);
     }
 }
