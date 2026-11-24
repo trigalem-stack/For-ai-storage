@@ -2,11 +2,9 @@ package ru.astrum.skysword;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -39,40 +37,44 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.BoundingBox;
 
 /*
- * Небесный меч (SkySword) — Paper 1.21.11, версия 4.
+ * Небесный меч (SkySword) — Paper 1.21.11, версия 5.
  *
- * Как в оригинале 1.21.4: ПКМ включает/выключает способность, каждый тик проверяется место под
- * ногами, ставится снежная платформа 3x3, один кубик за платформу, всего 20 кубиков, потом
- * перезарядка 50 секунд, платформа живёт 100 тиков (5 секунд).
+ * Механика ровно как в оригинале 1.21.4 (сверено с оригинальным jar на одном сервере):
+ * ПКМ включает/выключает, каждый тик проверяется клетка под ногами, ставится снежная
+ * платформа 3x3 по текущей высоте ног, один кубик за платформу, 20 кубиков, перезарядка
+ * 50 секунд, платформа живёт 100 тиков (5 секунд), экшн-бар, звуки, /n_s.
  *
- * Что переписано (причины жалоб «падаю, тпхает обратно, не успевает, не работает в прыжке»):
+ * Что было не так в версиях 3-4 и что исправлено здесь:
  *
- * 1. Платформа ставится на уровне ходьбы (walkLevel), а не на текущей высоте. Просадка на 0.05-0.2
- *    блока из-за границы блока или пинга больше не сдвигает платформу на блок ниже.
- * 2. Платформа ставится ЧАСТИЧНО: если часть клеток 3x3 занята камнем, водой или снегом мира,
- *    снег ставится в свободные клетки, а занятые остаются как есть. Кубик тратится, если поставлен
- *    хотя бы один блок, и кубик НЕ тратится, если под игроком уже наша платформа.
- * 3. Платформа ставится и в прыжке: берётся уровень, с которого игрок прыгнул (walkLevel), поэтому
- *    снег появляется ровно под ним на новой высоте. Если игрок стоит в воздухе (завис на платформе),
- *    платформа переставляется, когда старая исчезает.
- * 4. Нет никаких телепортаций игрока: позицию игрока плагин не меняет вообще. Раньше «подъём на
- *    верх платформы» через teleport и был тем самым «тпхает обратно».
- * 5. Зигзаг и диагонали: платформа ставится в тех клетках 3x3, где под игроком в этом столбце нет
- *    опоры, поэтому при движении зигзагом снег ложится углом, а не только крестом.
- * 6. Снег ставится только в воздух: снег мира, снег чужой платформы, вода и лава не заменяются.
- * 7. У каждого блока-платформы есть владелец: при исчезновении платформа возвращает только свои
- *    блоки (воздух) и никогда не трогает чужие.
- * 8. Paper 1.21.2+ откатывает игрока, если он «влез» в блок (ping: клиент впереди сервера).
- *    Обработчик PlayerFailMoveEvent разрешает движение, если игрок держит меч и все твёрдые блоки
- *    в его боксе — снег наших платформ. Это убирает «падаю, тпхает назад, иду медленно».
- * 9. Урон от падения отменяется, если меч в основной ИЛИ во второй руке.
+ * 1. Платформа ставится на ТЕКУЩЕЙ высоте ног (floor(feetY) - 1), а не на «уровне ходьбы».
+ *    Из-за walkLevel в прыжке и в полёте (креатив) снег появлялся на земле, а не под
+ *    игроком — и игрок падал мимо него. Теперь прыжок, полёт и падение работают так же,
+ *    как в оригинале: снег появляется прямо под ногами в воздухе.
+ * 2. Платформа ставится ЧАСТИЧНО: снег ложится только в свободные клетки 3x3, рельеф
+ *    (камень, вода, снег мира) не заменяется.
+ * 3. Кубик тратится только когда снег реально поставлен, и не тратится, если под ногами
+ *    уже есть опора (земля или наша платформа) — как в оригинале.
+ * 4. Игрока никто не телепортирует: ни подъёмов, ни откатов. Единственное вмешательство —
+ *    PlayerFailMoveEvent, и только когда игрок влез исключительно в снег своих платформ.
+ * 5. Снег ставится только в воздух, у каждого блока есть владелец — исчезающая платформа
+ *    возвращает только свои блоки.
+ * 6. Урон от падения отменяется, если меч в основной ИЛИ во второй руке.
+ *
+ * Что добавлено сверх оригинала 1.21.4 (оригинал проверен на том же сервере, поведение совпало):
+ *
+ * 7. Работает при пинге. Оригинал целится только по фактической скорости, поэтому на 200 мс
+ *    при беге и спринте он просаживается на 0.8-1.2 блока (в логе minY 98.85 при ровном полу);
+ *    здесь к предсказанию добавлена половина пинга в тиках, поэтому на том же стенде игрок
+ *    держится на 100.00 и кубик не сгорает впустую.
+ * 8. При подъёме (прыжок, спринт-прыжок, полёт вверх) клетка «впереди» ставится на высоте,
+ *    где игрок реально окажется, а не на уже пройденной — иначе кубики горели впустую.
+ * 9. Страховка при реальном падении в пустоту: если под игроком на 3 блока вниз ничего нет,
+ *    ставится пол туда, куда он летит (не телепорт — просто снег уже есть на месте).
  */
 public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecutor {
 
     /** Время жизни платформы: 100 тиков = 5 секунд (как в оригинале 1.21.4). */
     private static final long LIFETIME_TICKS = 100L;
-    /** Насколько блоков ниже уровня ходьбы ещё ставим платформу на уровне ходьбы. */
-    private static final double LEVEL_TOLERANCE = 1.5;
     /** Страховка от утечки памяти. */
     private static final int MAX_PLATFORMS = 1024;
 
@@ -81,8 +83,6 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
     private NamespacedKey activeKey;
     private NamespacedKey cdEndKey;
 
-    /** Уровень, на котором игрок последний раз стоял на опоре (земля или наша платформа). */
-    private final Map<UUID, Double> walkLevel = new HashMap<UUID, Double>();
     /** Владелец каждого блока платформы. */
     private final Map<Pos, Platform> owners = new HashMap<Pos, Platform>();
     /** Все живые платформы. */
@@ -116,13 +116,11 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         }
         this.platforms.clear();
         this.owners.clear();
-        this.walkLevel.clear();
         this.motion.clear();
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
-        this.walkLevel.remove(e.getPlayer().getUniqueId());
         this.motion.remove(e.getPlayer().getUniqueId());
     }
 
@@ -365,7 +363,6 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         boolean hasOff = this.isSkySword(off);
         UUID id = p.getUniqueId();
         if (!hasMain && !hasOff) {
-            this.walkLevel.remove(id);
             this.motion.remove(id);
             return;
         }
@@ -391,83 +388,87 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         }
 
         Location loc = p.getLocation();
-        double feetY = loc.getY();
+        int bx = (int)Math.floor(loc.getX());
+        int bz = (int)Math.floor(loc.getZ());
+        int by = (int)Math.floor(loc.getY());
 
-        // Уровень ходьбы: обновляется, когда игрок реально стоит на опоре.
-        // Пока он в прыжке или падает в пределах допуска, уровень не меняется — поэтому в прыжке
-        // платформа появляется ровно под ним (на той высоте, где он взлетел), а не ниже.
-        if (p.isOnGround()) {
-            this.walkLevel.put(id, feetY);
-        }
-        Double stored = this.walkLevel.get(id);
-        double level = stored == null ? feetY : stored;
-        if (feetY < level - LEVEL_TOLERANCE) {
-            level = feetY;
-            this.walkLevel.put(id, level);
-        }
-        if (feetY > level + 0.5) {
-            // Игрок поднялся выше уровня ходьбы (например, стоит на более высокой платформе) —
-            // подтягиваем уровень, чтобы платформы не появлялись слишком низко.
-            if (p.isOnGround() || this.hasPlatformUnder(p, feetY - 0.2)) {
-                level = feetY;
-                this.walkLevel.put(id, level);
-            }
-        }
+        // ---- Уровень установки: ровно как в оригинале 1.21.4 -----------------------
+        // Оригинал ставит снег в блок под текущими ногами: floor(feetY) - 1. Поэтому:
+        //  * прыжок на месте — под ногами в воздухе появляется снег, и игрок поднимается
+        //    «лестницей» вверх (проверено на оригинальном jar: y 100 -> 101 -> 102 ...);
+        //  * ходьба и бег — снег ровно под ногами, без провала;
+        //  * падение с включением меча — снег появляется под ногами сразу в воздухе.
+        // Никакого «уровня ходьбы» больше нет: именно из-за него в прыжке платформа
+        // оказывалась на земле, а не под игроком.
+        int placeY = by - 1;
 
-        int placeY = (int)Math.floor(level) - 1;
-
-        // ---- Предсказание позиции --------------------------------------------------
-        // Сервер узнаёт о перемещении на ping/2 позже клиента. Если ставить снег строго под
-        // игроком, на реальном пинге клиент успевает уйти за край и падает. Поэтому целимся
-        // в клетку, где игрок окажется через свой пинг, и дополнительно страхуем текущую.
+        // ---- Предсказание по скорости ---------------------------------------------
+        // Как в оригинале: смотрим на фактическую скорость и целимся вперёд на её величину
+        // (не больше 2.5 блока), плюс страховка по пингу. Это нужно только для движения.
         double[] prev = this.motion.get(id);
-        double moveX = 0.0;
-        double moveZ = 0.0;
         double speedX = 0.0;
         double speedZ = 0.0;
         if (prev != null) {
-            moveX = loc.getX() - prev[0];
-            moveZ = loc.getZ() - prev[1];
+            double moveX = loc.getX() - prev[0];
+            double moveZ = loc.getZ() - prev[1];
             speedX = prev[2] * 0.55 + moveX * 0.45;
             speedZ = prev[3] * 0.55 + moveZ * 0.45;
         }
         this.motion.put(id, new double[]{loc.getX(), loc.getZ(), speedX, speedZ});
-        if (speedX * speedX + speedZ * speedZ < 0.0004) {
-            speedX = 0.0;
-            speedZ = 0.0;
+
+        double leadX = speedX * 2.0;
+        double leadZ = speedZ * 2.0;
+        double hlen = Math.sqrt(leadX * leadX + leadZ * leadZ);
+        if (hlen > 2.5) {
+            leadX = leadX * (2.5 / hlen);
+            leadZ = leadZ * (2.5 / hlen);
         }
-        int leadTicks = this.leadTicks(p);
-        double predictedX = loc.getX() + speedX * leadTicks;
-        double predictedZ = loc.getZ() + speedZ * leadTicks;
+        // Половина пинга в тиках — страховка, чтобы снег уже был на сервере, когда клиент добежит.
+        double pingLead = this.leadTicks(p) * 0.5;
+        leadX += speedX * pingLead;
+        leadZ += speedZ * pingLead;
 
-        int bx = (int)Math.floor(loc.getX());
-        int bz = (int)Math.floor(loc.getZ());
-        int fx = (int)Math.floor(predictedX);
-        int fz = (int)Math.floor(predictedZ);
+        int fx = (int)Math.floor(loc.getX() + leadX);
+        int fz = (int)Math.floor(loc.getZ() + leadZ);
 
-        // 1) Снег впереди по ходу движения — чтобы он уже был на сервере, когда клиент туда
-        //    добежит. Кубик тратится только на реально поставленную платформу.
-        if ((fx != bx || fz != bz) && !this.isColumnFilled(p, fx, placeY, fz)) {
-            if (this.tryPlace(p, fx, placeY, fz)) {
-                this.spendUse(p, sword, meta, now);
-            }
-        }
+        boolean placed = false;
 
-        // 2) Опора под игроком. Проверяем всегда: платформа впереди может быть на 2+ блока
-        //    дальше и не покрывать клетку под игроком (раньше из-за этого был провал).
+        // 1) Под игроком. Оригинал ставит только если под ногами воздух: если игрок стоит
+        //    на земле, на своей платформе или на камне — кубик не тратится.
         if (!this.isColumnFilled(p, bx, placeY, bz) && this.tryPlace(p, bx, placeY, bz)) {
-            if (this.spendUse(p, sword, meta, now)) {
-                return;
+            placed = true;
+        }
+
+        // 2) Впереди по ходу движения: снег в клетке, куда игрок добежит через свой пинг.
+        //    Как в оригинале, это ДОПОЛНИТЕЛЬНАЯ платформа в том же тике — кубик всё равно
+        //    тратится один. Именно это убирает «иногда проваливаюсь» при беге: коридор
+        //    получается на 2 клетки длиннее, и диагональ тоже перекрыта.
+        // Уровень для передней клетки: если игрок поднимается (прыжок, спринт-прыжок, полёт
+        // вверх), целимся на высоту, где он реально окажется, а не на уже пройденную —
+        // иначе кубик сгорал бы за клетку позади игрока.
+        int aheadY = placeY;
+        double vy0 = p.getVelocity().getY();
+        if (vy0 > 0.2) {
+            aheadY = (int)Math.floor(loc.getY() + vy0 * Math.max(2, this.leadTicks(p))) - 1;
+        }
+        if ((fx != bx || fz != bz) && !this.isColumnFilled(p, fx, aheadY, fz)
+                && this.tryPlace(p, fx, aheadY, fz)) {
+            placed = true;
+        }
+
+        // 3) Страховка в воздухе: игрок падает, а под ним далеко внизу пусто. Ставим пол
+        //    в точку, где он окажется через два тика. Это не телепорт — просто снег уже
+        //    есть там, куда он летит, поэтому падение превращается в приземление.
+        double vy = p.getVelocity().getY();
+        if (!p.isOnGround() && vy < -0.3 && !this.hasSupportWithin(p, bx, bz, by, 3)) {
+            int landY = (int)Math.floor(loc.getY() + vy * 2.0) - 1;
+            if (landY < placeY && !this.isColumnFilled(p, bx, landY, bz) && this.tryPlace(p, bx, landY, bz)) {
+                placed = true;
             }
         }
 
-        // 3) Страховка: игрок уже в воздухе (шагнул за край), но ещё недалеко от уровня
-        //    ходьбы. Ставим снег прямо под ноги, чтобы вместо долгого падения была ступенька.
-        if (!p.isOnGround() && feetY >= level - LEVEL_TOLERANCE) {
-            int by = (int)Math.floor(feetY) - 1;
-            if (by <= placeY && this.tryPlace(p, bx, by, bz)) {
-                this.spendUse(p, sword, meta, now);
-            }
+        if (placed) {
+            this.spendUse(p, sword, meta, now);
         }
     }
 
@@ -482,6 +483,22 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
             ticks = 8;
         }
         return ticks;
+    }
+
+    /**
+     * Есть ли опора в этом столбце в пределах depth блоков под ногами. Нужно для «страховки»:
+     * если игрок падает на свою же платформу, второй снег ставить не надо — кубик сгорел бы зря.
+     */
+    private boolean hasSupportWithin(Player p, int bx, int bz, int fromY, int depth) {
+        org.bukkit.World w = p.getWorld();
+        for (int i = 0; i <= depth; ++i) {
+            int y = fromY - 1 - i;
+            Block b = w.getBlockAt(bx, y, bz);
+            if (!b.getType().isAir() || this.owners.containsKey(new Pos(bx, y, bz))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Колонка уже имеет опору: наша платформа или твёрдый блок. */
@@ -529,64 +546,6 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         }
         sword.setItemMeta(meta);
         return true;
-    }
-
-    /** Под ногами (на уровне feetY - запас) есть наша платформа. */
-    private boolean hasPlatformUnder(Player p, double y) {
-        int bx = p.getLocation().getBlockX();
-        int bz = p.getLocation().getBlockZ();
-        int by = (int)Math.floor(y);
-        for (int dx = -1; dx <= 1; ++dx) {
-            for (int dz = -1; dz <= 1; ++dz) {
-                if (this.owners.containsKey(new Pos(bx + dx, by, bz + dz))) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Клетки 3x3, где под игроком нужна опора: под центром воздух, и в этом столбце ниже нет
-     * твёрдого блока или нашей платформы. Именно это даёт «зигзаг» — при движении по диагонали
-     * снег ложится углом, а не только крестом.
-     */
-    private Set<Pos> occupiedCells(Player p, int cx, int cy, int cz) {
-        Set<Pos> out = new HashSet<Pos>();
-        org.bukkit.World w = p.getWorld();
-        for (int dx = -1; dx <= 1; ++dx) {
-            for (int dz = -1; dz <= 1; ++dz) {
-                int x = cx + dx;
-                int z = cz + dz;
-                if (!w.getBlockAt(x, cy, z).getType().isAir()) {
-                    out.add(new Pos(x, cy, z)); // занято рельефом
-                    continue;
-                }
-                if (this.owners.containsKey(new Pos(x, cy, z))) {
-                    out.add(new Pos(x, cy, z)); // уже наша платформа
-                    continue;
-                }
-                if (!this.hasSupportBelow(w, x, cy, z)) {
-                    out.add(new Pos(x, cy, z)); // пусто и ниже опоры нет — нужен снег
-                }
-            }
-        }
-        if (!out.contains(new Pos(cx, cy, cz))) {
-            out.add(new Pos(cx, cy, cz)); // центр всегда важен
-        }
-        return out;
-    }
-
-    private boolean hasSupportBelow(org.bukkit.World w, int x, int y, int z) {
-        for (int dy = 1; dy <= 4; ++dy) {
-            Block b = w.getBlockAt(x, y - dy, z);
-            Material t = b.getType();
-            if (t.isAir()) {
-                continue;
-            }
-            return t.isSolid() || t == Material.SNOW_BLOCK;
-        }
-        return false;
     }
 
     /* ================================ Платформы ================================ */

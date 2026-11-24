@@ -140,6 +140,21 @@ public class BotHelper extends JavaPlugin implements Listener, CommandExecutor {
         it.setItemMeta(meta);
     }
 
+    private void setActive(Player p, byte value) {
+        ItemStack it = p.getInventory().getItemInMainHand();
+        if (!(it != null && it.hasItemMeta() && it.getItemMeta().getPersistentDataContainer().has(USES, PersistentDataType.INTEGER))) {
+            it = p.getInventory().getItemInOffHand();
+        }
+        if (it == null || !it.hasItemMeta()) return;
+        ItemMeta meta = it.getItemMeta();
+        if (!meta.getPersistentDataContainer().has(USES, PersistentDataType.INTEGER)) return;
+        meta.getPersistentDataContainer().set(ACTIVE, PersistentDataType.BYTE, value);
+        meta.getPersistentDataContainer().set(CD, PersistentDataType.LONG, 0L);
+        it.setItemMeta(meta);
+        p.updateInventory();
+        this.log(p, "SETACTIVE " + value);
+    }
+
     private void stats(Player p) {
         UUID id = p.getUniqueId();
         this.maxY.put(id, 100.0);
@@ -263,6 +278,11 @@ public class BotHelper extends JavaPlugin implements Listener, CommandExecutor {
             this.buildStage(p.getWorld());
             p.teleport(new Location(p.getWorld(), 205.5, 100.0, 207.5, -90.0f, 0.0f));
             p.setFallDistance(0.0f);
+            p.setHealth(Math.min(20.0, p.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue()));
+            p.setFoodLevel(20);
+            p.setSaturation(20.0f);
+            p.setFireTicks(0);
+            p.getActivePotionEffects().forEach(eff -> p.removePotionEffect(eff.getType()));
             this.stats(p);
             this.resetSword(p);
             this.log(p, "RESET");
@@ -461,6 +481,55 @@ public class BotHelper extends JavaPlugin implements Listener, CommandExecutor {
             p.getInventory().setHeldItemSlot(0);
             p.updateInventory();
             this.log(p, "SWORD");
+        }
+        else if (sub.equals("activate")) {
+            this.setActive(p, (byte)1);
+        }
+        else if (sub.equals("deactivate")) {
+            this.setActive(p, (byte)0);
+        }
+        else if (sub.equals("fallact") && args.length >= 3) {
+            // Server-side deterministic: teleport up, then switch the sword on after N ticks.
+            int up = Integer.parseInt(args[1]);
+            long delay = Long.parseLong(args[2]);
+            Location l = p.getLocation();
+            p.setFlying(false);
+            p.setAllowFlight(false);
+            p.setGameMode(org.bukkit.GameMode.SURVIVAL);
+            p.setFallDistance(0.0f);
+            p.teleport(new Location(p.getWorld(), l.getX(), 100.0 + up, l.getZ(), l.getYaw(), 0.0f));
+            p.setFallDistance(0.0f);
+            this.stats(p);
+            this.log(p, "FALLACT>+" + up + " delay=" + delay);
+            Bukkit.getScheduler().runTaskLater((Plugin)this, () -> {
+                this.setActive(p, (byte)1);
+                this.log(p, "FALLACT ACTIVATED in air");
+            }, delay);
+        }
+        else if (sub.equals("creative")) {
+            p.setGameMode(org.bukkit.GameMode.CREATIVE);
+            p.setAllowFlight(true);
+            p.setFlying(true);
+            this.log(p, "CREATIVE+FLY");
+        }
+        else if (sub.equals("survival")) {
+            p.setFlying(false);
+            p.setAllowFlight(false);
+            p.setGameMode(org.bukkit.GameMode.SURVIVAL);
+            this.log(p, "SURVIVAL");
+        }
+        else if (sub.equals("fall") && args.length >= 2) {
+            // поднять на N блоков над площадкой и отдать в свободное падение
+            int up = Integer.parseInt(args[1]);
+            Location l = p.getLocation();
+            p.setFlying(false);
+            p.setAllowFlight(false);
+            p.setGameMode(org.bukkit.GameMode.SURVIVAL);
+            p.setFallDistance(0.0f);
+            p.teleport(new Location(p.getWorld(), l.getX(), 100.0 + up, l.getZ(), l.getYaw(), 0.0f));
+            p.setFallDistance(0.0f);
+            this.stats(p);
+            this.log(p, "FALL>+" + up);
         }
         else if (sub.equals("at") && args.length >= 4) {
             int x = Integer.parseInt(args[1]), y = Integer.parseInt(args[2]), z = Integer.parseInt(args[3]);
