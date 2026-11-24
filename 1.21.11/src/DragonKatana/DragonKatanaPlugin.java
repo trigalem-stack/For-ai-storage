@@ -204,23 +204,22 @@ CommandExecutor {
         if (dest == null) {
             return;
         }
-        p.teleport(dest);
-        if (this.needsSneak(p)) {
+        if (this.needsSneak(p.getWorld(), dest)) {
             p.setSneaking(true);
             p.setPose(org.bukkit.entity.Pose.SNEAKING);
         }
+        p.teleport(dest);
         p.playSound(p.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
         meta.getPersistentDataContainer().set(this.lastUseKey, PersistentDataType.LONG, now);
         item.setItemMeta(meta);
     }
 
-    private boolean needsSneak(Player p) {
-        Location l = p.getLocation();
+    private boolean needsSneak(World world, Location l) {
         int bx = l.getBlockX();
         int bz = l.getBlockZ();
         int by = l.getBlockY();
         for (int i = 0; i <= 2; ++i) {
-            BoundingBox box = p.getWorld().getBlockAt(bx, by + i, bz).getBoundingBox();
+            BoundingBox box = world.getBlockAt(bx, by + i, bz).getBoundingBox();
             if (box != null && box.getHeight() > 0.0 && box.getMinY() >= l.getY()) {
                 return box.getMinY() - l.getY() < 2.0;
             }
