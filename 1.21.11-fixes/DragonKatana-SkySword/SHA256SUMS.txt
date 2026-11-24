@@ -1,4 +1,3 @@
 309d093443fd972a9e7b799ffc159709c339ee4ec09c023c53998e801a5e9cf9  DragonKatana-1.0-1.21.11.jar
-82c6e0c2692dd4d93631d8800d372c59cea8faa92f6f3cc7bcb67134e3ea2329  DragonKatana-SkySword-1.21.11.zip
-827429dbfd87833127127a8171c3978c1c8d402d8cf9890dbe2f0ecfd2e68c5b  SkySwordPlugin-1.0-1.21.11.jar
-6b82bdb1ae144bcbac6bc58b2bac75c50ba5ec88351f3c2b335cc86d55df955a  эталон-original-1.21.4/SkySwordPlugin-1.0-original-1.21.4.jar
+fd6d7cb56d4760c2f29fc1026a80c6b5f6f74714946ab6823d7629e349c6cd83  SkySwordPlugin-1.0-1.21.11.jar
+f3cbeeca507b53afd4c0b386bf7e800d38537703af7d97489bba5b23bdb5cf50  DragonKatana-SkySword-1.21.11.zip

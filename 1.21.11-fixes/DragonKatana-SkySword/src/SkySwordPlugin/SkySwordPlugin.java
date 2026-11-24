@@ -75,6 +75,8 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
 
     /** Время жизни платформы: 100 тиков = 5 секунд (как в оригинале 1.21.4). */
     private static final long LIFETIME_TICKS = 100L;
+    /** Мёртвая зона скорости (блоков за тик): ниже неё игрок считается стоящим на месте. */
+    private static final double MIN_SPEED = 0.02;
     /** Страховка от утечки памяти. */
     private static final int MAX_PLATFORMS = 1024;
 
@@ -401,37 +403,49 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         // Никакого «уровня ходьбы» больше нет: именно из-за него в прыжке платформа
         // оказывалась на земле, а не под игроком.
         int placeY = by - 1;
+        boolean placed = false;
 
-        // ---- Предсказание по скорости ---------------------------------------------
-        // Как в оригинале: смотрим на фактическую скорость и целимся вперёд на её величину
-        // (не больше 2.5 блока), плюс страховка по пингу. Это нужно только для движения.
+        // ---- Предсказание траектории ----------------------------------------------
+        // Скорость считается по фактическому смещению за тик и сглаживается. Мёртвая зона
+        // (MIN_SPEED) важна: стоя на месте игрок дрожит на сотые блока, и раньше из-за этого
+        // платформа уезжала на клетку в сторону — «прыгаю на месте, а снег слева/справа».
         double[] prev = this.motion.get(id);
         double speedX = 0.0;
         double speedZ = 0.0;
         if (prev != null) {
             double moveX = loc.getX() - prev[0];
             double moveZ = loc.getZ() - prev[1];
-            speedX = prev[2] * 0.55 + moveX * 0.45;
-            speedZ = prev[3] * 0.55 + moveZ * 0.45;
+            speedX = prev[2] * 0.6 + moveX * 0.4;
+            speedZ = prev[3] * 0.6 + moveZ * 0.4;
+        }
+        // Резкий скачок (> 1.5 блока за тик) — это телепорт, а не бег. Предсказание по нему
+        // нарисовало бы «коридор» из воздуха, поэтому такой тик просто сбрасываем.
+        double hspeed = Math.sqrt(speedX * speedX + speedZ * speedZ);
+        if (hspeed > 1.5) {
+            speedX = 0.0;
+            speedZ = 0.0;
+            hspeed = 0.0;
+        }
+        if (hspeed < MIN_SPEED) {
+            speedX = 0.0;
+            speedZ = 0.0;
+            hspeed = 0.0;
         }
         this.motion.put(id, new double[]{loc.getX(), loc.getZ(), speedX, speedZ});
 
-        double leadX = speedX * 2.0;
-        double leadZ = speedZ * 2.0;
-        double hlen = Math.sqrt(leadX * leadX + leadZ * leadZ);
-        if (hlen > 2.5) {
-            leadX = leadX * (2.5 / hlen);
-            leadZ = leadZ * (2.5 / hlen);
-        }
-        // Половина пинга в тиках — страховка, чтобы снег уже был на сервере, когда клиент добежит.
-        double pingLead = this.leadTicks(p) * 0.5;
-        leadX += speedX * pingLead;
-        leadZ += speedZ * pingLead;
+        double vy = p.getVelocity().getY();
+        boolean moving = hspeed > 0.0;
 
-        int fx = (int)Math.floor(loc.getX() + leadX);
-        int fz = (int)Math.floor(loc.getZ() + leadZ);
-
-        boolean placed = false;
+        // Точка впереди по фактическому направлению движения: скорость × горизонт (свой пинг
+        // плюс запас). Считаем именно вектор, а не «по осям», поэтому диагональ под любым
+        // углом продолжается как диагональ.
+        double leadScale = 1.5 + this.leadTicks(p) * 0.5;
+        int fx = (int)Math.floor(loc.getX() + speedX * leadScale);
+        int fz = (int)Math.floor(loc.getZ() + speedZ * leadScale);
+        boolean aheadSameLevel = Math.abs(((int)Math.floor(loc.getY() + vy * leadScale)) - by) <= 1;
+        // В прыжке подъёма вперёд ничего не нужно: высоту ведёт клетка под ногами,
+        // а снег впереди на другом уровне — это лишняя платформа и лишний кубик.
+        boolean wantAhead = moving && vy <= 0.2 && aheadSameLevel;
 
         // 1) Под игроком. Оригинал ставит только если под ногами воздух: если игрок стоит
         //    на земле, на своей платформе или на камне — кубик не тратится.
@@ -439,34 +453,28 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
             placed = true;
         }
 
-        // 2) Впереди по ходу движения: снег в клетке, куда игрок добежит через свой пинг.
-        //    Как в оригинале, это ДОПОЛНИТЕЛЬНАЯ платформа в том же тике — кубик всё равно
-        //    тратится один. Именно это убирает «иногда проваливаюсь» при беге: коридор
-        //    получается на 2 клетки длиннее, и диагональ тоже перекрыта.
-        // Уровень для передней клетки: если игрок поднимается (прыжок, спринт-прыжок, полёт
-        // вверх), целимся на высоту, где он реально окажется, а не на уже пройденную —
-        // иначе кубик сгорал бы за клетку позади игрока.
-        int aheadY = placeY;
-        double vy0 = p.getVelocity().getY();
-        if (vy0 > 0.2) {
-            aheadY = (int)Math.floor(loc.getY() + vy0 * Math.max(2, this.leadTicks(p))) - 1;
-        }
-        if ((fx != bx || fz != bz) && !this.isColumnFilled(p, fx, aheadY, fz)
-                && this.tryPlace(p, fx, aheadY, fz)) {
+        // 2) Одна клетка впереди — чтобы снег уже был на сервере, когда клиент туда добежит.
+        //    Только если там реально нет опоры (иначе по ровному полу жглись бы кубики)
+        //    и только на том же уровне, где идёт игрок.
+        if (wantAhead && (fx != bx || fz != bz) && !this.isColumnFilled(p, fx, placeY, fz)
+                && !this.hasSupportWithin(p, fx, fz, placeY + 1, 3)
+                && this.tryPlace(p, fx, placeY, fz)) {
             placed = true;
         }
 
-        // 3) Страховка в воздухе: игрок падает, а под ним далеко внизу пусто. Ставим пол
-        //    в точку, где он окажется через два тика. Это не телепорт — просто снег уже
-        //    есть там, куда он летит, поэтому падение превращается в приземление.
-        double vy = p.getVelocity().getY();
-        if (!p.isOnGround() && vy < -0.3 && !this.hasSupportWithin(p, bx, bz, by, 3)) {
-            int landY = (int)Math.floor(loc.getY() + vy * 2.0) - 1;
-            if (landY < placeY && !this.isColumnFilled(p, bx, landY, bz) && this.tryPlace(p, bx, landY, bz)) {
+        // 3) Страховка при падении: если внизу на три блока пусто, ставим пол в точку,
+        //    где игрок окажется через два тика. Не телепорт — просто снег уже на месте.
+        if (!p.isOnGround() && vy < -0.15) {
+            int landY = (int)Math.floor(loc.getY() + vy * 3.0 - 1.0E-4);
+            if (landY < placeY && !this.isColumnFilled(p, bx, landY, bz)
+                    && !this.hasSupportWithin(p, bx, bz, landY + 1, 2)
+                    && this.tryPlace(p, bx, landY, bz)) {
                 placed = true;
             }
         }
 
+        // Кубик — один за тик, сколько бы клеток ни поставилось (как в оригинале:
+        // под игроком + впереди стоят один кубик).
         if (placed) {
             this.spendUse(p, sword, meta, now);
         }
