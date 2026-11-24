@@ -211,19 +211,28 @@ implements Listener {
         if (e.getClickedInventory() == e.getView().getTopInventory() && e.getSlot() >= 45) {
             e.setCancelled(true);
             if (e.getSlot() == 53) {
-                Location loc = this.pendingSetup.remove(p.getUniqueId());
-                ItemStack result = this.pendingResult.remove(p.getUniqueId());
-                if (loc == null || result == null) {
-                    return;
-                }
                 ArrayList<ItemStack> ingredients = new ArrayList<ItemStack>();
                 for (int i = 0; i < 45; ++i) {
                     ItemStack item = e.getView().getTopInventory().getItem(i);
                     if (item == null || item.getType() == Material.AIR) continue;
                     ingredients.add(item.clone());
                 }
+                Location loc = this.pendingSetup.remove(p.getUniqueId());
+                ItemStack result = this.pendingResult.remove(p.getUniqueId());
+                if (loc == null || result == null) {
+                    if (result != null) {
+                        this.giveItem(p, result);
+                    }
+                    if (loc != null) {
+                        this.removeIncompletePedestal(p, loc);
+                    }
+                    p.closeInventory();
+                    return;
+                }
                 if (ingredients.isEmpty()) {
-                    p.sendMessage("\u00a7c\u0418\u043d\u0433\u0440\u0435\u0434\u0438\u0435\u043d\u0442\u044b \u043d\u0435 \u0437\u0430\u0434\u0430\u043d\u044b.");
+                    p.sendMessage("\u00a7c\u0418\u043d\u0433\u0440\u0435\u0434\u0438\u0435\u043d\u0442\u044b \u043d\u0435 \u0437\u0430\u0434\u0430\u043d\u044b, \u043f\u0440\u0435\u0434\u043c\u0435\u0442 \u0432\u043e\u0437\u0432\u0440\u0430\u0449\u0451\u043d.");
+                    this.giveItem(p, result);
+                    this.removeIncompletePedestal(p, loc);
                     p.closeInventory();
                     return;
                 }
