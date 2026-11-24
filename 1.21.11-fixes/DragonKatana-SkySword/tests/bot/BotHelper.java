@@ -28,6 +28,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 /** Тестовый помощник: строит площадку, выдаёт меч, пишет в лог состояние бота. */
 public class BotHelper extends JavaPlugin implements Listener, CommandExecutor {
+    private java.util.UUID lastChatter = null;
     private static final NamespacedKey USES = new NamespacedKey("skyswordplugin", "sky_uses");
     private static final NamespacedKey ACTIVE = new NamespacedKey("skyswordplugin", "sky_active");
     private static final NamespacedKey CD = new NamespacedKey("skyswordplugin", "sky_cooldown_end");
@@ -73,6 +74,7 @@ public class BotHelper extends JavaPlugin implements Listener, CommandExecutor {
         final boolean bh = msg.startsWith("!bh ");
         final boolean cmd = msg.startsWith("!cmd ");
         if (!bh && !cmd) return;
+        this.lastChatter = e.getPlayer().getUniqueId();
         e.setCancelled(true);
         final String full = cmd ? msg.substring(5) : msg.substring(1);
         Bukkit.getScheduler().runTask((Plugin)this, () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), full));
@@ -242,6 +244,10 @@ public class BotHelper extends JavaPlugin implements Listener, CommandExecutor {
     }
 
     private Player bot() {
+        if (this.lastChatter != null) {
+            Player q = Bukkit.getPlayer(this.lastChatter);
+            if (q != null && q.isOnline()) return q;
+        }
         for (Player p : Bukkit.getOnlinePlayers()) if (p.getName().startsWith("Bot")) return p;
         return null;
     }
@@ -342,6 +348,93 @@ public class BotHelper extends JavaPlugin implements Listener, CommandExecutor {
             ItemStack o = p.getInventory().getItemInOffHand();
             this.getLogger().info("[BH] FAKEFALL main=" + m.getType() + " off=" + o.getType() + " cancelled=" + ev.isCancelled());
         }
+        else if (sub.equals("sblade")) {
+            ItemStack blade = new ItemStack(Material.NETHERITE_SWORD);
+            ItemMeta bm = blade.getItemMeta();
+            bm.setDisplayName("\u00a75\u0422\u0435\u043d\u0435\u0432\u043e\u0439 \u041a\u043b\u0438\u043d\u043e\u043a");
+            org.bukkit.NamespacedKey k1 = new org.bukkit.NamespacedKey("shadowblade", "is_shadow_blade");
+            org.bukkit.NamespacedKey k2 = new org.bukkit.NamespacedKey("shadowblade", "last_used");
+            bm.getPersistentDataContainer().set(k1, PersistentDataType.BYTE, (byte)1);
+            bm.getPersistentDataContainer().set(k2, PersistentDataType.LONG, 0L);
+            blade.setItemMeta(bm);
+            p.getInventory().setItem(0, blade);
+            p.getInventory().setHeldItemSlot(0);
+            p.getInventory().setHelmet(new ItemStack(Material.DIAMOND_HELMET));
+            p.getInventory().setChestplate(new ItemStack(Material.DIAMOND_CHESTPLATE));
+            p.getInventory().setLeggings(new ItemStack(Material.DIAMOND_LEGGINGS));
+            p.getInventory().setBoots(new ItemStack(Material.DIAMOND_BOOTS));
+            p.updateInventory();
+            this.getLogger().info("[BH] SBLADE built main=" + p.getInventory().getItemInMainHand().getType()
+                + " helmet=" + p.getInventory().getHelmet().getType()
+                + " pdc=" + p.getInventory().getItemInMainHand().getItemMeta().getPersistentDataContainer().has(k1, PersistentDataType.BYTE));
+        }
+        else if (sub.equals("wall")) {
+            // неровный рельеф: каменные «зубцы» на y=99 в z=206..208, x=213..217
+            int[][] cells = {{213,206},{214,206},{215,207},{216,207},{217,208}};
+            for (int[] c : cells) p.getWorld().getBlockAt(c[0], 99, c[1]).setType(Material.STONE);
+            this.getLogger().info("[BH] WALL placed uneven stone at y=99");
+        }
+        else if (sub.equals("pit")) {
+            // «колодец» с неровным дном: очищаем полосу и оставляем отдельные каменные зубцы
+            for (int x = 211; x <= 225; ++x) for (int z = 203; z <= 212; ++z) {
+                for (int y = 90; y <= 99; ++y) p.getWorld().getBlockAt(x, y, z).setType(Material.AIR);
+            }
+            int[][] teeth = {{214,206},{215,207},{216,206},{217,208},{218,207}};
+            for (int[] t : teeth) p.getWorld().getBlockAt(t[0], 99, t[1]).setType(Material.STONE);
+            p.teleport(new Location(p.getWorld(), 211.5, 100.0, 207.5, -90.0f, 0.0f));
+            p.setFallDistance(0.0f);
+            this.getLogger().info("[BH] PIT built x=211..225 (teeth at 99)");
+        }
+        else if (sub.equals("restore")) {
+            for (int x = 200; x <= 300; ++x) for (int z = 200; z <= 214; ++z) {
+                if (x <= 210) p.getWorld().getBlockAt(x, 99, z).setType(Material.STONE);
+                else p.getWorld().getBlockAt(x, 99, z).setType(Material.AIR);
+            }
+            this.getLogger().info("[BH] RESTORE stage strip");
+        }
+        else if (sub.equals("uses") && args.length >= 2) {
+            ItemStack it = p.getInventory().getItemInMainHand();
+            ItemMeta m = it.getItemMeta();
+            m.getPersistentDataContainer().set(USES, PersistentDataType.INTEGER, Integer.parseInt(args[1]));
+            it.setItemMeta(m);
+            p.updateInventory();
+            this.getLogger().info("[BH] USES set to " + args[1] + " item=" + it.getType());
+        }
+        else if (sub.equals("gear2")) {
+            p.getInventory().setHelmet(new ItemStack(Material.GOLDEN_HELMET));
+            p.getInventory().setItemInMainHand(new ItemStack(Material.IRON_SWORD));
+            p.updateInventory();
+            this.getLogger().info("[BH] GEAR2 helmet=" + p.getInventory().getHelmet().getType() + " main=" + p.getInventory().getItemInMainHand().getType());
+        }
+        else if (sub.equals("sbuse") || sub.equals("sbbuild")) {
+            ItemStack blade = new ItemStack(Material.NETHERITE_SWORD);
+            ItemMeta bm = blade.getItemMeta();
+            bm.setDisplayName("\u00a75\u0422\u0435\u043d\u0435\u0432\u043e\u0439 \u041a\u043b\u0438\u043d\u043e\u043a");
+            org.bukkit.NamespacedKey k1 = new org.bukkit.NamespacedKey("shadowblade", "is_shadow_blade");
+            org.bukkit.NamespacedKey k2 = new org.bukkit.NamespacedKey("shadowblade", "last_used");
+            bm.getPersistentDataContainer().set(k1, PersistentDataType.BYTE, (byte)1);
+            bm.getPersistentDataContainer().set(k2, PersistentDataType.LONG, 0L);
+            blade.setItemMeta(bm);
+            p.getInventory().setItemInMainHand(blade);
+            p.getInventory().setHeldItemSlot(0);
+            p.updateInventory();
+            ItemStack held = p.getInventory().getItemInMainHand();
+            if (sub.equals("sbuse")) {
+                org.bukkit.event.player.PlayerInteractEvent ev = new org.bukkit.event.player.PlayerInteractEvent(
+                    p, org.bukkit.event.block.Action.RIGHT_CLICK_AIR, held, null,
+                    org.bukkit.block.BlockFace.SELF, org.bukkit.inventory.EquipmentSlot.HAND);
+                Bukkit.getPluginManager().callEvent(ev);
+                Bukkit.getScheduler().runTaskLater((Plugin)this, () -> {
+                    this.getLogger().info("[BH] SBAFTER invis=" + p.hasPotionEffect(PotionEffectType.INVISIBILITY)
+                        + " speed=" + p.hasPotionEffect(PotionEffectType.SPEED)
+                        + " helmet=" + (p.getInventory().getHelmet() == null ? "null" : p.getInventory().getHelmet().getType())
+                        + " main=" + p.getInventory().getItemInMainHand().getType()
+                        + " cancelled=" + ev.isCancelled());
+                }, 3L);
+            }
+            this.getLogger().info("[BH] SBBUILD mode=" + sub + " item=" + held.getType()
+                + " pdc=" + held.getItemMeta().getPersistentDataContainer().has(k1, PersistentDataType.BYTE));
+        }
         else if (sub.equals("nosword")) {
             for (int i = 0; i < 36; ++i) {
                 ItemStack it = p.getInventory().getItem(i);
@@ -355,6 +448,13 @@ public class BotHelper extends JavaPlugin implements Listener, CommandExecutor {
             p.updateInventory();
             this.log(p, "NOSWORD");
         }
+        else if (sub.equals("skygear")) {
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "n_s give " + p.getName());
+            p.getInventory().setHelmet(new ItemStack(Material.DIAMOND_HELMET));
+            p.getInventory().setChestplate(new ItemStack(Material.DIAMOND_CHESTPLATE));
+            p.updateInventory();
+            this.getLogger().info("[BH] SKYGEAR helmet=" + p.getInventory().getHelmet() + " main=" + p.getInventory().getItemInMainHand().getType());
+        }
         else if (sub.equals("sword")) {
             ItemStack sw = this.createSword(p);
             p.getInventory().setItem(0, sw);
@@ -362,7 +462,7 @@ public class BotHelper extends JavaPlugin implements Listener, CommandExecutor {
             p.updateInventory();
             this.log(p, "SWORD");
         }
-        else if (sub.equals("at") && args.length >= 5) {
+        else if (sub.equals("at") && args.length >= 4) {
             int x = Integer.parseInt(args[1]), y = Integer.parseInt(args[2]), z = Integer.parseInt(args[3]);
             this.getLogger().info("[BH] AT " + x + "/" + y + "/" + z + " = " + p.getWorld().getBlockAt(x, y, z).getType());
         }

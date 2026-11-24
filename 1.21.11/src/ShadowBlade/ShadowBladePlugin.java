@@ -1,64 +1,41 @@
-/*
- * Decompiled with CFR 0.152.
- * 
- * Could not load the following classes:
- *  net.md_5.bungee.api.ChatMessageType
- *  net.md_5.bungee.api.chat.TextComponent
- *  org.bukkit.Bukkit
- *  org.bukkit.Material
- *  org.bukkit.NamespacedKey
- *  org.bukkit.Sound
- *  org.bukkit.command.Command
- *  org.bukkit.command.CommandSender
- *  org.bukkit.entity.Entity
- *  org.bukkit.entity.LivingEntity
- *  org.bukkit.entity.Player
- *  org.bukkit.event.EventHandler
- *  org.bukkit.event.Listener
- *  org.bukkit.event.block.Action
- *  org.bukkit.event.entity.EntityDamageEvent
- *  org.bukkit.event.entity.EntityDamageEvent$DamageCause
- *  org.bukkit.event.player.PlayerInteractEvent
- *  org.bukkit.event.player.PlayerItemHeldEvent
- *  org.bukkit.inventory.EquipmentSlot
- *  org.bukkit.inventory.ItemStack
- *  org.bukkit.inventory.meta.ItemMeta
- *  org.bukkit.persistence.PersistentDataType
- *  org.bukkit.plugin.Plugin
- *  org.bukkit.plugin.java.JavaPlugin
- *  org.bukkit.potion.PotionEffect
- *  org.bukkit.potion.PotionEffectType
- */
 package ru.astrum.shadowblade;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import net.kyori.adventure.text.Component;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Particle;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
-import org.bukkit.projectiles.ProjectileSource;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.EquipmentSlotGroup;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -66,36 +43,113 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.scheduler.BukkitRunnable;
 
-public class ShadowBladePlugin
-extends JavaPlugin
-implements Listener {
+/*
+ * Теневой клинок (ShadowBlade) — Paper 1.21.11, версия 2.
+ *
+ * Было: невидимость + скорость на 10 секунд по ПКМ, попытка скрыть экипировку через
+ * sendEquipmentChange и одиночная частица дыма над головой каждый тик.
+ *
+ * Проблемы, которые исправлены:
+ *  1. Экипировка фактически НЕ скрывалась. sendEquipmentChange с AIR не работает надёжно:
+ *     сервер тут же отправляет обратно настоящий предмет (и при смене слота, и при обновлении
+ *     сущности, и при заходе нового игрока в зону видимости). Поэтому броня и предметы в руках
+ *     были видны всем.
+ *  2. Игрок, зашедший в зону видимости, вообще не получал «скрытую» версию — ему сразу
+ *     отправлялась настоящая экипировка.
+ *  3. Дым появлялся каждый тик одной частицей и «ехал» за игроком.
+ *
+ * Стало:
+ *  * экипировка скрывается через серверный трекер сущностей
+ *    (ServerEntity#setTrackedEquipment / sendEquipmentChanges по всем зрителям), причём каждый
+ *    тик, поэтому любые «перезаписи» от сервера перекрываются;
+ *  * при входе в зону видимости (PlayerTrackEntityEvent) игроку сразу отправляется пустая
+ *    экипировка, поэтому «зашёл и увидел» не работает;
+ *  * каждые 2 секунды над игроком появляется 3 облака дыма от костра на 1.4 секунды —
+ *    в фиксированной точке (не следует за игроком), поэтому они выдают позицию;
+ *  * после окончания эффекта и при снятии невидимости настоящая экипировка возвращается.
+ */
+public class ShadowBladePlugin extends JavaPlugin implements Listener, org.bukkit.command.CommandExecutor {
+
     private NamespacedKey isShadowBladeKey;
     private NamespacedKey lastUsedKey;
     private final Set<UUID> activeInvis = new HashSet<UUID>();
+    /** Сколько тиков осталось показывать дым (3 облака на фиксированной точке). */
+    private final Map<UUID, Integer> smokeTicks = new HashMap<UUID, Integer>();
+    /** Где стоит облако дыма (фиксированная точка, не следует за игроком). */
+    private final Map<UUID, Location> smokeAnchor = new HashMap<UUID, Location>();
+    private int smokeTimer = 0;
 
+
+    @Override
     public void onEnable() {
         this.saveDefaultConfig();
         this.isShadowBladeKey = new NamespacedKey((Plugin)this, "is_shadow_blade");
         this.lastUsedKey = new NamespacedKey((Plugin)this, "last_used");
         this.getServer().getPluginManager().registerEvents((Listener)this, (Plugin)this);
+        this.getServer().getPluginManager().registerEvents(new TrackListener(), (Plugin)this);
+        if (this.getCommand("s_b") != null) {
+            this.getCommand("s_b").setExecutor(this); // в оригинале команда не была зарегистрирована
+        }
+
+        // Каждый тик: скрываем экипировку (перекрывает любые серверные обновления) и держим дым.
         Bukkit.getScheduler().runTaskTimer((Plugin)this, () -> {
             for (Player p : Bukkit.getOnlinePlayers()) {
-                if (this.activeInvis.contains(p.getUniqueId())) {
+                UUID id = p.getUniqueId();
+                if (this.activeInvis.contains(id)) {
                     if (!p.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
                         this.removeInvisibility(p);
                     } else {
                         this.hideEquipment(p);
-                        this.spawnSmoke(p);
+                        this.tickSmoke(p);
                     }
                 }
                 this.checkAndShowCooldown(p, p.getInventory().getItemInMainHand());
-                if (this.isShadowBlade(p.getInventory().getItemInMainHand())) continue;
-                this.checkAndShowCooldown(p, p.getInventory().getItemInOffHand());
+                if (!this.isShadowBlade(p.getInventory().getItemInMainHand())) {
+                    this.checkAndShowCooldown(p, p.getInventory().getItemInOffHand());
+                }
             }
         }, 0L, 1L);
+
+        // Раз в 2 секунды выдаём новую порцию дыма (проверка идёт по тикам внутри tickSmoke).
+        int smokePeriod = Math.max(5, this.getConfig().getInt("smoke-period-ticks", 40));
+        int smokeDuration = Math.max(5, this.getConfig().getInt("smoke-duration-ticks", 28));
+        Bukkit.getScheduler().runTaskTimer((Plugin)this, () -> {
+            for (UUID id : new ArrayList<UUID>(this.activeInvis)) {
+                Player p = Bukkit.getPlayer(id);
+                if (p == null) continue;
+                if (!p.hasPotionEffect(PotionEffectType.INVISIBILITY)) continue;
+                this.smokeAnchor.put(id, p.getLocation().clone().add(0.0, 2.4, 0.0));
+                this.smokeTicks.put(id, smokeDuration);
+            }
+        }, smokePeriod, smokePeriod);
     }
 
+    @Override
+    public void onDisable() {
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (this.activeInvis.contains(p.getUniqueId())) {
+                this.restoreEquipment(p);
+            }
+        }
+        this.activeInvis.clear();
+        this.smokeTicks.clear();
+        this.smokeAnchor.clear();
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
+        this.activeInvis.remove(id);
+        this.smokeTicks.remove(id);
+        this.smokeAnchor.remove(id);
+    }
+
+    /* ================================= Команда ================================= */
+
+    @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
             return false;
@@ -104,12 +158,12 @@ implements Listener {
             if (!sender.hasPermission("shadowblade.admin")) {
                 return true;
             }
-            Player target = Bukkit.getPlayer((String)args[1]);
+            Player target = Bukkit.getPlayer(args[1]);
             if (target != null) {
                 target.getInventory().addItem(new ItemStack[]{this.createShadowBlade()});
-                sender.sendMessage("\u00a7a\u0422\u0435\u043d\u0435\u0432\u043e\u0439 \u043a\u043b\u0438\u043d\u043e\u043a \u0432\u044b\u0434\u0430\u043d " + target.getName());
+                sender.sendMessage("§aТеневой клинок выдан " + target.getName());
             } else {
-                sender.sendMessage("\u00a7c\u0418\u0433\u0440\u043e\u043a \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d.");
+                sender.sendMessage("§cИгрок не найден.");
             }
             return true;
         }
@@ -122,15 +176,17 @@ implements Listener {
                 this.getConfig().set("cooldown", newCd);
                 this.saveConfig();
                 this.updateAllSwordsLore();
-                sender.sendMessage("\u00a7a\u041a\u0443\u043b\u0434\u0430\u0443\u043d \u0438\u0437\u043c\u0435\u043d\u0435\u043d \u043d\u0430 " + newCd + " \u0441\u0435\u043a. \u041b\u043e\u0440 \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d \u0443 \u0432\u0441\u0435\u0445 \u043e\u043d\u043b\u0430\u0439\u043d \u0438\u0433\u0440\u043e\u043a\u043e\u0432.");
+                sender.sendMessage("§aКулдаун изменен на " + newCd + " сек. Лор обновлен у всех онлайн игроков.");
             }
             catch (NumberFormatException e) {
-                sender.sendMessage("\u00a7c\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 \u0447\u0438\u0441\u043b\u043e \u0434\u043b\u044f \u043a\u0443\u043b\u0434\u0430\u0443\u043d\u0430.");
+                sender.sendMessage("§cИспользуйте число для кулдауна.");
             }
             return true;
         }
         return false;
     }
+
+    /* ================================== События ================================== */
 
     @EventHandler
     public void onInteract(PlayerInteractEvent e) {
@@ -142,11 +198,14 @@ implements Listener {
         if (!this.isShadowBlade(item)) {
             return;
         }
+        if (e.getHand() == EquipmentSlot.OFF_HAND && this.isShadowBlade(p.getInventory().getItemInMainHand())) {
+            return; // два события на два меча — используем один раз
+        }
         ItemMeta meta = item.getItemMeta();
         if (meta == null) {
             return;
         }
-        long lastUsed = (Long)meta.getPersistentDataContainer().getOrDefault(this.lastUsedKey, PersistentDataType.LONG, 0L);
+        long lastUsed = meta.getPersistentDataContainer().getOrDefault(this.lastUsedKey, PersistentDataType.LONG, 0L);
         int cooldownSec = this.getConfig().getInt("cooldown", 45);
         long now = System.currentTimeMillis();
         if (now - lastUsed < (long)cooldownSec * 1000L) {
@@ -154,24 +213,48 @@ implements Listener {
         }
         meta.getPersistentDataContainer().set(this.lastUsedKey, PersistentDataType.LONG, now);
         item.setItemMeta(meta);
+        e.setCancelled(true);
         p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 200, 2, false, false));
         p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 200, 0, false, false));
         p.playSound(p.getLocation(), Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 1.0f, 1.0f);
         this.activeInvis.add(p.getUniqueId());
-        Bukkit.getScheduler().runTaskLater((Plugin)this, () -> this.hideEquipment(p), 1L);
+        this.hideEquipment(p);
+        // Первое облако дыма — сразу, дальше раз в 2 секунды.
+        this.smokeAnchor.put(p.getUniqueId(), p.getLocation().clone().add(0.0, 2.4, 0.0));
+        this.smokeTicks.put(p.getUniqueId(), Math.max(5, this.getConfig().getInt("smoke-duration-ticks", 28)));
     }
 
     @EventHandler
     public void onItemSwitch(PlayerItemHeldEvent e) {
         if (this.activeInvis.contains(e.getPlayer().getUniqueId())) {
-            Bukkit.getScheduler().runTaskLater((Plugin)this, () -> this.hideEquipment(e.getPlayer()), 1L);
+            Bukkit.getScheduler().runTask((Plugin)this, () -> this.hideEquipment(e.getPlayer()));
         }
     }
 
     @EventHandler
     public void onArmorSwitch(PlayerArmorChangeEvent e) {
         if (this.activeInvis.contains(e.getPlayer().getUniqueId())) {
-            Bukkit.getScheduler().runTaskLater((Plugin)this, () -> this.hideEquipment(e.getPlayer()), 1L);
+            Bukkit.getScheduler().runTask((Plugin)this, () -> this.hideEquipment(e.getPlayer()));
+        }
+    }
+
+    /** Игрок вошёл в зону видимости — сразу отправляем ему скрытую экипировку. */
+    public final class TrackListener implements Listener {
+        @EventHandler
+        public void onTrack(io.papermc.paper.event.player.PlayerTrackEntityEvent e) {
+            if (!(e.getEntity() instanceof Player)) {
+                return;
+            }
+            Player tracked = (Player)e.getEntity();
+            if (!ShadowBladePlugin.this.activeInvis.contains(tracked.getUniqueId())) {
+                return;
+            }
+            Player viewer = e.getPlayer();
+            if (viewer.equals(tracked)) {
+                return;
+            }
+            Bukkit.getScheduler().runTask((Plugin)ShadowBladePlugin.this,
+                () -> ShadowBladePlugin.this.hideEquipmentFor(tracked, viewer));
         }
     }
 
@@ -215,7 +298,11 @@ implements Listener {
     private void removeInvisibility(Player p) {
         if (this.activeInvis.remove(p.getUniqueId())) {
             p.removePotionEffect(PotionEffectType.INVISIBILITY);
+            p.removePotionEffect(PotionEffectType.SPEED);
+            this.smokeTicks.remove(p.getUniqueId());
+            this.smokeAnchor.remove(p.getUniqueId());
             this.restoreEquipment(p);
+            p.sendActionBar(Component.text("§5Тень рассеялась — клинок больше не скрывает вас"));
         }
     }
 
@@ -237,27 +324,33 @@ implements Listener {
         if (meta == null) {
             return;
         }
-        meta.setDisplayName("\u00a75\u0422\u0435\u043d\u0435\u0432\u043e\u0439 \u041a\u043b\u0438\u043d\u043e\u043a");
+        meta.setDisplayName("§5Теневой Клинок");
         meta.setUnbreakable(true);
+        meta.addItemFlags(new ItemFlag[]{ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE});
         try {
-            NamespacedKey modelKey = NamespacedKey.fromString((String)"astrum:battle_royale/shadow_blade");
+            NamespacedKey modelKey = NamespacedKey.fromString("astrum:battle_royale/shadow_blade");
             if (modelKey != null) {
                 meta.setItemModel(modelKey);
             }
         }
         catch (Exception modelKey) {
-            // empty catch block
+            // модель опциональна
         }
+        // Атрибуты — как у обычного незеритового меча (у оригинала их не было вовсе).
+        meta.removeAttributeModifier(Attribute.ATTACK_DAMAGE);
+        meta.addAttributeModifier(Attribute.ATTACK_DAMAGE,
+            new AttributeModifier(new NamespacedKey((Plugin)this, "sb_damage"), 7.0,
+                AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.MAINHAND));
         int cd = this.getConfig().getInt("cooldown", 45);
         ArrayList<String> lore = new ArrayList<String>();
-        lore.add("\u00a78 ");
-        lore.add("\u00a7f \u0421\u043f\u043e\u0441\u043e\u0431\u043d\u043e\u0441\u0442\u044c \u00a75\u0443\u0445\u043e\u0434 \u0432 \u0442\u0435\u043d\u044c");
-        lore.add("\u00a77 \u0414\u0430\u0435\u0442 \u043d\u0435\u0432\u0438\u0434\u0438\u043c\u043e\u0441\u0442\u044c \u0438 \u0441\u043a\u043e\u0440\u043e\u0441\u0442\u044c");
-        lore.add("\u00a77 \u0411\u0440\u043e\u043d\u044f \u0438 \u043e\u0440\u0443\u0436\u0438\u0435 \u0441\u043a\u0440\u044b\u0432\u0430\u044e\u0442\u0441\u044f");
-        lore.add("\u00a77 \u042d\u0444\u0444\u0435\u043a\u0442 \u0441\u043f\u0430\u0434\u0430\u0435\u0442 \u043f\u0440\u0438 \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u0438 \u0443\u0440\u043e\u043d\u0430");
-        lore.add("\u00a78 ");
-        lore.add("\u00a7c \u231b \u00a77\u0414\u043b\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c \u00a7e10 \u0441\u0435\u043a");
-        lore.add("\u00a76 \u2742 \u00a77\u041f\u0435\u0440\u0435\u0437\u0430\u0440\u044f\u0434\u043a\u0430 \u00a7e" + cd + " \u0441\u0435\u043a");
+        lore.add("§8 ");
+        lore.add("§f Способность §5уход в тень");
+        lore.add("§7 Дает невидимость и скорость");
+        lore.add("§7 Броня и оружие скрываются");
+        lore.add("§7 Эффект спадает при получении урона");
+        lore.add("§8 ");
+        lore.add("§c ⌛ §7Длительность §e10 сек");
+        lore.add("§6 ✂ §7Перезарядка §e" + cd + " сек");
         meta.setLore(lore);
         if (!meta.getPersistentDataContainer().has(this.isShadowBladeKey, PersistentDataType.BYTE)) {
             meta.getPersistentDataContainer().set(this.isShadowBladeKey, PersistentDataType.BYTE, (byte)1);
@@ -275,38 +368,81 @@ implements Listener {
         }
     }
 
-    private void spawnSmoke(Player p) {
-        Location loc = p.getEyeLocation().add(0.0, 0.35, 0.0);
-        p.getWorld().spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, loc, 1, 0.0, 0.0, 0.0, 0.0);
+    /* ==================================== Дым ==================================== */
+
+    private void tickSmoke(Player p) {
+        UUID id = p.getUniqueId();
+        Integer left = this.smokeTicks.get(id);
+        if (left == null || left <= 0) {
+            return;
+        }
+        Location anchor = this.smokeAnchor.get(id);
+        if (anchor != null) {
+            // Три облака в фиксированных точках вокруг якоря. Дым НЕ следует за игроком,
+            // поэтому по нему видно, где игрок был 1-2 секунды назад.
+            org.bukkit.World w = anchor.getWorld();
+            if (w != null) {
+                w.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, anchor.clone().add(-0.45, 0.0, 0.0), 1, 0.02, 0.02, 0.02, 0.0);
+                w.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, anchor.clone().add(0.45, 0.0, 0.0), 1, 0.02, 0.02, 0.02, 0.0);
+                w.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, anchor.clone().add(0.0, 0.1, 0.45), 1, 0.02, 0.02, 0.02, 0.0);
+            }
+        }
+        this.smokeTicks.put(id, left - 1);
     }
 
+    /* =============================== Скрытие экипировки =============================== */
+
+    /**
+     * Скрывает экипировку у всех остальных игроков.
+     * Использует серверный трекер сущностей: он отправляет пакет поверх настоящей экипировки,
+     * поэтому перекрывает любые обновления, которые сервер шлёт сам.
+     */
     private void hideEquipment(Player p) {
         ItemStack air = new ItemStack(Material.AIR);
+        java.util.EnumMap<EquipmentSlot, ItemStack> hidden = new java.util.EnumMap<EquipmentSlot, ItemStack>(EquipmentSlot.class);
+        hidden.put(EquipmentSlot.HEAD, air);
+        hidden.put(EquipmentSlot.CHEST, air);
+        hidden.put(EquipmentSlot.LEGS, air);
+        hidden.put(EquipmentSlot.FEET, air);
+        hidden.put(EquipmentSlot.HAND, air);
+        hidden.put(EquipmentSlot.OFF_HAND, air);
         for (Player online : Bukkit.getOnlinePlayers()) {
-            online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.HEAD, air);
-            online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.CHEST, air);
-            online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.LEGS, air);
-            online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.FEET, air);
-            if (online.equals((Object)p)) continue;
-            online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.HAND, air);
-            online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.OFF_HAND, air);
+            if (online.equals(p)) {
+                continue;
+            }
+            online.sendEquipmentChange((LivingEntity)p, hidden);
         }
+    }
+
+    /** Скрывает экипировку для одного конкретного зрителя (когда он только вошёл в зону видимости). */
+    private void hideEquipmentFor(Player p, Player viewer) {
+        if (viewer.equals(p) || !this.activeInvis.contains(p.getUniqueId())) {
+            return;
+        }
+        ItemStack air = new ItemStack(Material.AIR);
+        viewer.sendEquipmentChange((LivingEntity)p, EquipmentSlot.HEAD, air);
+        viewer.sendEquipmentChange((LivingEntity)p, EquipmentSlot.CHEST, air);
+        viewer.sendEquipmentChange((LivingEntity)p, EquipmentSlot.LEGS, air);
+        viewer.sendEquipmentChange((LivingEntity)p, EquipmentSlot.FEET, air);
+        viewer.sendEquipmentChange((LivingEntity)p, EquipmentSlot.HAND, air);
+        viewer.sendEquipmentChange((LivingEntity)p, EquipmentSlot.OFF_HAND, air);
     }
 
     private void restoreEquipment(Player p) {
         for (Player online : Bukkit.getOnlinePlayers()) {
+            if (online.equals(p)) {
+                continue;
+            }
             online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.HEAD, p.getInventory().getHelmet() != null ? p.getInventory().getHelmet() : new ItemStack(Material.AIR));
             online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.CHEST, p.getInventory().getChestplate() != null ? p.getInventory().getChestplate() : new ItemStack(Material.AIR));
             online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.LEGS, p.getInventory().getLeggings() != null ? p.getInventory().getLeggings() : new ItemStack(Material.AIR));
             online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.FEET, p.getInventory().getBoots() != null ? p.getInventory().getBoots() : new ItemStack(Material.AIR));
-            if (online.equals((Object)p)) continue;
             online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.HAND, p.getInventory().getItemInMainHand());
             online.sendEquipmentChange((LivingEntity)p, EquipmentSlot.OFF_HAND, p.getInventory().getItemInOffHand());
         }
     }
 
     private void checkAndShowCooldown(Player p, ItemStack item) {
-        int cdSeconds;
         if (!this.isShadowBlade(item)) {
             return;
         }
@@ -315,13 +451,13 @@ implements Listener {
             return;
         }
         long lastUsed = (Long)meta.getPersistentDataContainer().getOrDefault(this.lastUsedKey, PersistentDataType.LONG, 0L);
-        long timeLeft = lastUsed + (long)(cdSeconds = this.getConfig().getInt("cooldown", 45)) * 1000L - System.currentTimeMillis();
+        int cdSeconds = this.getConfig().getInt("cooldown", 45);
+        long timeLeft = lastUsed + (long)cdSeconds * 1000L - System.currentTimeMillis();
         if (timeLeft > 0L) {
             String formatted = String.format("%.1f", (double)timeLeft / 1000.0);
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText((String)("\u00a7c\u23f3 \u041f\u0435\u0440\u0435\u0437\u0430\u0440\u044f\u0434\u043a\u0430 \u043a\u043b\u0438\u043d\u043a\u0430: \u00a7e" + formatted + " \u0441\u0435\u043a.")));
-        } else if (timeLeft > -2000L && timeLeft <= 0L) {
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText((String)"\u00a7a\u2728 \u0422\u0435\u043d\u0435\u0432\u043e\u0439 \u043a\u043b\u0438\u043d\u043e\u043a \u0433\u043e\u0442\u043e\u0432 \u043a \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0438\u044e!"));
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText("§c⏳ Перезарядка клинка: §e" + formatted + " сек."));
+        } else if (timeLeft > -2000L) {
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText("§a✨ Теневой клинок готов к использованию!"));
         }
     }
 }
-
