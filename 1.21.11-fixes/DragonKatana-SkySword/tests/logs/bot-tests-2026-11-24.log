@@ -1,0 +1,106 @@
+[17:24:48] [BotHelper] [BH] *** FALL T1 maxY=64.36 pos=226.70/64.36/207.30 ground=false health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=-1 active=-1 velY=0.00
+[17:24:50] [BotHelper] [BH] SUMMARY t=40 maxY=64.36 health=20.00 fell=true peakSnow=0 jumps=101 pos=226.70/64.00/207.30 ground=false health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=-1 active=-1 velY=0.28
+[17:24:51] [BotHelper] [BH] STAGE READY (start 205.5/100/207.5, walk +x, edge at x=211) swordSlot=1 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:24:52] [BotHelper] [BH] SUMMARY t=40 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:24:53] [BotHelper] [BH] DAMAGE cause=FALL amount=10.00 cancelled=false health=20.00 difficulty=HARD
+[17:24:53] [BotHelper] [BH] FAKEFALL main=DIAMOND_SWORD off=AIR cancelled=true
+[17:24:54] [BotHelper] [BH] SUMMARY t=80 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:24:56] [BotHelper] [BH] SUMMARY t=120 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:24:57] [BotHelper] [BH] DAMAGE cause=FALL amount=10.00 cancelled=false health=20.00 difficulty=HARD
+[17:24:57] [BotHelper] [BH] FAKEFALL main=AIR off=DIAMOND_SWORD cancelled=true
+[17:24:58] [BotHelper] [BH] SUMMARY t=160 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:25:00] [BotHelper] [BH] SUMMARY t=200 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=-1 active=-1 velY=-0.08
+[17:25:02] [BotHelper] [BH] DAMAGE cause=FALL amount=10.00 cancelled=false health=20.00 difficulty=HARD
+[17:25:02] [BotHelper] [BH] FAKEFALL main=AIR off=AIR cancelled=false
+[17:25:02] [BotHelper] [BH] SUMMARY t=240 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=-1 active=-1 velY=-0.08
+[17:25:09] [BotHelper] [BH] SUMMARY t=280 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=-1 active=-1 velY=-0.08
+[17:25:11] [BotHelper] [BH] STAGE READY (start 205.5/100/207.5, walk +x, edge at x=211) swordSlot=0 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:25:12] [BotHelper] [BH] SUMMARY t=40 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:25:13] [BotHelper] [BH] world snow strip placed 214..222/99/206..208
+[17:25:13] [BotHelper] [BH] CMD bh args=[eff]
+[17:25:14] [BotHelper] [BH] SUMMARY t=80 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=211.07/100.00/207.50 ground=true health=20.00 under=AIR at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:25:16] [BotHelper] [BH] SUMMARY t=120 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=219.70/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=15 snow2=0 uses=18 active=1 velY=-0.08
+[17:25:17] [BotHelper] [BH] MAP y=99 z=207 ###########SSSSSSSSSSSS....................................................................
+[17:25:18] [BotHelper] [BH] SUMMARY t=160 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=228.34/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=15 active=1 velY=-0.08
+[17:25:20] [BotHelper] [BH] SUMMARY t=200 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=236.76/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=11 active=1 velY=-0.08
+[17:25:21] [BotHelper] [BH] MAP y=99 z=207 ###########...SSSSSSSSSSSSSSSSSSSSSSSSSSS..................................................
+[17:25:22] [BotHelper] [BH] MANUAL pos=242.15/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=8 active=1 velY=-0.08
+[17:25:22] [BotHelper] [BH] SUMMARY t=240 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=245.61/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=12 snow2=0 uses=6 active=1 velY=-0.08
+[17:25:24] [BotHelper] [BH] SUMMARY t=280 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=246.08/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=6 active=1 velY=-0.08
+[17:25:26] [BotHelper] [BH] SUMMARY t=320 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=246.08/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=6 active=1 velY=-0.08
+[17:25:28] [BotHelper] [BH] SUMMARY t=360 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=246.08/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=5 active=1 velY=-0.08
+[17:25:30] [BotHelper] [BH] SUMMARY t=400 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=246.08/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=5 active=1 velY=-0.08
+[17:25:39] [BotHelper] [BH] SUMMARY t=440 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=246.08/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=4 active=1 velY=-0.08
+[17:25:41] [BotHelper] [BH] STAGE READY (start 205.5/100/207.5, walk +x, edge at x=211) swordSlot=0 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:25:42] [BotHelper] [BH] SUMMARY t=40 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:25:42] [BotHelper] [BH] CMD bh args=[eff]
+[17:25:44] [BotHelper] [BH] SUMMARY t=80 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=210.85/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:25:44] [BotHelper] [BH] MAP y=99 z=207 ###########SSSS............................................................................
+[17:25:45] [BotHelper] [BH] MANUAL pos=218.62/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=16 active=1 velY=-0.08
+[17:25:46] [BotHelper] [BH] SUMMARY t=120 maxY=100.00 health=20.00 fell=false peakSnow=12 jumps=101 pos=219.70/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=12 snow2=0 uses=15 active=1 velY=-0.08
+[17:25:48] [BotHelper] [BH] SUMMARY t=160 maxY=100.00 health=20.00 fell=false peakSnow=12 jumps=101 pos=228.12/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=11 active=1 velY=-0.08
+[17:25:50] [BotHelper] [BH] SUMMARY t=200 maxY=100.00 health=20.00 fell=false peakSnow=12 jumps=101 pos=236.76/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=7 active=1 velY=-0.08
+[17:25:51] [BotHelper] [BH] MAP y=99 z=207 ###########..........SSSSSSSSSSSSSSSSSSSSSS................................................
+[17:25:51] [BotHelper] [BH] MANUAL pos=244.53/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=3 active=1 velY=-0.08
+[17:25:52] [BotHelper] [BH] SUMMARY t=240 maxY=100.00 health=20.00 fell=false peakSnow=12 jumps=101 pos=245.39/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=12 snow2=0 uses=2 active=1 velY=-0.08
+[17:25:53] [BotHelper] [BH] *** FALL T272 maxY=100.00 pos=252.08/99.23/207.50 ground=false health=20.00 under=AIR at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.38
+[17:25:54] [BotHelper] [BH] SUMMARY t=280 maxY=100.00 health=20.00 fell=true peakSnow=12 jumps=101 pos=253.29/94.31/207.50 ground=false health=20.00 under=AIR at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.91
+[17:25:55] [BotHelper] [BH] DAMAGE cause=FALL amount=30.00 cancelled=false health=20.00 difficulty=HARD
+[17:25:56] [BotHelper] [BH] SUMMARY t=320 maxY=100.00 health=20.00 fell=true peakSnow=12 jumps=101 pos=254.33/67.00/207.50 ground=true health=20.00 under=OAK_LEAVES at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:25:58] [BotHelper] [BH] SUMMARY t=360 maxY=100.00 health=20.00 fell=true peakSnow=12 jumps=101 pos=254.33/67.00/207.50 ground=true health=20.00 under=OAK_LEAVES at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:26:00] [BotHelper] [BH] SUMMARY t=400 maxY=100.00 health=20.00 fell=true peakSnow=12 jumps=101 pos=254.33/67.00/207.50 ground=true health=20.00 under=OAK_LEAVES at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:26:02] [BotHelper] [BH] SUMMARY t=440 maxY=100.00 health=20.00 fell=true peakSnow=12 jumps=101 pos=254.33/67.00/207.50 ground=true health=20.00 under=OAK_LEAVES at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:26:07] [BotHelper] [BH] SUMMARY t=480 maxY=100.00 health=20.00 fell=true peakSnow=12 jumps=101 pos=254.33/67.00/207.50 ground=true health=20.00 under=OAK_LEAVES at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:26:09] [BotHelper] [BH] STAGE READY (start 205.5/100/207.5, walk +x, edge at x=211) swordSlot=0 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:26:10] [BotHelper] [BH] SUMMARY t=40 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:26:11] [BotHelper] [BH] MAP y=99 z=207 ###########................................................................................
+[17:26:12] [BotHelper] [BH] SUMMARY t=80 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:26:14] [BotHelper] [BH] SUMMARY t=120 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:26:16] [BotHelper] [BH] SUMMARY t=160 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:26:17] [BotHelper] [BH] MAP y=99 z=207 ###########................................................................................
+[17:26:17] [BotHelper] [BH] MANUAL pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:26:18] [BotHelper] [BH] SUMMARY t=200 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:26:20] [BotHelper] [BH] SUMMARY t=240 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:26:22] [BotHelper] [BH] SUMMARY t=280 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:26:24] [BotHelper] [BH] SUMMARY t=320 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:26:30] [BotHelper] [BH] SUMMARY t=360 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=1 velY=-0.08
+[17:26:32] [BotHelper] [BH] STAGE READY (start 205.5/100/207.5, walk +x, edge at x=211) swordSlot=0 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:26:33] [BotHelper] [BH] SUMMARY t=40 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:26:33] [BotHelper] [BH] world snow strip placed 214..222/99/206..208
+[17:26:34] [BotHelper] [BH] CMD bh args=[eff]
+[17:26:35] [BotHelper] [BH] MAP y=99 z=207 ###########...SSSSSSSSS....................................................................
+[17:26:35] [BotHelper] [BH] SUMMARY t=80 maxY=100.00 health=20.00 fell=false peakSnow=6 jumps=101 pos=211.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=6 snow2=0 uses=19 active=1 velY=-0.08
+[17:26:36] [BotHelper] [BH] MANUAL pos=215.39/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=15 snow2=0 uses=18 active=1 velY=-0.08
+[17:26:37] [BotHelper] [BH] SUMMARY t=120 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=220.13/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=15 snow2=0 uses=18 active=1 velY=-0.08
+[17:26:39] [BotHelper] [BH] SUMMARY t=160 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=228.55/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=15 active=1 velY=-0.08
+[17:26:41] [BotHelper] [BH] SUMMARY t=200 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=237.40/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=12 snow2=0 uses=10 active=1 velY=-0.08
+[17:26:42] [BotHelper] [BH] MAP y=99 z=207 ###########...SSSSSSSSSSSSSSSSSSSSSSSSSSSSS................................................
+[17:26:42] [BotHelper] [BH] MANUAL pos=243.45/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=12 snow2=0 uses=7 active=1 velY=-0.08
+[17:26:43] [BotHelper] [BH] SUMMARY t=240 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=244.14/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=7 active=1 velY=-0.08
+[17:26:45] [BotHelper] [BH] SUMMARY t=280 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=244.14/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=7 active=1 velY=-0.08
+[17:26:47] [BotHelper] [BH] SUMMARY t=320 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=244.14/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=6 snow2=0 uses=7 active=1 velY=-0.08
+[17:26:49] [BotHelper] [BH] SUMMARY t=360 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=244.14/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=6 active=1 velY=-0.08
+[17:26:56] [BotHelper] [BH] SUMMARY t=400 maxY=100.00 health=20.00 fell=false peakSnow=15 jumps=101 pos=244.14/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=5 active=1 velY=-0.08
+[17:26:58] [BotHelper] [BH] STAGE READY (start 205.5/100/207.5, walk +x, edge at x=211) swordSlot=0 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:26:59] [BotHelper] [BH] SUMMARY t=40 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:27:00] [BotHelper] [BH] MANUAL pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=19 active=1 velY=-0.08
+[17:27:01] [BotHelper] [BH] MANUAL pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=19 active=1 velY=-0.08
+[17:27:01] [BotHelper] [BH] SUMMARY t=80 maxY=100.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=19 active=1 velY=-0.08
+[17:27:03] [BotHelper] [BH] SUMMARY t=120 maxY=100.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=19 active=1 velY=-0.08
+[17:27:05] [BotHelper] [BH] SUMMARY t=160 maxY=100.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=18 active=1 velY=-0.08
+[17:27:06] [BotHelper] [BH] MANUAL pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=18 active=1 velY=-0.08
+[17:27:07] [BotHelper] [BH] SUMMARY t=200 maxY=100.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=18 active=1 velY=-0.08
+[17:27:09] [BotHelper] [BH] SUMMARY t=240 maxY=100.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=18 active=1 velY=-0.08
+[17:27:11] [BotHelper] [BH] SUMMARY t=280 maxY=100.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=17 active=1 velY=-0.08
+[17:27:13] [BotHelper] [BH] SUMMARY t=320 maxY=100.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=17 active=1 velY=-0.08
+[17:27:18] [BotHelper] [BH] SUMMARY t=360 maxY=100.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=230.50/100.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=16 active=1 velY=-0.08
+[17:27:20] [BotHelper] [BH] STAGE READY (start 205.5/100/207.5, walk +x, edge at x=211) swordSlot=0 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:27:21] [BotHelper] [BH] SUMMARY t=40 maxY=100.00 health=20.00 fell=false peakSnow=0 jumps=101 pos=205.50/100.00/207.50 ground=true health=20.00 under=STONE at=AIR snowUnder=0 snow2=0 uses=20 active=0 velY=-0.08
+[17:27:23] [BotHelper] [BH] SUMMARY t=80 maxY=106.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=232.50/106.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=19 active=1 velY=-0.08
+[17:27:25] [BotHelper] [BH] SUMMARY t=120 maxY=106.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=232.50/106.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=19 active=1 velY=-0.08
+[17:27:27] [BotHelper] [BH] SUMMARY t=160 maxY=106.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=232.50/106.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=18 active=1 velY=-0.08
+[17:27:29] [BotHelper] [BH] SUMMARY t=200 maxY=106.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=232.50/106.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=18 active=1 velY=-0.08
+[17:27:31] [BotHelper] [BH] SUMMARY t=240 maxY=106.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=232.50/106.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=18 active=1 velY=-0.08
+[17:27:33] [BotHelper] [BH] SUMMARY t=280 maxY=106.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=232.50/106.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=17 active=1 velY=-0.08
+[17:27:35] [BotHelper] [BH] SUMMARY t=320 maxY=106.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=232.50/106.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=17 active=1 velY=-0.08
+[17:27:37] [BotHelper] [BH] SUMMARY t=360 maxY=106.00 health=20.00 fell=false peakSnow=9 jumps=101 pos=232.50/106.00/207.50 ground=true health=20.00 under=SNOW_BLOCK at=AIR snowUnder=9 snow2=0 uses=16 active=1 velY=-0.08
