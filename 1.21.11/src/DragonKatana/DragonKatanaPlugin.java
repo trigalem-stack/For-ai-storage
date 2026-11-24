@@ -38,6 +38,8 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.block.BlockFace;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -204,6 +206,9 @@ CommandExecutor {
         if (dest == null) {
             return;
         }
+        if (dest.distanceSquared(p.getLocation()) < 1.0) {
+            return;
+        }
         if (this.needsSneak(p.getWorld(), dest)) {
             p.setSneaking(true);
             p.setPose(org.bukkit.entity.Pose.SNEAKING);
@@ -228,33 +233,97 @@ CommandExecutor {
     }
 
     private Location findTeleportSpot(Player p) {
-        Location eye = p.getEyeLocation();
+        return this.computeDestination(p.getWorld(), p.getEyeLocation());
+    }
+
+    /*
+     * Destination for a blink along the eye direction (up to 15 blocks):
+     *  - no block hit   -> 15 blocks ahead, feet = eye - eyeHeight (1.62), then settled onto the surface below;
+     *  - top face hit   -> stand on top of the hit block;
+     *  - bottom face    -> stand under the hit block (feet 1.8 below its bottom);
+     *  - side face      -> stand in the column in front of the face. The feet go on the floor of that
+     *                      column when the hit point is at most eyeHeight + 1 above it (looking at a
+     *                      block that stands on the ground), otherwise at hit.y - eyeHeight (air);
+     *                      aiming at the upper edge (<= 0.5 below the top) counts as "on top";
+     *  - settle() lifts the feet onto the surface if they end up inside/too close to a block and
+     *    refuses (null) when there is not enough head room.
+     * The old version stepped along the eye ray and stopped as soon as the projected feet entered a
+     * block, so looking at the ground / a nearby block produced no destination at all.
+     */
+    private Location computeDestination(World world, Location eye) {
         Vector dir = eye.getDirection().normalize();
-        World world = p.getWorld();
-        double eyeHeight = p.getEyeHeight();
-        double maxDist = 15.0;
-        double step = 0.2;
-        Location best = null;
-        for (double d = step; d <= maxDist + 1.0E-6; d += step) {
-            double x = eye.getX() + dir.getX() * d;
-            double y = eye.getY() + dir.getY() * d - eyeHeight;
-            double z = eye.getZ() + dir.getZ() * d;
-            int bx = (int)Math.floor(x);
-            int bz = (int)Math.floor(z);
-            double headroom = this.freeHeight(world, bx, bz, y, 4);
-            if (headroom < 0.95) {
-                break;
-            }
-            best = new Location(world, (double)bx + 0.5, y, (double)bz + 0.5, eye.getYaw(), eye.getPitch());
+        double eyeHeight = 1.62;
+        RayTraceResult ray = world.rayTraceBlocks(eye, dir, 15.0, FluidCollisionMode.NEVER, true);
+        Location feet;
+        if (ray == null || ray.getHitPosition() == null || ray.getHitBlock() == null) {
+            feet = eye.clone().add(dir.clone().multiply(15.0));
+            feet.setY(feet.getY() - eyeHeight);
+            return this.settle(world, feet);
         }
-        if (best == null) {
+        Block hb = ray.getHitBlock();
+        BlockFace face = ray.getHitBlockFace();
+        Vector hit = ray.getHitPosition();
+        BoundingBox hbb = hb.getBoundingBox();
+        double hx = (double)hb.getX() + 0.5;
+        double hz = (double)hb.getZ() + 0.5;
+        Location dest;
+        if (face == BlockFace.UP) {
+            dest = new Location(world, hx, hbb.getMaxY(), hz, eye.getYaw(), eye.getPitch());
+        } else if (face == BlockFace.DOWN) {
+            dest = new Location(world, hx, hbb.getMinY() - 1.8, hz, eye.getYaw(), eye.getPitch());
+        } else if (hit.getY() >= hbb.getMaxY() - 0.5) {
+            Location onTop = this.settle(world, new Location(world, hx, hbb.getMaxY(), hz, eye.getYaw(), eye.getPitch()));
+            if (onTop != null) {
+                return onTop;
+            }
+            return this.settle(world, this.sideDestination(world, hb, face, hit, eye, eyeHeight));
+        } else {
+            return this.settle(world, this.sideDestination(world, hb, face, hit, eye, eyeHeight));
+        }
+        return this.settle(world, dest);
+    }
+
+    /* Column in front of the hit face: on its floor when the hit point is close above the floor, else in the air at hit height - eye height. */
+    private Location sideDestination(World world, Block hb, BlockFace face, Vector hit, Location eye, double eyeHeight) {
+        Block front = hb.getRelative(face);
+        double floorTop = this.columnFloorTop(world, front.getX(), front.getZ(), hit.getY());
+        double feetY = hit.getY() - eyeHeight;
+        if (!Double.isNaN(floorTop) && floorTop <= hit.getY() + 0.01 && hit.getY() - floorTop <= eyeHeight + 1.0) {
+            feetY = floorTop;
+        }
+        return new Location(world, (double)front.getX() + 0.5, feetY, (double)front.getZ() + 0.5, eye.getYaw(), eye.getPitch());
+    }
+
+    /* Top face of the first solid block in the column at or below y (up to 4 blocks down), NaN if none. */
+    private double columnFloorTop(World world, int bx, int bz, double y) {
+        int base = (int)Math.floor(y);
+        for (int i = 0; i >= -4; --i) {
+            BoundingBox box = world.getBlockAt(bx, base + i, bz).getBoundingBox();
+            if (box == null || box.getHeight() <= 0.0) continue;
+            return box.getMaxY();
+        }
+        return Double.NaN;
+    }
+
+    private Location settle(World world, Location feet) {
+        if (feet == null) {
             return null;
         }
-        double top = this.groundTop(world, best.getBlockX(), best.getBlockZ(), best.getY());
-        if (best.getY() - top < 1.0) {
-            best.setY(top);
+        int bx = feet.getBlockX();
+        int bz = feet.getBlockZ();
+        double y = feet.getY();
+        BoundingBox inside = world.getBlockAt(bx, (int)Math.floor(y), bz).getBoundingBox();
+        if (inside != null && inside.getHeight() > 0.0 && inside.getMinY() <= y && inside.getMaxY() > y) {
+            y = inside.getMaxY();
         }
-        return best;
+        double top = this.groundTop(world, bx, bz, y);
+        if (y - top < 1.0) {
+            y = top;
+        }
+        if (this.freeHeight(world, bx, bz, y, 4) < 0.95) {
+            return null;
+        }
+        return new Location(world, (double)bx + 0.5, y, (double)bz + 0.5, feet.getYaw(), feet.getPitch());
     }
 
     private double freeHeight(World world, int bx, int bz, double y, int maxUp) {
@@ -278,6 +347,9 @@ CommandExecutor {
             BoundingBox box = world.getBlockAt(bx, base + i, bz).getBoundingBox();
             if (box == null || box.getHeight() <= 0.0) continue;
             if (box.getMaxY() <= y + 0.001) {
+                return box.getMaxY();
+            }
+            if (box.getMinY() <= y) {
                 return box.getMaxY();
             }
         }

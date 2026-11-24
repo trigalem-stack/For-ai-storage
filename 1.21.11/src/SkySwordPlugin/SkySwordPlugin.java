@@ -57,19 +57,24 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
 public class SkySwordPlugin
@@ -81,6 +86,8 @@ CommandExecutor {
     private NamespacedKey activeKey;
     private NamespacedKey cdEndKey;
     private final Map<UUID, Location> lastPlatformLoc = new HashMap<UUID, Location>();
+    /* 0 vx, 1 vy, 2 vz (blocks/tick, smoothed), 3 last raw dy, 4 last move time ms */
+    private final Map<UUID, double[]> track = new HashMap<UUID, double[]>();
 
     public void onEnable() {
         this.saveDefaultConfig();
@@ -101,6 +108,32 @@ CommandExecutor {
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         this.lastPlatformLoc.remove(e.getPlayer().getUniqueId());
+        this.track.remove(e.getPlayer().getUniqueId());
+    }
+
+    /*
+     * Player#getVelocity() on the server is not updated by client movement (the server does not simulate
+     * player physics), so we measure the real per-tick movement from move packets ourselves.
+     */
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
+    public void onMove(PlayerMoveEvent e) {
+        if (e instanceof PlayerTeleportEvent) {
+            return;
+        }
+        Location from = e.getFrom();
+        Location to = e.getTo();
+        double dx = to.getX() - from.getX();
+        double dy = to.getY() - from.getY();
+        double dz = to.getZ() - from.getZ();
+        if (Math.abs(dx) > 1.5 || Math.abs(dz) > 1.5 || Math.abs(dy) > 4.5) {
+            return;
+        }
+        double[] t = this.track.computeIfAbsent(e.getPlayer().getUniqueId(), k -> new double[5]);
+        t[0] = t[0] * 0.4 + dx * 0.6;
+        t[1] = t[1] * 0.4 + dy * 0.6;
+        t[2] = t[2] * 0.4 + dz * 0.6;
+        t[3] = dy;
+        t[4] = System.currentTimeMillis();
     }
 
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -270,39 +303,9 @@ CommandExecutor {
             p.sendActionBar((Component)Component.text((String)("\u00a7b\u041d\u0435\u0431\u0435\u0441\u043d\u044b\u0439 \u041c\u0435\u0447 \u00a78| " + state + " \u00a78| " + cubesVisual)));
         }
         if (active == 1 && now >= cdEnd && uses > 0) {
-            Location feet = p.getLocation();
-            Vector vel = p.getVelocity();
-            double look = 2.0;
-            double vx = vel.getX() * look;
-            double vz = vel.getZ() * look;
-            double hlen = Math.sqrt(vx * vx + vz * vz);
-            if (hlen > 2.5) {
-                double k = 2.5 / hlen;
-                vx *= k;
-                vz *= k;
-            }
-            World world = p.getWorld();
-            int floorY = feet.getBlockY() - 1;
-            int cbx = feet.getBlockX();
-            int cbz = feet.getBlockZ();
-            int pbx = (int)Math.floor(feet.getX() + vx);
-            int pbz = (int)Math.floor(feet.getZ() + vz);
-            boolean needPlayer = world.getBlockAt(cbx, floorY, cbz).getType().isAir();
-            boolean needPredicted = world.getBlockAt(pbx, floorY, pbz).getType().isAir();
-            if (!needPlayer && !needPredicted) {
+            if (!this.tryPlacePlatform(p, now)) {
                 return;
             }
-            boolean placedAny = false;
-            if (needPlayer) {
-                placedAny |= this.generatePlatform(new Location((World)world, (double)cbx, (double)floorY, (double)cbz));
-            }
-            if (needPredicted && (pbx != cbx || pbz != cbz)) {
-                placedAny |= this.generatePlatform(new Location((World)world, (double)pbx, (double)floorY, (double)pbz));
-            }
-            if (!placedAny) {
-                return;
-            }
-            this.lastPlatformLoc.put(p.getUniqueId(), new Location((World)world, (double)pbx, (double)floorY, (double)pbz));
             meta.getPersistentDataContainer().set(this.usesKey, PersistentDataType.INTEGER, --uses);
             p.playSound(p.getLocation(), Sound.BLOCK_SNOW_PLACE, 0.5f, 1.5f);
             if (uses <= 0) {
@@ -318,11 +321,153 @@ CommandExecutor {
         }
     }
 
-    private boolean generatePlatform(Location center) {
+    /*
+     * Predicts where the player will be when the block update reaches the client and places the
+     * snow platform there BEFORE the player arrives. Returns true when at least one block was placed.
+     *
+     *  - The server only sees the player's position ping/2 late and the client only learns about a
+     *    placed block ping/2 later, so the platform is aimed `lead` = ping/50 + 2 ticks ahead.
+     *  - While the player still has enough solid ground ahead of them (they leave support no sooner
+     *    than ping/50 + 2 ticks from now) the platform is placed flush with the current floor level,
+     *    so walking off an edge does not drop a block at all.
+     *  - When the player is already falling (or about to fall too soon), the platform is placed
+     *    one block below the predicted landing feet, so the client never clips into it (that clip
+     *    is what made the server rubber-band the player back).
+     *  - If the simulated trajectory already lands on an existing block (ground or an earlier
+     *    platform) within the lead window, nothing is placed and no use is consumed.
+     */
+    private boolean tryPlacePlatform(Player p, long now) {
+        if (p.isInsideVehicle() || p.isGliding() || p.isSwimming()
+            || (p.getAllowFlight() && p.isFlying())
+            || p.hasPotionEffect(PotionEffectType.LEVITATION) || p.hasPotionEffect(PotionEffectType.SLOW_FALLING)) {
+            return false;
+        }
+        Location feet = p.getLocation();
+        World world = p.getWorld();
+        Material feetMat = feet.getBlock().getType();
+        if (feet.getBlock().isLiquid() || p.getEyeLocation().getBlock().isLiquid()) {
+            return false;
+        }
+        if (feetMat == Material.LADDER || feetMat == Material.SCAFFOLDING || feetMat.name().endsWith("VINES") || feetMat.name().endsWith("VINE_PLANT")) {
+            return false;
+        }
+        double[] t = this.track.computeIfAbsent(p.getUniqueId(), k -> new double[5]);
+        if (now - t[4] > 150L) {
+            t[0] *= 0.5;
+            t[1] *= 0.5;
+            t[2] *= 0.5;
+            t[3] *= 0.5;
+        }
+        double vx = t[0];
+        double vz = t[2];
+        double hspeed = Math.sqrt(vx * vx + vz * vz);
+        if (hspeed > 0.6) {
+            double k = 0.6 / hspeed;
+            vx *= k;
+            vz *= k;
+        }
+        boolean onGround = p.isOnGround();
+        double vy = onGround ? 0.0 : Math.min(t[1], t[3]);
+        int pingTicks = (int)Math.ceil(Math.max(0, p.getPing()) / 50.0);
+        int lead = Math.min(8, Math.max(2, pingTicks + 2));
+        double[] r = this.predict(world, feet.getX(), feet.getY(), feet.getZ(), vx, vy, vz, onGround, lead);
+        if (r == null) {
+            return false;
+        }
+        int leaveTick = (int)r[3];
+        if (leaveTick < 0 || leaveTick > lead) {
+            return false;
+        }
+        int bx;
+        int bz;
+        int by;
+        if (onGround && leaveTick >= pingTicks + 2) {
+            int ahead = Math.min(lead, leaveTick + 1);
+            bx = (int)Math.floor(feet.getX() + vx * (double)ahead);
+            bz = (int)Math.floor(feet.getZ() + vz * (double)ahead);
+            by = feet.getBlockY() - 1;
+        } else {
+            bx = (int)Math.floor(r[0]);
+            bz = (int)Math.floor(r[2]);
+            by = (int)Math.floor(r[1]) - 1;
+        }
+        if (by <= world.getMinHeight() || by >= world.getMaxHeight()) {
+            return false;
+        }
+        Block center = world.getBlockAt(bx, by, bz);
+        if (center.getType() == Material.SNOW_BLOCK) {
+            return false;
+        }
+        if (!this.generatePlatform(center)) {
+            return false;
+        }
+        this.lastPlatformLoc.put(p.getUniqueId(), new Location(world, (double)bx, (double)by, (double)bz));
+        return true;
+    }
+
+    /*
+     * Simulates the player's movement (Minecraft air physics, constant horizontal speed) for
+     * max(lead + 2, 14) ticks. Returns {x, y, z, leaveTick} for tick `lead`, where leaveTick is the
+     * tick at which the player loses support (0 = already airborne, -1 = stays supported), or null
+     * when the trajectory hits a wall or lands on an existing block within the horizon (a normal
+     * jump, a small drop or an earlier platform: nothing needs to be placed).
+     */
+    private double[] predict(World world, double x, double y, double z, double vx, double vy, double vz, boolean supported, int lead) {
+        double sy = vy;
+        int leaveTick = supported ? -1 : 0;
+        double[] result = null;
+        int horizon = Math.max(lead + 2, 14);
+        for (int tick = 1; tick <= horizon; ++tick) {
+            x += vx;
+            z += vz;
+            double yPrev = y;
+            sy = supported ? -0.0784 : (sy - 0.08) * 0.98;
+            y = yPrev + sy;
+            double top = this.surfaceTop(world, x, yPrev, y, z);
+            if (!Double.isNaN(top)) {
+                if (top > yPrev + 0.6) {
+                    return null;
+                }
+                if (!supported) {
+                    return null;
+                }
+                y = top;
+            } else if (supported) {
+                supported = false;
+                leaveTick = tick;
+            }
+            if (tick == lead) {
+                result = new double[]{x, y, z, (double)leaveTick};
+            }
+        }
+        return result;
+    }
+
+    /* Top face of the first solid block in the column between the old and the new feet position, NaN if none. */
+    private double surfaceTop(World world, double x, double yPrev, double y, double z) {
+        int bx = (int)Math.floor(x);
+        int bz = (int)Math.floor(z);
+        int from = (int)Math.floor(yPrev);
+        int to = (int)Math.floor(y);
+        for (int by = from; by >= to; --by) {
+            if (by <= world.getMinHeight() || by >= world.getMaxHeight()) {
+                continue;
+            }
+            BoundingBox box = world.getBlockAt(bx, by, bz).getBoundingBox();
+            if (box == null || box.getHeight() <= 0.0) {
+                continue;
+            }
+            return box.getMaxY();
+        }
+        return Double.NaN;
+    }
+
+    private boolean generatePlatform(Block center) {
         boolean placedAny = false;
+        World world = center.getWorld();
         for (int x = -1; x <= 1; ++x) {
             for (int z = -1; z <= 1; ++z) {
-                Block b = center.clone().add((double)x, 0.0, (double)z).getBlock();
+                Block b = world.getBlockAt(center.getX() + x, center.getY(), center.getZ() + z);
                 if (!b.getType().isAir()) continue;
                 b.setType(Material.SNOW_BLOCK);
                 placedAny = true;
