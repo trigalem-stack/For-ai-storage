@@ -2,6 +2,8 @@ package ru.astrum.skysword;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,7 +91,11 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
     private final Map<Pos, Platform> owners = new HashMap<Pos, Platform>();
     /** Все живые платформы. */
     private final List<Platform> platforms = new ArrayList<Platform>();
-    /** [lastX, lastZ, smoothVx, smoothVz] в блоках за тик. */
+    /** [lastX, lastY, lastZ, smoothVx, smoothVy, smoothVz] в блоках за тик. */
+    /** Частота логов об ошибках тика (на игрока). */
+    private final Map<UUID, Long> errLog = new HashMap<UUID, Long>();
+    /** [x, z, тик, высота] последней платформы «на падение». */
+    private final Map<UUID, int[]> lastFallPlace = new HashMap<UUID, int[]>();
     private final Map<UUID, double[]> motion = new HashMap<UUID, double[]>();
 
     /* ============================== Жизненный цикл ============================== */
@@ -366,6 +372,7 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         UUID id = p.getUniqueId();
         if (!hasMain && !hasOff) {
             this.motion.remove(id);
+            this.lastFallPlace.remove(id);
             return;
         }
         ItemStack sword = hasMain ? main : off;
@@ -403,7 +410,6 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         // Никакого «уровня ходьбы» больше нет: именно из-за него в прыжке платформа
         // оказывалась на земле, а не под игроком.
         int placeY = by - 1;
-        boolean placed = false;
 
         // ---- Предсказание траектории ----------------------------------------------
         // Скорость считается по фактическому смещению за тик и сглаживается. Мёртвая зона
@@ -411,12 +417,15 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         // платформа уезжала на клетку в сторону — «прыгаю на месте, а снег слева/справа».
         double[] prev = this.motion.get(id);
         double speedX = 0.0;
+        double speedY = 0.0;
         double speedZ = 0.0;
         if (prev != null) {
             double moveX = loc.getX() - prev[0];
-            double moveZ = loc.getZ() - prev[1];
-            speedX = prev[2] * 0.6 + moveX * 0.4;
-            speedZ = prev[3] * 0.6 + moveZ * 0.4;
+            double moveY = loc.getY() - prev[1];
+            double moveZ = loc.getZ() - prev[2];
+            speedX = prev[3] * 0.6 + moveX * 0.4;
+            speedY = prev[4] * 0.6 + moveY * 0.4;
+            speedZ = prev[5] * 0.6 + moveZ * 0.4;
         }
         // Резкий скачок (> 1.5 блока за тик) — это телепорт, а не бег. Предсказание по нему
         // нарисовало бы «коридор» из воздуха, поэтому такой тик просто сбрасываем.
@@ -431,7 +440,7 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
             speedZ = 0.0;
             hspeed = 0.0;
         }
-        this.motion.put(id, new double[]{loc.getX(), loc.getZ(), speedX, speedZ});
+        this.motion.put(id, new double[]{loc.getX(), loc.getY(), loc.getZ(), speedX, speedY, speedZ});
 
         double vy = p.getVelocity().getY();
         boolean moving = hspeed > 0.0;
@@ -439,43 +448,72 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         // Точка впереди по фактическому направлению движения: скорость × горизонт (свой пинг
         // плюс запас). Считаем именно вектор, а не «по осям», поэтому диагональ под любым
         // углом продолжается как диагональ.
-        double leadScale = 1.5 + this.leadTicks(p) * 0.5;
-        int fx = (int)Math.floor(loc.getX() + speedX * leadScale);
-        int fz = (int)Math.floor(loc.getZ() + speedZ * leadScale);
-        boolean aheadSameLevel = Math.abs(((int)Math.floor(loc.getY() + vy * leadScale)) - by) <= 1;
-        // В прыжке подъёма вперёд ничего не нужно: высоту ведёт клетка под ногами,
-        // а снег впереди на другом уровне — это лишняя платформа и лишний кубик.
-        boolean wantAhead = moving && vy <= 0.2 && aheadSameLevel;
+        // Где клиент на самом деле: сервер видит его на половину RTT позади. По X/Z сдвигаем
+        // на скорость × пинг, по Y (только при реальном прыжке/падении) — с поправкой на
+        // гравитацию. Это убирает «платформа не успевает заспавниться»: снег ставится туда,
+        // где игрок уже находится, а не под устаревшую серверную клетку.
+        int lead = this.leadTicks(p);
+        double clientX = loc.getX() + speedX * lead;
+        double clientZ = loc.getZ() + speedZ * lead;
+        double clientFeet = loc.getY();
+        if (Math.abs(vy) > 0.3) {
+            clientFeet = loc.getY() + vy * (lead + 1) - 0.04 * lead * lead;
+        }
+        int placeYc = (int)Math.floor(clientFeet) - 1;
+        Set<Pos> body = this.bodyCells(clientFeet, clientX, clientZ);
 
-        // 1) Под игроком. Оригинал ставит только если под ногами воздух: если игрок стоит
-        //    на земле, на своей платформе или на камне — кубик не тратится.
-        if (!this.isColumnFilled(p, bx, placeY, bz) && this.tryPlace(p, bx, placeY, bz)) {
+        boolean placed = false;
+
+        // 1) Под игроком — как в оригинале (floor(ноги) - 1), но по КЛИЕНТСКОЙ высоте и без
+        //    блоков в теле. В прыжке это «лестница», при ходьбе — обычная платформа.
+        if (!this.isColumnFilled(p, bx, placeYc, bz)
+                && this.tryPlaceSafe(p, bx, placeYc, bz, body)) {
             placed = true;
         }
 
-        // 2) Одна клетка впереди — чтобы снег уже был на сервере, когда клиент туда добежит.
-        //    Только если там реально нет опоры (иначе по ровному полу жглись бы кубики)
-        //    и только на том же уровне, где идёт игрок.
-        if (wantAhead && (fx != bx || fz != bz) && !this.isColumnFilled(p, fx, placeY, fz)
-                && !this.hasSupportWithin(p, fx, fz, placeY + 1, 3)
-                && this.tryPlace(p, fx, placeY, fz)) {
-            placed = true;
-        }
-
-        // 3) Страховка при падении: если внизу на три блока пусто, ставим пол в точку,
-        //    где игрок окажется через два тика. Не телепорт — просто снег уже на месте.
-        if (!p.isOnGround() && vy < -0.15) {
-            int landY = (int)Math.floor(loc.getY() + vy * 3.0 - 1.0E-4);
-            if (landY < placeY && !this.isColumnFilled(p, bx, landY, bz)
-                    && !this.hasSupportWithin(p, bx, bz, landY + 1, 2)
-                    && this.tryPlace(p, bx, landY, bz)) {
+        // 2) Клетка впереди по фактическому направлению (вектор, а не «по осям») — диагональ
+        //    под любым углом, зигзаг и лёд: снег уже на сервере, когда клиент туда добежит.
+        if (moving && vy <= 0.2) {
+            double leadScale = 1.5 + lead * 0.5;
+            int fx = (int)Math.floor(loc.getX() + speedX * leadScale);
+            int fz = (int)Math.floor(loc.getZ() + speedZ * leadScale);
+            if ((fx != bx || fz != bz) && Math.abs(fx - bx) <= 3 && Math.abs(fz - bz) <= 3
+                    && !this.isColumnFilled(p, fx, placeYc, fz)
+                    && !this.hasSupportWithin(p, fx, fz, placeYc + 1, 2)
+                    && this.tryPlaceSafe(p, fx, placeYc, fz, body)) {
                 placed = true;
+            }
+        }
+
+        // 3) Держим снег под КЛИЕНТОМ. Сервер узнаёт о сходе с края с задержкой (иногда на
+        //    несколько тиков), поэтому опора проверяется не по onGround, а по клетке под
+        //    реальной позицией игрока. Если там пусто — ставим снег туда. При падении целимся
+        //    на два блока ниже ног: ровно под ногами снег оказывается в теле (клиент в этом же
+        //    тике пролетает эту клетку) — отсюда «спасает, но я провалился на блок и застрял».
+        //    Одна платформа на падение, иначе сверху образуется «потолок» из снега.
+        boolean fallSave = false;
+        int px = (int)Math.floor(clientX);
+        int pz = (int)Math.floor(clientZ);
+        int underY = (int)Math.floor(clientFeet) - 1;
+        boolean inFall = vy < -0.15 || !p.isOnGround();
+        if (inFall) {
+            underY -= 1; // в полёте — на два блока ниже ног, иначе снег оказывается в теле
+        }
+        if (underY < by + 1 && !this.isColumnFilled(p, px, underY, pz)
+                && !this.hasSupportWithin(p, px, pz, underY + 1, 3)) {
+            int tick = Bukkit.getCurrentTick();
+            int[] last = this.lastFallPlace.get(id);
+            double passedDown = last == null ? 99.0 : last[3] - loc.getY();
+            boolean covered = last != null && tick - last[2] < 12 && passedDown < 6.0;
+            if (!covered && this.tryPlaceSafe(p, px, underY, pz, body)) {
+                this.lastFallPlace.put(id, new int[]{px, pz, tick, (int)loc.getY()});
+                fallSave = true;
             }
         }
 
         // Кубик — один за тик, сколько бы клеток ни поставилось (как в оригинале:
         // под игроком + впереди стоят один кубик).
-        if (placed) {
+        if (placed || fallSave) {
             this.spendUse(p, sword, meta, now);
         }
     }
@@ -535,6 +573,40 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
         return pf != null && !pf.blocks.isEmpty();
     }
 
+    /**
+     * Клетки платформы 3×3, которые пересекают тело игрока (клиентские координаты).
+     * Их не ставим: блок в игроке — это удушение и «застрял в блоках».
+     */
+    private Set<Pos> bodyCells(double feetY, double clientX, double clientZ) {
+        int bodyMinY = (int)Math.floor(feetY);
+        int bodyMaxY = (int)Math.floor(feetY + 1.8);
+        Set<Pos> skip = new HashSet<Pos>();
+        int cx = (int)Math.floor(clientX);
+        int cz = (int)Math.floor(clientZ);
+        for (int x = cx - 1; x <= cx + 1; ++x) {
+            for (int z = cz - 1; z <= cz + 1; ++z) {
+                if (Math.abs(x + 0.5 - clientX) < 0.9 && Math.abs(z + 0.5 - clientZ) < 0.9) {
+                    for (int y = bodyMinY; y <= bodyMaxY; ++y) {
+                        skip.add(new Pos(x, y, z));
+                    }
+                }
+            }
+        }
+        return skip;
+    }
+
+    /** Ставит платформу, не задевая тело игрока. */
+    private boolean tryPlaceSafe(Player p, int cx, int cy, int cz, Set<Pos> body) {
+        if (this.owners.containsKey(new Pos(cx, cy, cz))) {
+            return false;
+        }
+        if (!p.getWorld().getBlockAt(cx, cy, cz).getType().isAir()) {
+            return false;
+        }
+        Platform pf = this.placePlatform(p.getWorld(), cx, cy, cz, body);
+        return pf != null && !pf.blocks.isEmpty();
+    }
+
     /** Тратит один кубик, обновляет лор и уходит в перезарядку на нуле. Возвращает true, если кубик был. */
     private boolean spendUse(Player p, ItemStack sword, ItemMeta meta, long now) {
         int uses = meta.getPersistentDataContainer().getOrDefault(this.usesKey, PersistentDataType.INTEGER, 20);
@@ -559,12 +631,24 @@ public class SkySwordPlugin extends JavaPlugin implements Listener, CommandExecu
     /* ================================ Платформы ================================ */
 
     private Platform placePlatform(org.bukkit.World world, int cx, int cy, int cz) {
+        return this.placePlatform(world, cx, cy, cz, null);
+    }
+
+    /**
+     * @param skip клетки, которые ставить нельзя (тело игрока). Раньше проверялась только
+     *             центральная клетка, а весь блок 3×3 ложился как есть — если игрок оказывался
+     *             рядом, три блока появлялись в нём: «спасает, но я застреваю в блоках».
+     */
+    private Platform placePlatform(org.bukkit.World world, int cx, int cy, int cz, Set<Pos> skip) {
         Platform pf = new Platform(world, cx, cy, cz);
         for (int dx = -1; dx <= 1; ++dx) {
             for (int dz = -1; dz <= 1; ++dz) {
                 int x = cx + dx;
                 int z = cz + dz;
                 Pos pos = new Pos(x, cy, z);
+                if (skip != null && skip.contains(pos)) {
+                    continue;
+                }
                 Platform owner = this.owners.get(pos);
                 if (owner != null && !owner.removed) {
                     continue; // блок уже принадлежит другой платформе
