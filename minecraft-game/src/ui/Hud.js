@@ -16,6 +16,14 @@ const DEATH_REASON_TEXT = {
   fire: 'Сгорел в пламени',
   starve: 'Умер от голода',
   void: 'Провалился в бездну',
+  zombie: 'Был съеден Зомби',
+  skeleton: 'Застрелен Скелетом',
+  arrow: 'Пронзён стрелой',
+  spider: 'Растерзан Пауком',
+  creeper: 'Взорван Крипером',
+  explosion: 'Погиб при взрыве',
+  enderman: 'Пал от руки Эндермена',
+  ender_pearl: 'Ударился о землю при телепортации',
   generic: 'Погиб в мире',
 };
 
@@ -105,6 +113,8 @@ export class Hud {
     this.heartsRowEl = document.getElementById('hud-hearts-row');
     this.oxygenRowEl = document.getElementById('hud-oxygen-row');
     this.hungerRowEl = document.getElementById('hud-hunger-row');
+    this.xpFillEl = document.getElementById('hud-xp-fill');
+    this.xpLevelEl = document.getElementById('hud-xp-level');
     this.damageVignetteEl = document.getElementById('damage-vignette');
     this.suffocationVignetteEl = document.getElementById('suffocation-vignette');
     this.fluidOverlayEl = document.getElementById('fluid-overlay');
@@ -146,6 +156,11 @@ export class Hud {
     this.btnGraphicsMode = document.getElementById('btn-graphics-mode');
     this.btnFogMode = document.getElementById('btn-fog-mode');
     this.btnCloudsMode = document.getElementById('btn-clouds-mode');
+    this.btnStarsMode = document.getElementById('btn-stars-mode');
+    this.btnLeavesMode = document.getElementById('btn-leaves-mode');
+    this.btnSmoothLightMode = document.getElementById('btn-smooth-light-mode');
+    this.btnAnimFluidMode = document.getElementById('btn-anim-fluid-mode');
+    this.btnParticlesMode = document.getElementById('btn-particles-mode');
     this.btnHintMode = document.getElementById('btn-hint-mode');
 
     this.rangeRenderDist = document.getElementById('range-render-dist');
@@ -173,7 +188,7 @@ export class Hud {
 
   _bindInstantHudTap(el, handler) {
     if (!el) return;
-    let lastTrigger = 0;
+    let lastTrigger = -99999;
     const fire = (e) => {
       e.stopPropagation();
       if (e.type === 'touchstart') e.preventDefault();
@@ -346,6 +361,31 @@ export class Hud {
       this.callbacks.onToggleCloudsMode?.();
     });
 
+    this.btnStarsMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onToggleStarsMode?.();
+    });
+
+    this.btnLeavesMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onToggleLeavesMode?.();
+    });
+
+    this.btnSmoothLightMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onToggleSmoothLightMode?.();
+    });
+
+    this.btnAnimFluidMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onToggleAnimFluidMode?.();
+    });
+
+    this.btnParticlesMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onCycleParticlesMode?.();
+    });
+
     this.btnHintMode?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.hintsEnabled = !this.hintsEnabled;
@@ -423,6 +463,17 @@ export class Hud {
     const poisoned = (player.hungerDebuffTimer || 0) > 0;
     const showOxygen = player.headInWater || player.airTicks < MAX_AIR_TICKS;
     const bubbles = showOxygen ? Math.ceil((Math.max(0, player.airTicks) / MAX_AIR_TICKS) * 10) : 10;
+    const xpLvl = Math.max(0, player.xpLevel | 0);
+    const xpPct = Math.round(Math.max(0, Math.min(1, player.xpProgress || 0)) * 100);
+
+    // Update XP bar & level immediately
+    if (this.xpFillEl) {
+      this.xpFillEl.style.width = `${xpPct}%`;
+    }
+    if (this.xpLevelEl) {
+      this.xpLevelEl.textContent = String(xpLvl);
+      this.xpLevelEl.classList.toggle('hidden', xpLvl <= 0);
+    }
 
     // Low-health pulsing red edge & sand/wall suffocation overlay
     this.damageVignetteEl?.classList.toggle('low-health', hp > 0 && hp <= 4);
@@ -724,8 +775,8 @@ export class Hud {
   setGraphicsModeLabel(highQuality) {
     if (this.btnGraphicsMode) {
       this.btnGraphicsMode.textContent = highQuality
-        ? 'Графика: Улучшенная (чёткий PixelRatio)'
-        : 'Графика: Производительная (макс. FPS)';
+        ? 'Разрешение: Улучшенное (чёткий PixelRatio)'
+        : 'Разрешение: Производительное (макс. FPS)';
     }
   }
 
@@ -738,6 +789,37 @@ export class Hud {
   setCloudsEnabledLabel(enabled) {
     if (this.btnCloudsMode) {
       this.btnCloudsMode.textContent = enabled ? 'Облака и небо: ВКЛ' : 'Облака: ВЫКЛ';
+    }
+  }
+
+  setStarsEnabledLabel(enabled) {
+    if (this.btnStarsMode) {
+      this.btnStarsMode.textContent = enabled ? 'Звёзды ночью: ВКЛ' : 'Звёзды ночью: ВЫКЛ';
+    }
+  }
+
+  setFancyLeavesLabel(enabled) {
+    if (this.btnLeavesMode) {
+      this.btnLeavesMode.textContent = enabled ? 'Листва: Детальная (Fancy)' : 'Листва: Быстрая (Fast)';
+    }
+  }
+
+  setSmoothLightingLabel(enabled) {
+    if (this.btnSmoothLightMode) {
+      this.btnSmoothLightMode.textContent = enabled ? 'Мягкое освещение (AO): ВКЛ' : 'Мягкое освещение (AO): ВЫКЛ';
+    }
+  }
+
+  setAnimatedFluidsLabel(enabled) {
+    if (this.btnAnimFluidMode) {
+      this.btnAnimFluidMode.textContent = enabled ? 'Анимация воды и лавы: ВКЛ' : 'Анимация воды и лавы: ВЫКЛ';
+    }
+  }
+
+  setParticlesModeLabel(mode) {
+    if (this.btnParticlesMode) {
+      const label = mode === 'off' ? 'Выкл' : mode === 'minimal' ? 'Минимум' : 'Все';
+      this.btnParticlesMode.textContent = `Частицы: ${label}`;
     }
   }
 
@@ -792,7 +874,7 @@ export class Hud {
     }, durationMs);
   }
 
-  updateDebug({ player, world, sky, targetHit }) {
+  updateDebug({ player, world, sky, targetHit, mobCount = 0 }) {
     this.fpsFrames++;
     const now = performance.now();
     const elapsed = now - this.fpsLastTime;
@@ -824,7 +906,7 @@ export class Hud {
 
     this.debugPanel.textContent = [
       `FPS: ${this.currentFps} | XYZ: ${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}`,
-      `HP: ${player.health.toFixed(1)}/20 | Food: ${player.foodLevel}/20 (Sat ${player.saturation.toFixed(1)})`,
+      `HP: ${player.health.toFixed(1)}/20 | Food: ${player.foodLevel}/20 | XP Lv ${player.xpLevel || 0} | Mobs: ${mobCount}`,
       `${timePart} | Light: Sky ${light.sky} / Block ${light.block}`,
       `Biome: ${biomeName}`,
       `Chunk: ${cx}, ${cz} | ${player.getFacingCardinal()} | ${modeLabel} | Chunks: ${world.chunks.size}`,

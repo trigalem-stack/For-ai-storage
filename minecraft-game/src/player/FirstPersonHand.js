@@ -32,7 +32,7 @@ export class FirstPersonHand {
       side: THREE.DoubleSide,
     });
 
-    this.extrudedMaterial = new THREE.MeshLambertMaterial({
+    this.extrudedMaterial = new THREE.MeshBasicMaterial({
       vertexColors: true,
       side: THREE.FrontSide,
     });
@@ -56,8 +56,11 @@ export class FirstPersonHand {
     this.pivot.add(this.heldItemMount);
 
     this.heldCache = new Map();
+    this.bowStageCache = new Map();
     this.currentHeldId = 0;
     this.currentHeldIsTool = false;
+    this.currentBowStage = -1;
+    this.bowCharge = 0;
 
     // Animation & inertia state
     this.swayX = 0;
@@ -134,6 +137,7 @@ export class FirstPersonHand {
     const itemDef = ItemRegistry.get(id);
     const isExtrudedItem = id >= 256;
     this.currentHeldIsTool = isExtrudedItem && Boolean(itemDef?.toolType);
+    this.currentBowStage = -1;
 
     let mesh = this.heldCache.get(id);
     if (!mesh) {
@@ -145,11 +149,13 @@ export class FirstPersonHand {
         }
         const geom = getExtrudedTileGeometry(this.atlas, itemDef.sprite, { scale: 0.54 });
         mesh = new THREE.Mesh(geom, this.extrudedMaterial);
-        if (itemDef.toolType && itemDef.toolType !== 'bucket') {
+        if (itemDef.toolType === 'bow') {
+          mesh.rotation.set(-0.08, -Math.PI * 0.44, 0.14);
+        } else if (itemDef.toolType && itemDef.toolType !== 'bucket') {
           // Authentic diagonal grip pointing forward-upward into the view
-          mesh.rotation.set(-0.22, -Math.PI * 0.42, 0.26);
+          mesh.rotation.set(-0.20, -Math.PI * 0.42, 0.24);
         } else {
-          mesh.rotation.set(0.12, -0.32, -0.08);
+          mesh.rotation.set(0.10, -0.32, -0.06);
         }
       } else {
         const geom = buildBlockItemGeometry(this.atlas, id, 0.36);
@@ -160,7 +166,7 @@ export class FirstPersonHand {
         }
         mesh = new THREE.Mesh(geom, this.blockMaterial);
         const def = BlockRegistry.get(id);
-        if (def.isCross || def.isLadder) {
+        if (def.isCross || def.isLadder || def.isCrop) {
           mesh.rotation.set(0.06, -0.22, -0.06);
         } else if (def.isTorch) {
           mesh.rotation.set(-0.22, 0.12, -0.14);
@@ -176,6 +182,30 @@ export class FirstPersonHand {
     this.heldItemMount.add(mesh);
     this.armHolder.visible = false;
     this.heldItemMount.visible = true;
+  }
+
+  setBowCharge(charge01) {
+    const c = Math.max(0, Math.min(1, charge01 || 0));
+    this.bowCharge = c;
+    const itemDef = ItemRegistry.get(this.currentHeldId);
+    if (!itemDef || itemDef.toolType !== 'bow') return;
+
+    const stage = c <= 0.01 ? 0 : c < 0.45 ? 1 : c < 0.88 ? 2 : 3;
+    if (stage === this.currentBowStage) return;
+    this.currentBowStage = stage;
+
+    const spriteName = stage === 0 ? 'item_bow' : `item_bow_pull_${stage - 1}`;
+    let mesh = this.bowStageCache.get(spriteName);
+    if (!mesh) {
+      const geom = getExtrudedTileGeometry(this.atlas, spriteName, { scale: 0.56 });
+      mesh = new THREE.Mesh(geom, this.extrudedMaterial);
+      mesh.rotation.set(-0.08, -Math.PI * 0.44, 0.14);
+      this.bowStageCache.set(spriteName, mesh);
+    }
+    while (this.heldItemMount.children.length > 0) {
+      this.heldItemMount.remove(this.heldItemMount.children[0]);
+    }
+    this.heldItemMount.add(mesh);
   }
 
   /**
@@ -288,6 +318,16 @@ export class FirstPersonHand {
     const crouchDrop = isCrouching ? -0.045 : 0;
 
     if (this.currentHeldId > 0) {
+      if (this.bowCharge > 0.01) {
+        const shake = this.bowCharge >= 0.9 ? Math.sin(performance.now() * 0.055) * 0.008 : 0;
+        this.pivot.position.set(
+          0.32 - this.bowCharge * 0.08 + shake + this.swayX * 0.5,
+          -0.28 + this.bowCharge * 0.05 + shake * 0.5 + this.swayY * 0.5,
+          -0.66 + this.bowCharge * 0.14
+        );
+        this.pivot.rotation.set(0.08, -0.16 * this.bowCharge, 0.10);
+        return;
+      }
       if (this.currentHeldIsTool) {
         // Extruded 3D tool with energetic forward chop swing
         this.pivot.position.set(

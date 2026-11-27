@@ -203,7 +203,7 @@ export class TextureAtlas {
     const sideLeftRec = this.getUV(blockDef.faces.west);
     const sideRightRec = this.getUV(blockDef.faces.south);
 
-    if (blockDef.isCross || blockDef.isTorch || blockDef.isLadder) {
+    if (blockDef.isCross || blockDef.isTorch || blockDef.isLadder || blockDef.isCrop) {
       g.drawImage(
         this.canvas,
         topRec.cx * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
@@ -259,14 +259,42 @@ export class TextureAtlas {
       g.restore();
     };
 
-    // Isometric cube projection centered in 32x32 icon
+    // Isometric cube projection matching 3D world & held-block orientation (Top=1.0, West-left=0.74, South-front=0.90)
     drawIsoFace(topRec, 0.85, 0.42, -0.85, 0.42, 16, 2, 1.0);
-    drawIsoFace(sideLeftRec, 0.85, 0.42, 0, 0.92, 2.4, 8.7, 0.82);
-    drawIsoFace(sideRightRec, 0.85, -0.42, 0, 0.92, 16, 15.4, 0.64);
+    drawIsoFace(sideLeftRec, 0.85, 0.42, 0, 0.92, 2.4, 8.7, 0.74);
+    drawIsoFace(sideRightRec, 0.85, -0.42, 0, 0.92, 16, 15.4, 0.90);
 
     const url = c.toDataURL();
     this.previewCache.set(cacheKey, url);
     return url;
+  }
+
+  getItemSamplePalette(id) {
+    if (!this._samplePaletteCache) this._samplePaletteCache = new Map();
+    if (this._samplePaletteCache.has(id)) return this._samplePaletteCache.get(id);
+
+    let tileName = null;
+    if (id > 0 && id < 256) {
+      const b = BlockRegistry.get(id);
+      tileName = b?.faces?.south || b?.faces?.top || null;
+    } else if (id >= 256) {
+      const it = ItemRegistry.get(id);
+      tileName = it?.sprite || null;
+    }
+
+    const cols = [];
+    const px = tileName ? this.getTilePixels16(tileName) : null;
+    if (px) {
+      for (let i = 0; i < 256; i += 3) {
+        const off = i * 4;
+        if (px[off + 3] >= 128) {
+          cols.push(((px[off] << 16) | (px[off + 1] << 8) | px[off + 2]) >>> 0);
+        }
+      }
+    }
+    if (cols.length === 0) cols.push(0x9e9e9e);
+    this._samplePaletteCache.set(id, cols);
+    return cols;
   }
 
   getItemIconDataURL(itemOrId) {
@@ -534,7 +562,7 @@ export class TextureAtlas {
       const cluster = pxHash(902, x >> 1, y >> 1);
       // Keep borders fairly connected while creating crisp alpha cutouts inside
       if (hole < 0.24 && cluster < 0.72) {
-        return [0, 0, 0, 0];
+        return [32, 62, 18, 0];
       }
       const shade = pxHash(903, x, y);
       if (shade < 0.25) return [...shadeRgb(leafBase, -26), 255];
@@ -708,7 +736,7 @@ export class TextureAtlas {
     const birchLeaf = hexToRgb('#74a846');
     this.addTile('birch_leaves', (x, y) => {
       const hole = pxHash(1810, x, y);
-      if (hole < 0.22 && pxHash(1811, x >> 1, y >> 1) < 0.72) return [0, 0, 0, 0];
+      if (hole < 0.22 && pxHash(1811, x >> 1, y >> 1) < 0.72) return [42, 74, 24, 0];
       const shade = pxHash(1812, x, y);
       return [...shadeRgb(birchLeaf, (shade - 0.5) * 42), 255];
     });
@@ -730,7 +758,7 @@ export class TextureAtlas {
     const spruceLeaf = hexToRgb('#315d34');
     this.addTile('spruce_leaves', (x, y) => {
       const hole = pxHash(1910, x, y);
-      if (hole < 0.18 && pxHash(1911, x >> 1, y >> 1) < 0.65) return [0, 0, 0, 0];
+      if (hole < 0.18 && pxHash(1911, x >> 1, y >> 1) < 0.65) return [22, 46, 24, 0];
       const shade = pxHash(1912, x, y);
       return [...shadeRgb(spruceLeaf, (shade - 0.5) * 34), 255];
     });
@@ -1424,7 +1452,42 @@ export class TextureAtlas {
       return shadeRgb([22, 18, 34], (n - 0.5) * 18);
     });
 
-    // Stage 5 & 6 All 16x16 Item Pixel Sprites
+    // Stage 8: TNT Top, Bottom & Side (classic red wraps + white band + TNT lettering)
+    this.addTile('tnt_top', (x, y) => {
+      const stickX = x % 4;
+      const stickY = y % 4;
+      if (stickX === 0 || stickY === 0) return [116, 26, 20];
+      if (x >= 6 && x <= 9 && y >= 6 && y <= 9) {
+        return (x === 7 || x === 8) && (y === 7 || y === 8) ? [48, 48, 54] : [206, 206, 206];
+      }
+      return shadeRgb([188, 52, 40], (pxHash(3301, x, y) - 0.5) * 22);
+    });
+    this.addTile('tnt_bottom', (x, y) => {
+      const stickX = x % 4;
+      const stickY = y % 4;
+      if (stickX === 0 || stickY === 0) return [104, 22, 16];
+      return shadeRgb([172, 46, 36], (pxHash(3302, x, y) - 0.5) * 20);
+    });
+    const tntBand = [
+      '................',
+      '.TTT..N..N..TTT.',
+      '..T...NN.N...T..',
+      '..T...N.NN...T..',
+      '..T...N..N...T..',
+      '................',
+    ];
+    this.addTile('tnt_side', (x, y) => {
+      if (y >= 5 && y <= 10) {
+        const ch = tntBand[y - 5][x];
+        if (ch === 'T' || ch === 'N') return [22, 22, 26];
+        return shadeRgb([238, 236, 230], (pxHash(3303, x, y) - 0.5) * 10);
+      }
+      const seam = x % 4 === 0 ? -18 : 0;
+      const rim = (y === 4 || y === 11) ? -22 : 0;
+      return shadeRgb([196, 46, 34], seam + rim + (pxHash(3304, x, y) - 0.5) * 20);
+    });
+
+    // Stage 5, 6 & 8 All 16x16 Item Pixel Sprites
     registerAllItemSprites(this);
   }
 }

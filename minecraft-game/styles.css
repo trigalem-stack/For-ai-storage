@@ -565,6 +565,21 @@ body.webgl-crosshair #crosshair::after {
   font-size: 19px;
 }
 
+.touch-drop-pair {
+  display: flex;
+  gap: 5px;
+}
+
+.mc-touch-mini {
+  width: 34px;
+  height: 30px;
+  font-size: 11.5px;
+  font-weight: 800;
+  border-width: 2px;
+  border-radius: 6px;
+  background: rgba(42, 48, 58, 0.78);
+}
+
 /* Modals: Main Menu, World Manager, Tabbed Settings, Pause */
 #main-menu-overlay,
 #settings-overlay,
@@ -1070,6 +1085,98 @@ body.webgl-crosshair #crosshair::after {
   opacity: 0.62;
 }
 
+.recipe-book-item.requires-table {
+  border-color: #c2564e;
+}
+
+.recipe-book-item:hover,
+.recipe-book-item.vm-hover {
+  outline: 2px solid #ffffff;
+}
+
+.inv-recipe-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.recipe-page-label {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #e4eaf2;
+}
+
+.inv-recipe-preview {
+  background: rgba(20, 24, 32, 0.92);
+  border: 2px solid #1b2028;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.inv-recipe-preview-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #f6e04c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inv-recipe-preview-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.inv-recipe-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 24px);
+  gap: 2px;
+}
+
+.inv-recipe-preview-cell {
+  width: 24px;
+  height: 24px;
+  background: #6c7078;
+  border: 1px solid #2b2e35;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inv-recipe-preview-cell img {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+}
+
+.inv-recipe-preview-arrow {
+  font-size: 14px;
+  font-weight: 900;
+  color: #b0b8c4;
+}
+
+.inv-recipe-preview-out {
+  width: 28px;
+  height: 28px;
+  background: #4e6b44;
+  border: 2px solid #7cd958;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inv-recipe-preview-out img {
+  width: 22px;
+  height: 22px;
+  image-rendering: pixelated;
+}
+
 .inv-header {
   display: flex;
   align-items: center;
@@ -1368,8 +1475,10 @@ body.webgl-crosshair #crosshair::after {
   cursor: pointer;
 }
 
-.inv-slot:hover {
-  background: #9ea6b3;
+.inv-slot:hover,
+.inv-slot.vm-hover {
+  background: #a9b5c8;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.72);
 }
 
 .inv-slot.hotbar-active {
@@ -1417,10 +1526,10 @@ body.webgl-crosshair #crosshair::after {
 
 .inv-cursor-ghost {
   position: fixed;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   pointer-events: none;
-  z-index: 80;
+  z-index: 94;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1540,20 +1649,67 @@ body.webgl-crosshair #crosshair::after {
   100% { filter: brightness(1.16); }
 }
 
-/* Survival Vitals Bar positioned neatly above Hotbar */
+/* Survival Vitals & XP Bar positioned neatly above Hotbar */
 #survival-hud {
   position: fixed;
-  bottom: calc(var(--safe-bottom) + 52px);
+  bottom: calc(var(--safe-bottom) + 46px);
   left: 50%;
   transform: translateX(-50%);
   width: 396px;
   max-width: 94vw;
   display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+  z-index: 27;
+}
+
+.vitals-top-rows {
+  width: 100%;
+  display: flex;
   justify-content: space-between;
   align-items: flex-end;
   gap: 8px;
-  pointer-events: none;
-  z-index: 27;
+}
+
+.hud-xp-row {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hud-xp-level {
+  position: relative;
+  z-index: 2;
+  margin-bottom: -4px;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  color: #84ff34;
+  text-shadow:
+    1px 1px 0 #102406,
+    -1px -1px 0 #102406,
+    1px -1px 0 #102406,
+    -1px 1px 0 #102406,
+    0 2px 0 #0a1804;
+}
+
+.hud-xp-bar {
+  width: 100%;
+  height: 5px;
+  background: rgba(18, 22, 18, 0.85);
+  border: 1px solid #090c08;
+  overflow: hidden;
+  position: relative;
+}
+
+.hud-xp-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(to bottom, #9cff4e, #55c822);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .vitals-col {
@@ -1719,6 +1875,7 @@ body.webgl-crosshair #crosshair::after {
 }
 
 .vm-btn:active,
+.vm-btn.pressed,
 .vm-btn.active {
   background: #5cb832;
   border-color: #ffffff;
@@ -1727,7 +1884,7 @@ body.webgl-crosshair #crosshair::after {
 /* Mobile Responsive Inventory (No-Scroll Fit across Phones & Tablets) */
 @media (max-width: 680px) {
   #survival-hud {
-    bottom: calc(var(--safe-bottom) + 42px);
+    bottom: calc(var(--safe-bottom) + 38px);
     width: 315px;
   }
   .v-icon svg {
@@ -1738,7 +1895,7 @@ body.webgl-crosshair #crosshair::after {
 
 @media (max-height: 450px) {
   #survival-hud {
-    bottom: calc(var(--safe-bottom) + 41px);
+    bottom: calc(var(--safe-bottom) + 37px);
     width: 320px;
   }
   .v-icon svg {

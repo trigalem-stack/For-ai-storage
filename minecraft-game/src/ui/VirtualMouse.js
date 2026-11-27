@@ -1,6 +1,6 @@
 // PojavLauncher-style Virtual Mouse Cursor for Mobile Devices:
 // - Pixel-crisp arrow pointer (`ic_mouse_pointer` style)
-// - Auto-activates inside Inventory/Crafting/Furnace/Chest GUIs on touch devices, plus manual toggle button
+// - Auto-activates inside Inventory/Crafting/Furnace/Chest GUIs on touch devices
 // - Touchpad drag anywhere on the overlay moves the pointer across the screen (1.45x reach)
 // - Dedicated PRI (LMB), SEC (RMB) with hold-drag support, Shift-modifier, and Drop (Q) buttons
 
@@ -19,7 +19,6 @@ export class VirtualMouse {
 
     this.cursorEl = document.getElementById('virtual-cursor');
     this.barEl = document.getElementById('vm-action-bar');
-    this.toggleBtn = document.getElementById('btn-touch-mouse');
 
     this.btnPri = document.getElementById('vm-btn-pri');
     this.btnSec = document.getElementById('vm-btn-sec');
@@ -52,6 +51,8 @@ export class VirtualMouse {
     if (this.guiOpen) {
       this.x = Math.round(window.innerWidth * 0.5);
       this.y = Math.round(window.innerHeight * 0.45);
+    } else {
+      this.manualActive = false;
     }
     this._syncState();
   }
@@ -67,8 +68,6 @@ export class VirtualMouse {
     this.enabled = shouldShow;
     this.cursorEl?.classList.toggle('hidden', !shouldShow);
     this.barEl?.classList.toggle('hidden', !shouldShow);
-    this.toggleBtn?.classList.toggle('hidden', !this.touchDevice);
-    this.toggleBtn?.classList.toggle('active', this.manualActive || this.guiOpen);
     if (shouldShow) {
       this._updatePosition(this.x, this.y);
     } else {
@@ -107,21 +106,32 @@ export class VirtualMouse {
     }
 
     const under = this._elementAtPointer();
-    if (under !== this._hoveredEl) {
+    const hoverTarget = under?.closest?.(
+      '.inv-slot, .recipe-book-item, .inv-creative-item, .inv-cat-btn, .inv-creative-scrollbar, .mc-menu-btn, .mc-hud-btn'
+    ) || null;
+    if (hoverTarget !== this._hoveredEl) {
       this._clearHover();
-      const hoverTarget = under?.closest?.(
-        '.inv-slot, .recipe-book-item, .inv-creative-item, .inv-cat-btn, .inv-creative-scrollbar, .mc-menu-btn, .mc-hud-btn'
-      );
       if (hoverTarget) {
         this._hoveredEl = hoverTarget;
         hoverTarget.classList.add('vm-hover');
       }
     }
-    this.callbacks.onPointerMove?.(this.x, this.y, this._hoveredEl, this.activeButton);
+    this.callbacks.onPointerMove?.(this.x, this.y, this._hoveredEl || under, this.activeButton);
   }
 
   _elementAtPointer() {
-    return document.elementFromPoint(this.x, this.y) || null;
+    const direct = document.elementFromPoint(this.x, this.y);
+    const interactiveSel = '.inv-slot, .recipe-book-item, .inv-creative-item, .inv-cat-btn, .inv-creative-scrollbar, .inv-creative-thumb, button';
+    if (direct?.closest?.(interactiveSel)) return direct;
+    // Probe +-3px offsets so 2px grid gaps between slots never drop clicks/drags
+    const offsets = [[3, 0], [-3, 0], [0, 3], [0, -3]];
+    for (const [ox, oy] of offsets) {
+      const probe = document.elementFromPoint(this.x + ox, this.y + oy);
+      if (probe?.closest?.('.inv-slot, .inv-creative-item, .recipe-book-item')) {
+        return probe;
+      }
+    }
+    return direct || null;
   }
 
   _dispatchPointerDown(button = 0) {
@@ -186,57 +196,83 @@ export class VirtualMouse {
   _bindEvents() {
     const bindFastTap = (el, handler) => {
       if (!el) return;
-      let lastFire = 0;
-      const run = (e) => {
+      let lastTouchAt = -99999;
+      el.addEventListener('touchstart', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const now = performance.now();
-        if (now - lastFire < 45) return;
-        lastFire = now;
+        lastTouchAt = performance.now();
         handler(e);
-      };
-      el.addEventListener('touchstart', run, { passive: false });
-      el.addEventListener('mousedown', run);
+      }, { passive: false });
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (performance.now() - lastTouchAt < 950) return;
+        handler(e);
+      });
     };
 
     const bindHoldButton = (el, button) => {
       if (!el) return;
-      let lastDownAt = 0;
+      let lastTouchAt = -99999;
       let holding = false;
+      let activeTouchId = null;
 
-      const onDown = (e) => {
+      const onDown = (e, fromTouch) => {
         e.preventDefault();
         e.stopPropagation();
         const now = performance.now();
-        if (now - lastDownAt < 45) return;
-        lastDownAt = now;
+        if (fromTouch) {
+          lastTouchAt = now;
+          const t = e.changedTouches?.[0];
+          activeTouchId = t ? t.identifier : null;
+        } else if (now - lastTouchAt < 950) {
+          return;
+        }
+        if (holding) return;
         holding = true;
         el.classList.add('pressed');
         this._dispatchPointerDown(button);
       };
 
-      const onUp = (e) => {
+      const onUp = (e, fromTouch) => {
+        if (fromTouch) {
+          lastTouchAt = performance.now();
+          if (activeTouchId !== null && e?.changedTouches) {
+            let found = false;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+              if (e.changedTouches[i].identifier === activeTouchId) {
+                found = true;
+                break;
+              }
+            }
+            if (!found) return;
+          }
+          activeTouchId = null;
+        } else if (performance.now() - lastTouchAt < 950) {
+          return;
+        }
         if (!holding) return;
-        e.preventDefault?.();
-        e.stopPropagation?.();
+        e?.preventDefault?.();
+        e?.stopPropagation?.();
         holding = false;
         el.classList.remove('pressed');
         this._dispatchPointerUp(button);
       };
 
-      el.addEventListener('touchstart', onDown, { passive: false });
-      el.addEventListener('touchend', onUp, { passive: false });
-      el.addEventListener('touchcancel', onUp, { passive: false });
-      el.addEventListener('mousedown', onDown);
-      el.addEventListener('mouseup', onUp);
-      window.addEventListener('mouseup', onUp);
-      window.addEventListener('blur', onUp);
+      el.addEventListener('touchstart', (e) => onDown(e, true), { passive: false });
+      el.addEventListener('touchend', (e) => onUp(e, true), { passive: false });
+      el.addEventListener('touchcancel', (e) => onUp(e, true), { passive: false });
+      el.addEventListener('mousedown', (e) => onDown(e, false));
+      el.addEventListener('mouseup', (e) => onUp(e, false));
+      window.addEventListener('mouseup', (e) => onUp(e, false));
+      window.addEventListener('blur', () => {
+        if (!holding) return;
+        holding = false;
+        activeTouchId = null;
+        el.classList.remove('pressed');
+        this._dispatchPointerUp(button);
+      });
     };
-
-    bindFastTap(this.toggleBtn, () => {
-      const on = this.toggleManual();
-      this.callbacks.onStatusToast?.(on ? 'Виртуальная мышь: ВКЛ' : 'Виртуальная мышь: ВЫКЛ');
-    });
 
     bindHoldButton(this.btnPri, 0);
     bindHoldButton(this.btnSec, 2);
@@ -257,7 +293,7 @@ export class VirtualMouse {
     // Touchpad pointer movement inside GUI or whenever Virtual Mouse is active
     window.addEventListener('touchstart', (e) => {
       if (!this.enabled) return;
-      if (e.target.closest?.('#vm-action-bar, #btn-touch-mouse, #hud-top-right')) return;
+      if (e.target.closest?.('#vm-action-bar, #hud-top-right')) return;
       if (!this.guiOpen && !this.manualActive) return;
       if (this._dragTouchId !== null) return;
       const t = e.changedTouches[0];
@@ -292,7 +328,7 @@ export class VirtualMouse {
         if (e.changedTouches[i].identifier === this._dragTouchId) {
           const moved = this._dragTotalDist;
           this._dragTouchId = null;
-          if (this.enabled && !this.guiOpen && moved < 8 && !e.target.closest?.('#vm-action-bar, #btn-touch-mouse')) {
+          if (this.enabled && !this.guiOpen && moved < 8 && !e.target.closest?.('#vm-action-bar')) {
             this._dispatchPointerDown(0);
             this._dispatchPointerUp(0);
           }

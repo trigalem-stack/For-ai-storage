@@ -78,6 +78,11 @@ class ItemRegistryImpl {
       fluidId: def.fluidId ?? 0,
       isFood: Boolean(def.foodStats),
       foodStats: def.foodStats || null,
+      isBow: def.id === ITEM_IDS.BOW,
+      isMilk: def.id === ITEM_IDS.MILK_BUCKET,
+      isPearl: def.id === ITEM_IDS.ENDER_PEARL,
+      isEgg: def.id === ITEM_IDS.EGG,
+      isBoneMeal: def.id === ITEM_IDS.BONE_MEAL,
     };
     this.items.set(entry.id, entry);
     this.byKey.set(entry.key, entry);
@@ -104,10 +109,60 @@ class ItemRegistryImpl {
       { id: ITEM_IDS.BOWL, key: 'bowl', name: 'Миска', sprite: 'item_bowl' },
       { id: ITEM_IDS.RAW_COPPER, key: 'raw_copper', name: 'Рудная медь', sprite: 'item_raw_copper' },
       { id: ITEM_IDS.COPPER_INGOT, key: 'copper_ingot', name: 'Медный слиток', sprite: 'item_copper_ingot' },
+      { id: ITEM_IDS.GUNPOWDER, key: 'gunpowder', name: 'Порох', sprite: 'item_gunpowder' },
+      { id: ITEM_IDS.STRING, key: 'string', name: 'Нить', sprite: 'item_string' },
+      { id: ITEM_IDS.FEATHER, key: 'feather', name: 'Перо', sprite: 'item_feather' },
+      { id: ITEM_IDS.BONE, key: 'bone', name: 'Кость', sprite: 'item_bone' },
+      { id: ITEM_IDS.BONE_MEAL, key: 'bone_meal', name: 'Костная мука', sprite: 'item_bone_meal' },
     ];
     for (const m of materials) {
       this._register({ ...m, category: 'material', maxStack: 64 });
     }
+
+    this._register({
+      id: ITEM_IDS.ARROW,
+      key: 'arrow',
+      name: 'Стрела',
+      category: 'weapon',
+      maxStack: 64,
+      sprite: 'item_arrow',
+    });
+    this._register({
+      id: ITEM_IDS.EGG,
+      key: 'egg',
+      name: 'Яйцо',
+      category: 'material',
+      maxStack: 16,
+      sprite: 'item_egg',
+    });
+    this._register({
+      id: ITEM_IDS.ENDER_PEARL,
+      key: 'ender_pearl',
+      name: 'Жемчуг Эндера',
+      category: 'utility',
+      maxStack: 16,
+      sprite: 'item_ender_pearl',
+    });
+    this._register({
+      id: ITEM_IDS.BOW,
+      key: 'bow',
+      name: 'Лук',
+      category: 'weapon',
+      maxStack: 1,
+      sprite: 'item_bow',
+      toolType: 'bow',
+      maxDurability: 384,
+      attackDamage: 1,
+    });
+    this._register({
+      id: ITEM_IDS.MILK_BUCKET,
+      key: 'milk_bucket',
+      name: 'Ведро молока',
+      category: 'utility',
+      maxStack: 1,
+      sprite: 'item_milk_bucket',
+      toolType: 'bucket',
+    });
 
     // Foods (Stage 6)
     const foods = [
@@ -148,6 +203,13 @@ class ItemRegistryImpl {
         name: 'Гнилая плоть',
         sprite: 'item_rotten_flesh',
         foodStats: { hunger: 4, saturation: 0.8, hungerDebuffChance: 0.8, hungerDebuffTicks: 600 },
+      },
+      {
+        id: ITEM_IDS.SPIDER_EYE,
+        key: 'spider_eye',
+        name: 'Паучий глаз',
+        sprite: 'item_spider_eye',
+        foodStats: { hunger: 2, saturation: 3.2, hungerDebuffChance: 1.0, hungerDebuffTicks: 240 },
       },
     ];
     for (const f of foods) {
@@ -405,6 +467,21 @@ class ItemRegistryImpl {
     if (!stack || !stack.id || stack.count <= 0) return 0;
     const def = this.get(stack.id);
     return def ? (def.lightEmission || 0) : 0;
+  }
+
+  getMeleeDamage(id) {
+    const def = this.get(id);
+    return def ? (def.attackDamage || 1) : 1;
+  }
+
+  isTool(id) {
+    const def = this.get(id);
+    return Boolean(def && (def.maxDurability || 0) > 0 && !def.armorSlot);
+  }
+
+  isWeapon(id) {
+    const def = this.get(id);
+    return Boolean(def && (def.toolType === 'sword' || def.isBow));
   }
 }
 

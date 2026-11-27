@@ -1,4 +1,4 @@
-const CACHE_NAME = 'minecraft-web-stage7-v3';
+const CACHE_NAME = 'minecraft-web-stage8-v1';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const CORE_ASSETS = [
   './src/textures/ExtrudedItemMesh.js',
   './src/textures/TextureAtlas.js',
   './src/physics/AABBPhysics.js',
+  './src/effects/ParticleManager.js',
   './src/world/Noise.js',
   './src/world/ChunkGenKernel.js',
   './src/world/BiomeManager.js',
@@ -26,12 +27,17 @@ const CORE_ASSETS = [
   './src/world/ChunkMesher.js',
   './src/world/Raycast.js',
   './src/world/BlockEntityManager.js',
+  './src/world/Explosion.js',
   './src/world/SkyRenderer.js',
   './src/world/MenuPanorama.js',
   './src/world/SkyEnvironment.js',
   './src/world/World.js',
   './src/entities/ItemEntity.js',
   './src/entities/FallingBlockEntity.js',
+  './src/entities/XPOrbEntity.js',
+  './src/entities/ProjectileEntity.js',
+  './src/entities/Mob.js',
+  './src/entities/EntityManager.js',
   './src/player/PlayerSkin.js',
   './src/player/FirstPersonHand.js',
   './src/player/PlayerController.js',

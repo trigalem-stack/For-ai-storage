@@ -48,7 +48,7 @@ export function buildBlockItemGeometry(atlas, itemId, scale = 1.0) {
 
   const addQuad = (p0, p1, p2, p3, nx, ny, nz, u0, u1, vBot, vTop, shade) => {
     const base = positions.length / 3;
-    const b = Math.pow(shade, 2.2);
+    const b = Math.pow(shade, 1.38);
     positions.push(...p0, ...p1, ...p2, ...p3);
     for (let i = 0; i < 4; i++) {
       normals.push(nx, ny, nz);
@@ -140,7 +140,7 @@ export function buildBlockItemGeometry(atlas, itemId, scale = 1.0) {
     const face = CUBE_FACES[f];
     const uv = atlas.getUV(def.faces[face.key]);
     const base = positions.length / 3;
-    const b = Math.pow(face.shade, 2.2);
+    const b = Math.pow(face.shade, 1.38);
 
     for (let i = 0; i < 4; i++) {
       const v = face.verts[i];
@@ -216,6 +216,55 @@ export class ItemEntityManager {
       fog: true,
       side: THREE.FrontSide,
     });
+    this._litMaterialPool = new Map();
+  }
+
+  _getLitMaterial(isExtruded, r, g, b) {
+    const qr = Math.max(1, Math.min(15, Math.round(r * 15)));
+    const qg = Math.max(1, Math.min(15, Math.round(g * 15)));
+    const qb = Math.max(1, Math.min(15, Math.round(b * 15)));
+    const key = (isExtruded ? 4096 : 0) | (qr << 8) | (qg << 4) | qb;
+    let mat = this._litMaterialPool.get(key);
+    if (!mat) {
+      mat = new THREE.MeshBasicMaterial({
+        map: isExtruded ? null : this.atlas.texture,
+        vertexColors: true,
+        fog: true,
+        alphaTest: isExtruded ? 0 : 0.5,
+        side: isExtruded ? THREE.FrontSide : THREE.DoubleSide,
+      });
+      mat.color.setRGB(qr / 15, qg / 15, qb / 15);
+      this._litMaterialPool.set(key, mat);
+    }
+    return mat;
+  }
+
+  _computeLightRGB(world, x, y, z, skyInfo, heldEmit = 0) {
+    const l = world.getLightAt ? world.getLightAt(x, y, z) : { sky: 15, block: 0 };
+    const skyLevel = l.sky ?? 15;
+    const blockLevel = Math.max(l.block ?? 0, heldEmit);
+    const sunIntensity = skyInfo?.sunIntensity ?? 1.0;
+    const skyTint = skyInfo?.skyTint;
+    const torchTint = skyInfo?.torchTint;
+
+    const skyCurve = Math.pow(0.82, (1 - Math.min(1, Math.max(0, skyLevel / 15))) * 15);
+    const sunCurve = Math.pow(Math.max(0.001, sunIntensity), 0.92);
+    const blkCurve = Math.pow(0.87, (1 - Math.min(1, Math.max(0, blockLevel / 15))) * 15);
+
+    const sr = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.r : 1);
+    const sg = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.g : 1);
+    const sb = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.b : 1);
+
+    const br = Math.pow(Math.max(0.001, blkCurve), 1.32) * (torchTint ? torchTint.r : 1);
+    const bg = Math.pow(Math.max(0.001, blkCurve), 1.32) * (torchTint ? torchTint.g : 0.90);
+    const bb = Math.pow(Math.max(0.001, blkCurve), 1.32) * (torchTint ? torchTint.b : 0.72);
+
+    const minL = 0.08;
+    return [
+      Math.min(1, Math.max(minL, sr, br)),
+      Math.min(1, Math.max(minL, sg, bg)),
+      Math.min(1, Math.max(minL, sb, bb)),
+    ];
   }
 
   _getGeometry(itemId) {
@@ -314,7 +363,7 @@ export class ItemEntityManager {
     });
   }
 
-  update(dt, world, player, receiver) {
+  update(dt, world, player, receiver, skyInfo = null) {
     const targetX = player.x;
     const targetY = player.y + 0.85;
     const targetZ = player.z;
@@ -426,6 +475,14 @@ export class ItemEntityManager {
       const hover = Math.sin(item.age * 3.2 + item.phase) * 0.06 + 0.08;
       item.mesh.position.set(item.x, item.y + ITEM_HALF + hover, item.z);
       item.mesh.rotation.y += dt * 1.9;
+
+      const itemDef = ItemRegistry.get(item.id);
+      const emit = itemDef?.lightEmission || 0;
+      const [lr, lg, lb] = this._computeLightRGB(world, item.x, item.y + 0.35, item.z, skyInfo, emit);
+      const targetMat = this._getLitMaterial(item.id >= 256, lr, lg, lb);
+      if (item.mesh.material !== targetMat) {
+        item.mesh.material = targetMat;
+      }
     }
   }
 
@@ -444,5 +501,9 @@ export class ItemEntityManager {
     this.geometryCache.clear();
     this.material.dispose();
     this.extrudedMaterial.dispose();
+    for (const mat of this._litMaterialPool.values()) {
+      mat.dispose();
+    }
+    this._litMaterialPool.clear();
   }
 }

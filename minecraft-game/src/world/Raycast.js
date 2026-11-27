@@ -316,3 +316,50 @@ export class BreakCrackOverlay {
     }
   }
 }
+
+/**
+ * Raycasts against an iterable of entities with { alive, x, y, z, halfWidth, height }.
+ * Respects block occlusion distance (`maxDist`).
+ */
+export function raycastEntities(origin, direction, maxDist, entities) {
+  let dx = direction.x;
+  let dy = direction.y;
+  let dz = direction.z;
+  const len = Math.hypot(dx, dy, dz);
+  if (len < 1e-8) return null;
+  dx /= len;
+  dy /= len;
+  dz /= len;
+
+  let closestDist = maxDist;
+  let bestHit = null;
+
+  for (const entity of entities) {
+    if (!entity || !entity.alive || entity.dying) continue;
+    const hw = (entity.halfWidth || 0.35) + 0.08;
+    const h = (entity.height || 1.8) + 0.05;
+    const hit = intersectRayAABB(
+      origin.x, origin.y, origin.z,
+      dx, dy, dz,
+      entity.x - hw, entity.y, entity.z - hw,
+      entity.x + hw, entity.y + h, entity.z + hw
+    );
+    if (!hit) continue;
+    const dist = Math.max(0, hit.t);
+    if (dist <= closestDist) {
+      closestDist = dist;
+      bestHit = {
+        entity,
+        distance: dist,
+        point: {
+          x: origin.x + dx * dist,
+          y: origin.y + dy * dist,
+          z: origin.z + dz * dist,
+        },
+        normal: hit.normal,
+      };
+    }
+  }
+
+  return bestHit;
+}

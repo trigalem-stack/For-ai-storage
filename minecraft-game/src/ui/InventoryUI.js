@@ -12,6 +12,7 @@ export class InventoryUI {
     this.onClose = options.onClose || null;
     this.onDropStack = options.onDropStack || null;
     this.onOpen = options.onOpen || null;
+    this.onCollectFurnaceXp = options.onCollectFurnaceXp || null;
     this.playerPreview = options.playerPreview || null;
 
     this.isOpen = false;
@@ -21,6 +22,9 @@ export class InventoryUI {
     this.selectedTouchRef = null;
     this.recipeBookOpen = false;
     this.onlyCraftableFilter = false;
+    this.recipePage = 0;
+    this.recipesPerPage = 10;
+    this.previewRecipe = null;
     this.creativeCategory = 'all';
     this.craftGrid = new Array(9).fill(null);
     this.craftResult = null;
@@ -32,7 +36,7 @@ export class InventoryUI {
     this._longPressTriggered = false;
     this._touchStartPos = { x: 0, y: 0 };
     this._touchMoved = false;
-    this._lastTouchEventAt = 0;
+    this._lastTouchEventAt = -99999;
 
     // Java 1.21 Drag-Distribution & Double-Click Collect state
     this._drag = null;
@@ -51,6 +55,10 @@ export class InventoryUI {
     this.recipeDrawerEl = document.getElementById('inv-recipe-drawer');
     this.recipeListEl = document.getElementById('inv-recipe-list');
     this.recipeFilterBtn = document.getElementById('btn-recipe-filter');
+    this.recipePrevBtn = document.getElementById('btn-recipe-prev');
+    this.recipeNextBtn = document.getElementById('btn-recipe-next');
+    this.recipePageLabel = document.getElementById('recipe-page-label');
+    this.recipePreviewEl = document.getElementById('inv-recipe-preview');
     this.cursorGhostEl = document.getElementById('inv-cursor-ghost');
     this.tooltipEl = document.getElementById('inv-tooltip');
 
@@ -73,7 +81,7 @@ export class InventoryUI {
     });
 
     this.overlay?.addEventListener('mousedown', (e) => {
-      if (performance.now() - this._lastTouchEventAt < 450) return;
+      if (performance.now() - this._lastTouchEventAt < 950) return;
       if (e.target === this.overlay) {
         if (this.cursorStack) {
           const dropS = ItemRegistry.cloneStack(this.cursorStack);
@@ -127,8 +135,23 @@ export class InventoryUI {
     this.recipeFilterBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.onlyCraftableFilter = !this.onlyCraftableFilter;
+      this.recipePage = 0;
       this.recipeFilterBtn.classList.toggle('active', this.onlyCraftableFilter);
       this.recipeFilterBtn.textContent = this.onlyCraftableFilter ? '✓ Доступные' : 'Все';
+      this.renderRecipeBook();
+    });
+
+    this.recipePrevBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.recipePage > 0) {
+        this.recipePage--;
+        this.renderRecipeBook();
+      }
+    });
+
+    this.recipeNextBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.recipePage++;
       this.renderRecipeBook();
     });
 
@@ -450,7 +473,7 @@ export class InventoryUI {
     btn.addEventListener('mousedown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (performance.now() - this._lastTouchEventAt < 450) return;
+      if (performance.now() - this._lastTouchEventAt < 950) return;
       this._handleSlotMouseDown(zone, index, e);
     });
 
@@ -606,6 +629,7 @@ export class InventoryUI {
       }
 
       if (!this._canSlotAcceptDragStack(zone, index, this._drag.sourceCursor)) return;
+      if (Math.floor(this._drag.sourceCursor.count / (this._drag.visited.length + 1)) < 1) return;
       this._drag.visitedKeys.add(key);
       this._drag.visited.push({ zone, index });
       this._drag.snapshots.set(key, this._getSlot(zone, index));
@@ -713,6 +737,7 @@ export class InventoryUI {
         } else {
           this._setSlot(zone, index, null);
         }
+        this._collectIfFurnaceOut(zone, index);
       } else {
         if (!this._isAllowedInSlot(zone, index, this.cursorStack)) return;
         const placedOk = !slotStack || (
@@ -736,12 +761,15 @@ export class InventoryUI {
             this._setSlot(zone, index, slotStack);
           }
           this.cursorStack.count -= 1;
-          if (this.cursorStack.count <= 0) this.cursorStack = null;
-          this._drag = {
-            active: true,
-            button: 2,
-            visitedKeys: new Set([`${zone}:${index}`]),
-          };
+          if (this.cursorStack.count <= 0) {
+            this.cursorStack = null;
+          } else {
+            this._drag = {
+              active: true,
+              button: 2,
+              visitedKeys: new Set([`${zone}:${index}`]),
+            };
+          }
         }
       }
       this.render();
@@ -770,6 +798,27 @@ export class InventoryUI {
     }
 
     // Normal Left-click (button 0) + arm Java Left-Drag if holding a stack > 1
+    if (zone === 'furnace' && index === 2) {
+      if (!slotStack) return;
+      if (!this.cursorStack) {
+        this.cursorStack = slotStack;
+        this._setSlot(zone, index, null);
+        this._collectIfFurnaceOut(zone, index);
+      } else if (ItemRegistry.canStackTogether(this.cursorStack, slotStack)) {
+        const maxS = ItemRegistry.getMaxStack(this.cursorStack.id);
+        const space = maxS - this.cursorStack.count;
+        if (space > 0) {
+          const take = Math.min(space, slotStack.count);
+          this.cursorStack.count += take;
+          slotStack.count -= take;
+          this._setSlot(zone, index, slotStack.count > 0 ? slotStack : null);
+          this._collectIfFurnaceOut(zone, index);
+        }
+      }
+      this.render();
+      return;
+    }
+
     if (!this.cursorStack) {
       if (!slotStack) {
         this._lastClick = { time: now, zone, index, itemId: 0, meta: 0 };
@@ -895,9 +944,25 @@ export class InventoryUI {
       }
     } else {
       tryMoveToRange('inv', 0, INVENTORY_SIZE);
+      if (zone === 'furnace' && index === 2) {
+        this._collectIfFurnaceOut(zone, index);
+      }
     }
 
     this.render();
+  }
+
+  _collectIfFurnaceOut(zone, index) {
+    if (zone === 'furnace' && index === 2 && this.activeBlockPos) {
+      const xp = this.blockEntities?.collectFurnaceXp?.(
+        this.activeBlockPos.x,
+        this.activeBlockPos.y,
+        this.activeBlockPos.z
+      ) || 0;
+      if (xp > 0) {
+        this.onCollectFurnaceXp?.(xp);
+      }
+    }
   }
 
   _handleTouchSplit(zone, index) {
@@ -933,6 +998,30 @@ export class InventoryUI {
       }
       this.inventory.addItem(this.craftResult.id, this.craftResult.count, null, this.craftResult.meta);
       this._consumeCraftIngredients(1);
+      this.render();
+      return;
+    }
+
+    if (zone === 'furnace' && index === 2) {
+      const fOut = this._getSlot(zone, index);
+      if (!fOut) return;
+      if (this.cursorStack) {
+        if (ItemRegistry.canStackTogether(this.cursorStack, fOut)) {
+          const maxS = ItemRegistry.getMaxStack(this.cursorStack.id);
+          const take = Math.min(maxS - this.cursorStack.count, fOut.count);
+          if (take > 0) {
+            this.cursorStack.count += take;
+            fOut.count -= take;
+            this._setSlot(zone, index, fOut.count > 0 ? fOut : null);
+            this._collectIfFurnaceOut(zone, index);
+            this.render();
+          }
+        }
+        return;
+      }
+      const rem = this.inventory.addItem(fOut.id, fOut.count, fOut.maxDurability > 0 ? fOut.durability : null, fOut.meta);
+      this._setSlot(zone, index, rem > 0 ? ItemRegistry.createStack(fOut.id, rem, null, fOut.meta) : null);
+      if (rem < fOut.count) this._collectIfFurnaceOut(zone, index);
       this.render();
       return;
     }
@@ -1087,14 +1176,34 @@ export class InventoryUI {
       1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
       27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 60, 61, 62, 63, 74,
     ]);
+    const isCombatOrTool = (id) => {
+      if (id === 76) return true; // TNT
+      const def = ItemRegistry.get(id);
+      if (!def) return false;
+      return Boolean(
+        def.toolType ||
+        def.armorSlot ||
+        def.isBow ||
+        id === 343 || // ARROW
+        id === 321 || // FLINT_AND_STEEL
+        id === 322 || // SHEARS
+        id === 348    // ENDER_PEARL
+      );
+    };
     if (category === 'blocks') {
-      return blocks.filter((b) => !natureSet.has(b.id)).map((b) => ({ id: b.id, name: b.name }));
+      return blocks.filter((b) => !natureSet.has(b.id) && b.id !== 76).map((b) => ({ id: b.id, name: b.name }));
     }
     if (category === 'nature') {
       return blocks.filter((b) => natureSet.has(b.id)).map((b) => ({ id: b.id, name: b.name }));
     }
+    if (category === 'combat') {
+      return [
+        ...blocks.filter((b) => b.id === 76).map((b) => ({ id: b.id, name: b.name })),
+        ...items.filter((it) => isCombatOrTool(it.id)).map((it) => ({ id: it.id, name: it.name })),
+      ];
+    }
     if (category === 'items') {
-      return items.map((it) => ({ id: it.id, name: it.name }));
+      return items.filter((it) => !isCombatOrTool(it.id)).map((it) => ({ id: it.id, name: it.name }));
     }
     return [...blocks.map((b) => ({ id: b.id, name: b.name })), ...items.map((it) => ({ id: it.id, name: it.name }))];
   }
@@ -1266,7 +1375,8 @@ export class InventoryUI {
         ['all', 'Все'],
         ['blocks', 'Блоки'],
         ['nature', 'Природа'],
-        ['items', 'Предметы'],
+        ['combat', 'Оружие и инстр.'],
+        ['items', 'Еда и ресурсы'],
       ];
 
       const body = document.createElement('div');
@@ -1454,6 +1564,76 @@ export class InventoryUI {
     this._renderSlotVisual('furnace', 2, f.output);
   }
 
+  _renderRecipePreview(entry) {
+    if (!this.recipePreviewEl) return;
+    if (!entry || !entry.recipe) {
+      this.recipePreviewEl.classList.add('hidden');
+      return;
+    }
+    const r = entry.recipe;
+    const resName = entry.resultDef?.name || 'Предмет';
+    const note = !entry.fitsInGrid ? ' (нужен верстак 3×3)' : (!entry.craftable ? ' (недостаточно ресурсов)' : '');
+
+    // Build 3x3 array of itemIds
+    const cells = new Array(9).fill(0);
+    if (r.type === 'shapeless') {
+      r.ingredients.forEach((ing, idx) => {
+        if (idx < 9) cells[idx] = Array.isArray(ing) ? ing[0] : ing;
+      });
+    } else {
+      for (let py = 0; py < r.height; py++) {
+        const row = r.pattern[py];
+        for (let px = 0; px < r.width; px++) {
+          const ch = row[px];
+          if (ch !== ' ') {
+            const expected = r.key[ch];
+            cells[py * 3 + px] = Array.isArray(expected) ? expected[0] : expected;
+          }
+        }
+      }
+    }
+
+    this.recipePreviewEl.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'inv-recipe-preview-title';
+    title.textContent = `${resName} ×${r.result.count}${note}`;
+
+    const body = document.createElement('div');
+    body.className = 'inv-recipe-preview-body';
+
+    const grid = document.createElement('div');
+    grid.className = 'inv-recipe-preview-grid';
+    for (let i = 0; i < 9; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'inv-recipe-preview-cell';
+      if (cells[i] > 0) {
+        const img = document.createElement('img');
+        img.src = this.atlas.getItemIconDataURL(cells[i]);
+        img.alt = ItemRegistry.getName(cells[i]);
+        img.title = ItemRegistry.getName(cells[i]);
+        img.draggable = false;
+        cell.appendChild(img);
+      }
+      grid.appendChild(cell);
+    }
+
+    const arrow = document.createElement('div');
+    arrow.className = 'inv-recipe-preview-arrow';
+    arrow.textContent = '➜';
+
+    const out = document.createElement('div');
+    out.className = 'inv-recipe-preview-out';
+    const outImg = document.createElement('img');
+    outImg.src = this.atlas.getItemIconDataURL(r.result.id);
+    outImg.alt = resName;
+    outImg.draggable = false;
+    out.appendChild(outImg);
+
+    body.append(grid, arrow, out);
+    this.recipePreviewEl.append(title, body);
+    this.recipePreviewEl.classList.remove('hidden');
+  }
+
   renderRecipeBook() {
     if (!this.recipeDrawerEl || !this.recipeListEl) return;
     const allow = this.isOpen && (this.mode === 'inventory' || this.mode === 'crafting') && this.recipeBookOpen;
@@ -1462,51 +1642,61 @@ export class InventoryUI {
     if (!allow) return;
 
     const gridSize = this._getActiveGridSize();
-    const list = RecipeRegistry.getRecipeBookList(this.inventory.slots, gridSize);
+    const allList = RecipeRegistry.getRecipeBookList(this.inventory.slots, gridSize, true);
+    const filtered = this.onlyCraftableFilter ? allList.filter((e) => e.craftable) : allList;
 
-    // Diffed DOM cache: build recipe DOM buttons only when gridSize changes, then update classes/visibility in place
-    if (this._recipeDomCache.gridSize !== gridSize || this._recipeDomCache.entries.length !== list.length) {
-      this.recipeListEl.innerHTML = '';
-      this._recipeDomCache = { gridSize, entries: [] };
+    const totalPages = Math.max(1, Math.ceil(filtered.length / this.recipesPerPage));
+    this.recipePage = Math.max(0, Math.min(totalPages - 1, this.recipePage));
 
-      for (const entry of list) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'recipe-book-item';
-        btn.title = `${entry.resultDef?.name || 'Рецепт'} ×${entry.recipe.result.count}`;
-
-        const img = document.createElement('img');
-        img.src = this.atlas.getItemIconDataURL(entry.recipe.result.id);
-        img.alt = entry.resultDef?.name || '';
-        img.draggable = false;
-
-        const label = document.createElement('span');
-        label.className = 'recipe-item-name';
-        label.textContent = `${entry.resultDef?.name || ''}${entry.recipe.result.count > 1 ? ` ×${entry.recipe.result.count}` : ''}`;
-
-        btn.append(img, label);
-        const recipeRef = entry.recipe;
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const curItem = this._recipeDomCache.entries.find((it) => it.recipe.id === recipeRef.id);
-          if (curItem?.craftable) {
-            this.autoFillRecipe(recipeRef, e.shiftKey);
-          } else {
-            this._showTooltip({ id: recipeRef.result.id, count: recipeRef.result.count }, e.clientX, e.clientY);
-          }
-        });
-        this.recipeListEl.appendChild(btn);
-        this._recipeDomCache.entries.push({ recipe: recipeRef, btn, craftable: false });
-      }
+    if (this.recipePageLabel) {
+      this.recipePageLabel.textContent = `${this.recipePage + 1} / ${totalPages}`;
+    }
+    if (this.recipePrevBtn) {
+      this.recipePrevBtn.disabled = this.recipePage <= 0;
+    }
+    if (this.recipeNextBtn) {
+      this.recipeNextBtn.disabled = this.recipePage >= totalPages - 1;
     }
 
-    for (let i = 0; i < list.length; i++) {
-      const item = this._recipeDomCache.entries[i];
-      const craftable = list[i].craftable;
-      item.craftable = craftable;
-      item.btn.classList.toggle('craftable', craftable);
-      item.btn.classList.toggle('missing', !craftable);
-      item.btn.classList.toggle('hidden', Boolean(this.onlyCraftableFilter && !craftable));
+    const start = this.recipePage * this.recipesPerPage;
+    const pageEntries = filtered.slice(start, start + this.recipesPerPage);
+
+    this.recipeListEl.innerHTML = '';
+    for (const entry of pageEntries) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'recipe-book-item';
+      btn.classList.toggle('craftable', entry.craftable);
+      btn.classList.toggle('missing', !entry.craftable);
+      btn.classList.toggle('requires-table', !entry.fitsInGrid);
+      btn.title = `${entry.resultDef?.name || 'Рецепт'} ×${entry.recipe.result.count}${!entry.fitsInGrid ? ' (Верстак 3×3)' : ''}`;
+
+      const img = document.createElement('img');
+      img.src = this.atlas.getItemIconDataURL(entry.recipe.result.id);
+      img.alt = entry.resultDef?.name || '';
+      img.draggable = false;
+
+      const label = document.createElement('span');
+      label.className = 'recipe-item-name';
+      label.textContent = `${entry.resultDef?.name || ''}${entry.recipe.result.count > 1 ? ` ×${entry.recipe.result.count}` : ''}`;
+
+      btn.append(img, label);
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.previewRecipe = entry.recipe.id;
+        this._renderRecipePreview(entry);
+        if (entry.craftable) {
+          this.autoFillRecipe(entry.recipe, e.shiftKey);
+        }
+      });
+      this.recipeListEl.appendChild(btn);
+    }
+
+    if (this.previewRecipe) {
+      const matchEntry = allList.find((e) => e.recipe.id === this.previewRecipe);
+      this._renderRecipePreview(matchEntry || null);
+    } else {
+      this.recipePreviewEl?.classList.add('hidden');
     }
   }
 
@@ -1528,8 +1718,8 @@ export class InventoryUI {
 
   _updateCursorGhost(x, y) {
     if (!this.cursorGhostEl || !this.cursorStack) return;
-    this.cursorGhostEl.style.left = `${x + 6}px`;
-    this.cursorGhostEl.style.top = `${y + 6}px`;
+    this.cursorGhostEl.style.left = `${x + 12}px`;
+    this.cursorGhostEl.style.top = `${y - 8}px`;
   }
 
   _showTooltip(stack, x, y) {
@@ -1566,6 +1756,21 @@ export class InventoryUI {
       }
       if (def.toolSpeed > 1) {
         lines.push(`Скорость: ${def.toolSpeed}×`);
+      }
+      if (def.meleeDamage > 1) {
+        lines.push(`Урон: ${def.meleeDamage}`);
+      }
+      if (def.isBow) {
+        lines.push('Зажмите ПКМ для натяжения тетивы (нужны Стрелы)');
+      }
+      if (def.isMilk) {
+        lines.push('Снимает эффекты голода и регенерации');
+      }
+      if (def.isPearl) {
+        lines.push('Телепортирует к месту попадания (−5 HP)');
+      }
+      if (def.isBoneMeal) {
+        lines.push('Мгновенно удобряет посевы и саженцы');
       }
       if (def.fluidId) {
         lines.push(def.fluidId === 74 ? 'Разливает лаву · топливо для печи (100 оп.)' : 'Разливает бесконечный источник воды');

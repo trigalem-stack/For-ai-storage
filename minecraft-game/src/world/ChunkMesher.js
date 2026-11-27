@@ -204,8 +204,10 @@ class ScratchMeshBuffer {
 }
 
 export class ChunkMesher {
-  constructor(atlas) {
+  constructor(atlas, options = {}) {
     this.atlas = atlas;
+    this.fancyLeaves = options.fancyLeaves !== undefined ? Boolean(options.fancyLeaves) : true;
+    this.smoothLighting = options.smoothLighting !== undefined ? Boolean(options.smoothLighting) : true;
 
     // Shared lighting uniforms across ALL terrain materials -> 0 ms CPU for full Day/Night & Held Torch cycle!
     this.lightUniforms = {
@@ -622,8 +624,9 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
 
           // 4. Standard cubic blocks (and slightly inset Cactus / 15px Farmland)
           const isIce = id === BLOCK_IDS.ICE;
+          const isLeaves = id === BLOCK_IDS.OAK_LEAVES || id === BLOCK_IDS.BIRCH_LEAVES || id === BLOCK_IDS.SPRUCE_LEAVES;
           const isTranslucent = def.isTransparent;
-          const buf = isIce ? iceBuf : (isTranslucent ? waterBuf : (def.isCutout ? cutoutBuf : opaqueBuf));
+          const buf = isIce ? iceBuf : (isTranslucent ? waterBuf : ((def.isCutout && (!isLeaves || this.fancyLeaves)) ? cutoutBuf : opaqueBuf));
           const farmlandDrop = def.isFarmland ? 0.0625 : 0;
           const farmlandWet = def.isFarmland && (chunk.getMeta(x, y, z) > 0);
           const inset = def.inset || 0;
@@ -641,6 +644,9 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
 
             if (def.isOpaque) {
               if (opaqueTable[neighborId] === 1) continue;
+            } else if (isLeaves && !this.fancyLeaves) {
+              const nbIsLeaves = neighborId === BLOCK_IDS.OAK_LEAVES || neighborId === BLOCK_IDS.BIRCH_LEAVES || neighborId === BLOCK_IDS.SPRUCE_LEAVES;
+              if (nbIsLeaves || opaqueTable[neighborId] === 1) continue;
             } else if (inset > 0 || farmlandDrop > 0) {
               if (face.ny !== 0 && (neighborId === id || opaqueTable[neighborId] === 1)) continue;
             } else if (isIce) {
@@ -704,7 +710,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
               let blkSum = centerBlk;
               let lightCount = 1;
 
-              if (!isTranslucent && inset === 0) {
+              if (!isTranslucent && inset === 0 && this.smoothLighting) {
                 const ox = corner[3];
                 const oy = corner[4];
                 const oz = corner[5];

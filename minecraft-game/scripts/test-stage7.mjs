@@ -544,7 +544,7 @@ async function runStage7Tests() {
     modifiedBlocks: [[3, 61, 3, BLOCK_IDS.WATER, 4], [4, 61, 3, BLOCK_IDS.STONE]],
   });
   const loadedV7 = await sm.loadWorld('stage7_test');
-  assert.equal(loadedV7.version, 7);
+  assert.ok(loadedV7.version >= 7);
   assert.deepEqual(loadedV7.modifiedBlocks, [[3, 61, 3, BLOCK_IDS.WATER, 4], [4, 61, 3, BLOCK_IDS.STONE]]);
 
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

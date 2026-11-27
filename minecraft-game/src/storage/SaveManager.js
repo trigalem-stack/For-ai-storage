@@ -160,7 +160,7 @@ export class SaveManager {
     const cleanMode = gameMode === 'creative' ? 'creative' : 'survival';
 
     const worldData = {
-      version: 6,
+      version: 8,
       id,
       name: cleanName,
       worldSeed: cleanSeed,
@@ -177,12 +177,16 @@ export class SaveManager {
         exhaustion: 0,
         airTicks: 300,
         score: 0,
+        xpLevel: 0,
+        xpProgress: 0,
+        xpTotal: 0,
         hungerDebuffTimer: 0,
       },
       player: null,
       hotbar: null,
       inventory: null,
       blockEntities: null,
+      entities: null,
       modifiedBlocks: [],
       createdAt: now,
       updatedAt: now,
@@ -223,7 +227,7 @@ export class SaveManager {
       : (existing?.gameMode || 'survival');
 
     const payload = {
-      version: 7,
+      version: 8,
       id: worldId,
       name,
       worldSeed: state.worldSeed,
@@ -237,6 +241,7 @@ export class SaveManager {
       hotbar: state.hotbar || null,
       inventory: state.inventory ?? existing?.inventory ?? null,
       blockEntities: state.blockEntities ?? existing?.blockEntities ?? null,
+      entities: state.entities !== undefined ? state.entities : (existing?.entities ?? null),
       modifiedBlocks: mods,
       createdAt,
       updatedAt: now,

@@ -192,6 +192,31 @@ class RecipeRegistryImpl {
     this._addShapeless('copper_ingot_from_block', [BLOCK_IDS.COPPER_BLOCK], { id: ITEM_IDS.COPPER_INGOT, count: 9 }, 'building');
     this._addShaped('bricks_block', ['BB', 'BB'], { B: ITEM_IDS.BRICK }, { id: BLOCK_IDS.BRICKS, count: 1 }, { category: 'building' });
     this._addShaped('bookshelf', ['PPP', 'CCC', 'PPP'], { P: ANY_PLANKS, C: ANY_PLANKS }, { id: BLOCK_IDS.BOOKSHELF, count: 1 }, { category: 'building' });
+
+    // 15. Stage 8 Weapons, Ammo, Explosives & Mob Drops
+    this._addShaped(
+      'bow',
+      [' S#', 'S #', ' S#'],
+      { '#': ITEM_IDS.STRING, S: ITEM_IDS.STICK },
+      { id: ITEM_IDS.BOW, count: 1 },
+      { category: 'tools', mirror: true }
+    );
+    this._addShaped(
+      'arrow',
+      ['F', 'S', 'E'],
+      { F: ITEM_IDS.FLINT, S: ITEM_IDS.STICK, E: ITEM_IDS.FEATHER },
+      { id: ITEM_IDS.ARROW, count: 4 },
+      { category: 'tools' }
+    );
+    this._addShaped(
+      'tnt',
+      ['GSG', 'SGS', 'GSG'],
+      { G: ITEM_IDS.GUNPOWDER, S: BLOCK_IDS.SAND },
+      { id: BLOCK_IDS.TNT, count: 1 },
+      { category: 'building' }
+    );
+    this._addShapeless('bone_meal', [ITEM_IDS.BONE], { id: ITEM_IDS.BONE_MEAL, count: 3 }, 'basic');
+    this._addShaped('wool_from_string', ['SS', 'SS'], { S: ITEM_IDS.STRING }, { id: BLOCK_IDS.WOOL_WHITE, count: 1 }, { category: 'building' });
   }
 
   _registerSmelting() {
@@ -383,14 +408,19 @@ class RecipeRegistryImpl {
     return true;
   }
 
-  getRecipeBookList(slots, gridSize = 3) {
+  getRecipeBookList(slots, gridSize = 3, includeAll = false) {
     return this.recipes
-      .filter((r) => this.fitsInGrid(r, gridSize))
-      .map((recipe) => ({
-        recipe,
-        craftable: this.canCraftFromSlots(recipe, slots, gridSize),
-        resultDef: ItemRegistry.get(recipe.result.id),
-      }))
+      .filter((r) => includeAll || this.fitsInGrid(r, gridSize))
+      .map((recipe) => {
+        const fits = this.fitsInGrid(recipe, gridSize);
+        const craftable = fits && this.canCraftFromSlots(recipe, slots, gridSize);
+        return {
+          recipe,
+          fitsInGrid: fits,
+          craftable,
+          resultDef: ItemRegistry.get(recipe.result.id),
+        };
+      })
       .sort((a, b) => Number(b.craftable) - Number(a.craftable));
   }
 }

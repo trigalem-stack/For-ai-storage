@@ -563,7 +563,7 @@ async function runStage6Tests() {
     'survival-hud', 'hud-hearts-row', 'hud-armor-row', 'hud-hunger-row', 'hud-oxygen-row',
     'damage-vignette', 'suffocation-vignette', 'death-overlay', 'btn-respawn',
     'virtual-cursor', 'vm-action-bar', 'vm-btn-pri', 'vm-btn-sec', 'vm-btn-shift', 'vm-btn-drop',
-    'btn-touch-mouse', 'btn-recipe-filter', 'btn-new-mode-survival', 'btn-new-mode-creative',
+    'btn-recipe-filter', 'btn-new-mode-survival', 'btn-new-mode-creative',
   ]) {
     assert.ok(html.includes(requiredId), `index.html missing Stage 6 element #${requiredId}`);
   }

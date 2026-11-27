@@ -9,9 +9,10 @@ export function blockCoordKey(wx, wy, wz) {
 
 export class BlockEntityManager {
   constructor() {
-    this.furnaces = new Map(); // key -> { x, y, z, input, fuel, output, burnTime, burnMax, cookTime, cookMax }
+    this.furnaces = new Map(); // key -> { x, y, z, input, fuel, output, burnTime, burnMax, cookTime, cookMax, storedXp }
     this.chests = new Map();   // key -> { x, y, z, slots: Array(27) }
     this.onChange = null;
+    this.onSmeltXp = null;
   }
 
   clear() {
@@ -38,6 +39,7 @@ export class BlockEntityManager {
         burnMax: 0,
         cookTime: 0,
         cookMax: FURNACE_COOK_TICKS,
+        storedXp: 0,
       };
       this.furnaces.set(key, f);
     }
@@ -113,6 +115,7 @@ export class BlockEntityManager {
           } else {
             f.output.count += smelt.count;
           }
+          f.storedXp = (f.storedXp || 0) + 1;
         }
         changed = true;
       } else {
@@ -151,6 +154,10 @@ export class BlockEntityManager {
           }
         }
       }
+      if ((f.storedXp || 0) > 0) {
+        this.onSmeltXp?.(f.x + 0.5, f.y + 0.5, f.z + 0.5, Math.floor(f.storedXp));
+        f.storedXp = 0;
+      }
       this.furnaces.delete(key);
     }
 
@@ -169,6 +176,14 @@ export class BlockEntityManager {
 
   exportState() {
     return this.serialize();
+  }
+
+  collectFurnaceXp(wx, wy, wz) {
+    const f = this.furnaces.get(blockCoordKey(wx, wy, wz));
+    if (!f || !f.storedXp || f.storedXp <= 0) return 0;
+    const xp = Math.floor(f.storedXp);
+    f.storedXp = 0;
+    return xp;
   }
 
   loadState(data) {
@@ -191,6 +206,7 @@ export class BlockEntityManager {
         burnTime: f.burnTime,
         burnMax: f.burnMax,
         cookTime: f.cookTime,
+        storedXp: f.storedXp || 0,
       })),
       chests: Array.from(this.chests.values()).map((c) => ({
         x: c.x,
@@ -218,6 +234,7 @@ export class BlockEntityManager {
         f.burnTime = raw.burnTime || 0;
         f.burnMax = raw.burnMax || 0;
         f.cookTime = raw.cookTime || 0;
+        f.storedXp = raw.storedXp || 0;
       }
     }
 

@@ -28,6 +28,7 @@ export class SkyRenderer {
     this.worldTime = ((initialTime % DAY_LENGTH_TICKS) + DAY_LENGTH_TICKS) % DAY_LENGTH_TICKS;
     this.dayCount = Math.max(1, initialDay | 0);
     this.cloudsEnabled = true;
+    this.starsEnabled = true;
     this.cloudScroll = 0;
 
     this.sunIntensity = 1.0;
@@ -359,6 +360,11 @@ export class SkyRenderer {
   setCloudsEnabled(enabled) {
     this.cloudsEnabled = Boolean(enabled);
     this.cloudMesh.visible = this.cloudsEnabled;
+  }
+
+  setStarsEnabled(enabled) {
+    this.starsEnabled = Boolean(enabled);
+    this.starsGroup.visible = this.starsEnabled;
   }
 
   setTime(ticks, dayCount = null) {

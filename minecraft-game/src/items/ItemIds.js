@@ -96,4 +96,17 @@ export const ITEM_IDS = Object.freeze({
   // Stage 7 Fluid Buckets
   WATER_BUCKET: 340,
   LAVA_BUCKET: 341,
+
+  // Stage 8 Combat, Mobs & Utility Drops
+  BOW: 342,
+  ARROW: 343,
+  GUNPOWDER: 344,
+  STRING: 345,
+  FEATHER: 346,
+  BONE: 347,
+  BONE_MEAL: 348,
+  EGG: 349,
+  ENDER_PEARL: 350,
+  MILK_BUCKET: 351,
+  SPIDER_EYE: 352,
 });

@@ -79,6 +79,7 @@ export const BLOCK_IDS = Object.freeze({
   MOSSY_COBBLESTONE: 73,
   LAVA: 74,
   OBSIDIAN: 75,
+  TNT: 76,
 });
 
 const TOOL_NAME_RU = Object.freeze({
@@ -169,6 +170,9 @@ class BlockRegistryImpl {
       tintType: def.tintType || null, // 'grass' | 'foliage' | 'spruce' | 'birch' | 'swamp'
       materialType: def.materialType || 'stone',
       hardness: def.hardness ?? 1.0,
+      blastResistance: def.blastResistance !== undefined
+        ? def.blastResistance
+        : (def.hardness < 0 ? 3600000 : def.isLiquid ? 100 : (def.materialType === 'stone' ? Math.max(2.0, (def.hardness ?? 1.5) * 4.0) : Math.max(0.2, (def.hardness ?? 0.5) * 1.5))),
       requiresTool: Boolean(def.requiresTool),
       preferredTool: def.preferredTool || null,
       minToolTier: def.minToolTier ?? (def.requiresTool ? 1 : 0),
@@ -278,6 +282,11 @@ class BlockRegistryImpl {
 
   getAllBlocks() {
     return this.byId.filter((b) => b && !b.isAir);
+  }
+
+  getBlastResistance(id) {
+    const b = this.byId[id];
+    return b ? (b.blastResistance ?? 0.5) : 0;
   }
 
   canHarvest(blockId, heldItem = null) {
@@ -1455,10 +1464,28 @@ class BlockRegistryImpl {
       name: 'Обсидиан',
       materialType: 'stone',
       hardness: 50.0,
+      blastResistance: 1200.0,
       requiresTool: true,
       preferredTool: 'pickaxe',
       minToolTier: 4,
       faces: this._allFaces('obsidian'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.TNT,
+      key: 'tnt',
+      name: 'Динамит (TNT)',
+      materialType: 'plant',
+      hardness: 0.0,
+      blastResistance: 0.0,
+      faces: {
+        top: 'tnt_top',
+        bottom: 'tnt_bottom',
+        north: 'tnt_side',
+        south: 'tnt_side',
+        east: 'tnt_side',
+        west: 'tnt_side',
+      },
     });
   }
 }

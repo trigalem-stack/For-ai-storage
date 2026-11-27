@@ -54,6 +54,25 @@ export const LAVA_TICK_DELAY = 30;
 export const MAX_FLUID_UPDATES_PER_TICK = 256;
 export const FLUID_FALLING_BIT = 8;
 
+// Stage 8 Combat, Mobs, Explosions & XP constants
+export const MOB_SPAWN_MIN_DIST = 24;
+export const MOB_SPAWN_MAX_DIST = 56;
+export const MOB_DESPAWN_DIST = 76;
+export const PASSIVE_MOB_CAP = 16;
+export const HOSTILE_MOB_CAP = 20;
+export const MELEE_REACH = 3.2;
+export const CRIT_MULTIPLIER = 1.5;
+export const BOW_CHARGE_SEC = 1.0;
+export const ARROW_BASE_DAMAGE = 9;
+export const CREEPER_EXPLOSION_POWER = 3.0;
+export const CREEPER_FUSE_SEC = 1.5;
+export const CREEPER_IGNITE_RANGE = 3.0;
+export const CREEPER_CANCEL_RANGE = 7.0;
+export const TNT_EXPLOSION_POWER = 4.0;
+export const TNT_FUSE_TICKS = 80; // 4.0s at 20 TPS
+export const XP_MAGNET_RANGE = 6.5;
+export const XP_PICKUP_RANGE = 1.35;
+
 // Player AABB hitbox & eye dimensions (authentic Minecraft Java proportions)
 export const PLAYER_WIDTH = 0.6;
 export const PLAYER_HALF_WIDTH = PLAYER_WIDTH * 0.5; // 0.3

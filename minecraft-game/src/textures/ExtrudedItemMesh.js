@@ -72,25 +72,25 @@ export function getExtrudedTileGeometry(atlas, tileName, options = {}) {
       const y0 = y1 - pxSize;
 
       // Front (+Z)
-      pushQuad([x0, y0, halfZ], [x1, y0, halfZ], [x1, y1, halfZ], [x0, y1, halfZ], 0, 0, 1, r, g, b, 0.98);
+      pushQuad([x0, y0, halfZ], [x1, y0, halfZ], [x1, y1, halfZ], [x0, y1, halfZ], 0, 0, 1, r, g, b, 1.0);
       // Back (-Z)
-      pushQuad([x1, y0, -halfZ], [x0, y0, -halfZ], [x0, y1, -halfZ], [x1, y1, -halfZ], 0, 0, -1, r, g, b, 0.92);
+      pushQuad([x1, y0, -halfZ], [x0, y0, -halfZ], [x0, y1, -halfZ], [x1, y1, -halfZ], 0, 0, -1, r, g, b, 0.96);
 
       // Left (-X)
       if (!isOpaque(x - 1, y)) {
-        pushQuad([x0, y0, -halfZ], [x0, y0, halfZ], [x0, y1, halfZ], [x0, y1, -halfZ], -1, 0, 0, r, g, b, 0.82);
+        pushQuad([x0, y0, -halfZ], [x0, y0, halfZ], [x0, y1, halfZ], [x0, y1, -halfZ], -1, 0, 0, r, g, b, 0.86);
       }
       // Right (+X)
       if (!isOpaque(x + 1, y)) {
-        pushQuad([x1, y0, halfZ], [x1, y0, -halfZ], [x1, y1, -halfZ], [x1, y1, halfZ], 1, 0, 0, r, g, b, 0.82);
+        pushQuad([x1, y0, halfZ], [x1, y0, -halfZ], [x1, y1, -halfZ], [x1, y1, halfZ], 1, 0, 0, r, g, b, 0.86);
       }
       // Top (+Y -> smaller y index)
       if (!isOpaque(x, y - 1)) {
-        pushQuad([x0, y1, halfZ], [x1, y1, halfZ], [x1, y1, -halfZ], [x0, y1, -halfZ], 0, 1, 0, r, g, b, 1.0);
+        pushQuad([x0, y1, halfZ], [x1, y1, halfZ], [x1, y1, -halfZ], [x0, y1, -halfZ], 0, 1, 0, r, g, b, 0.95);
       }
       // Bottom (-Y -> larger y index)
       if (!isOpaque(x, y + 1)) {
-        pushQuad([x0, y0, -halfZ], [x1, y0, -halfZ], [x1, y0, halfZ], [x0, y0, halfZ], 0, -1, 0, r, g, b, 0.72);
+        pushQuad([x0, y0, -halfZ], [x1, y0, -halfZ], [x1, y0, halfZ], [x0, y0, halfZ], 0, -1, 0, r, g, b, 0.78);
       }
     }
   }

@@ -20,6 +20,8 @@ export class MobileControls {
     this.btnBreak = document.getElementById('btn-touch-break');
     this.btnPlace = document.getElementById('btn-touch-place');
     this.btnFly = document.getElementById('btn-touch-fly');
+    this.btnDropOne = document.getElementById('btn-hud-drop-one');
+    this.btnDropAll = document.getElementById('btn-hud-drop-all');
 
     this.enabled = false;
     this.touchSensitivity = 0.0052;
@@ -73,7 +75,7 @@ export class MobileControls {
     }
     if (active && this.crouchToggled) {
       this.crouchToggled = false;
-      this.player.touchInput.crouch = false;
+      if (this.player) this.player.touchInput.crouch = false;
       this.btnCrouch?.classList.remove('active');
     }
   }
@@ -84,10 +86,20 @@ export class MobileControls {
     }
   }
 
-  setHeldFoodIndicator(isFood) {
-    if (this.btnPlace) {
-      this.btnPlace.textContent = isFood ? '🍖' : '🧱';
-      this.btnPlace.title = isFood ? 'Зажмите, чтобы съесть (1.6с)' : 'Поставить / Использовать';
+  setHeldFoodIndicator(isFood, modeTag = '') {
+    if (!this.btnPlace) return;
+    if (modeTag === 'bow') {
+      this.btnPlace.textContent = '🏹';
+      this.btnPlace.title = 'Зажмите, чтобы натянуть лук и отпустите для выстрела';
+    } else if (modeTag === 'throw') {
+      this.btnPlace.textContent = '🎯';
+      this.btnPlace.title = 'Бросить';
+    } else if (isFood) {
+      this.btnPlace.textContent = '🍖';
+      this.btnPlace.title = 'Зажмите, чтобы съесть / выпить';
+    } else {
+      this.btnPlace.textContent = '🧱';
+      this.btnPlace.title = 'Поставить / Использовать';
     }
   }
 
@@ -109,13 +121,13 @@ export class MobileControls {
     this.crouchToggled = false;
     this.longPressTriggered = false;
     this.sprintLocked = false;
-    this.player.touchInput.moveX = 0;
-    this.player.touchInput.moveZ = 0;
-    this.player.touchInput.jump = false;
-    this.player.touchInput.crouch = false;
-    this.player.touchInput.sprint = false;
-    this.player.touchInput.breakHeld = false;
     if (this.player) {
+      this.player.touchInput.moveX = 0;
+      this.player.touchInput.moveZ = 0;
+      this.player.touchInput.jump = false;
+      this.player.touchInput.crouch = false;
+      this.player.touchInput.sprint = false;
+      this.player.touchInput.breakHeld = false;
       this.player.touchInput.useHeld = false;
       this.player.stopEating?.();
     }
@@ -131,7 +143,7 @@ export class MobileControls {
 
     // Entire left half of screen spawns the joystick right where user's finger touches!
     this.moveZone?.addEventListener('touchstart', (e) => {
-      if (!this.enabled) return;
+      if (!this.enabled || !this.player) return;
       e.preventDefault();
       e.stopPropagation();
       if (this.joystickTouchId !== null) return;
@@ -165,7 +177,7 @@ export class MobileControls {
 
     // Right half of screen controls camera look (swipe = look, quick tap = place, long hold = break)
     this.lookZone?.addEventListener('touchstart', (e) => {
-      if (!this.enabled) return;
+      if (!this.enabled || !this.player) return;
       e.preventDefault();
       if (this.lookTouchId !== null) return;
       const touch = e.changedTouches[0];
@@ -190,7 +202,7 @@ export class MobileControls {
     }, { passive: false });
 
     this._onTouchMove = (e) => {
-      if (!this.enabled) return;
+      if (!this.enabled || !this.player) return;
       let handled = false;
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
@@ -215,6 +227,7 @@ export class MobileControls {
     };
 
     this._onTouchEnd = (e) => {
+      if (!this.player) return;
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
         if (t.identifier === this.joystickTouchId) {
@@ -252,7 +265,7 @@ export class MobileControls {
       if (!btn) return;
       let activeId = null;
       btn.addEventListener('touchstart', (e) => {
-        if (!this.enabled) return;
+        if (!this.enabled || !this.player) return;
         e.preventDefault();
         e.stopPropagation();
         const t = e.changedTouches[0];
@@ -262,6 +275,7 @@ export class MobileControls {
       }, { passive: false });
 
       const finish = (e) => {
+        if (!this.player) return;
         for (let i = 0; i < e.changedTouches.length; i++) {
           if (e.changedTouches[i].identifier === activeId) {
             activeId = null;
@@ -313,16 +327,42 @@ export class MobileControls {
       }
     );
 
-    // Dedicated Break button (instant creative break + hold repeat)
+    // Dedicated Break / Attack button (instant melee swing/attack + creative/survival break hold)
     bindHoldBtn(
       this.btnBreak,
       () => {
         this.player.touchInput.breakHeld = true;
+        this.player.firstPersonHand?.triggerSwing?.();
+        this.callbacks.onPrimaryAttack?.();
       },
       () => {
         this.player.touchInput.breakHeld = false;
       }
     );
+
+    // HUD Drop 1 & Drop All quick touch buttons
+    const bindSimpleTap = (btn, handler) => {
+      if (!btn) return;
+      let lastTouch = -99999;
+      btn.addEventListener('touchstart', (e) => {
+        if (!this.enabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        lastTouch = performance.now();
+        btn.classList.add('pressed');
+        setTimeout(() => btn.classList.remove('pressed'), 120);
+        handler();
+      }, { passive: false });
+      btn.addEventListener('mousedown', (e) => {
+        if (!this.enabled) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (performance.now() - lastTouch < 950) return;
+        handler();
+      });
+    };
+    bindSimpleTap(this.btnDropOne, () => this.callbacks.onDropOne?.());
+    bindSimpleTap(this.btnDropAll, () => this.callbacks.onDropAll?.());
 
     // Dedicated Place / Eat-Hold button
     bindHoldBtn(
@@ -340,7 +380,7 @@ export class MobileControls {
     // Fly quick toggle button
     if (this.btnFly) {
       this.btnFly.addEventListener('touchstart', (e) => {
-        if (!this.enabled) return;
+        if (!this.enabled || !this.player) return;
         e.preventDefault();
         e.stopPropagation();
         const active = this.player.toggleFlyMode();

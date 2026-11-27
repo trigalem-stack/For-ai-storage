@@ -63,6 +63,31 @@ export class PlayerController {
     this.exhaustion = options.exhaustion ?? 0;
     this.airTicks = options.airTicks ?? MAX_AIR_TICKS;
     this.score = options.score ?? 0;
+    this.xpLevel = options.xpLevel ?? 0;
+    this.xpProgress = options.xpProgress ?? 0;
+    this.xpTotal = options.xpTotal ?? 0;
+    this.eatParticleTimer = 0;
+
+    // Lightweight compatibility proxies for entity/explosion subsystems
+    const self = this;
+    this.position = {
+      get x() { return self.x; },
+      set x(v) { self.x = v; },
+      get y() { return self.y; },
+      set y(v) { self.y = v; },
+      get z() { return self.z; },
+      set z(v) { self.z = v; },
+      set(nx, ny, nz) { self.x = nx; self.y = ny; self.z = nz; self.fallDistance = 0; },
+    };
+    this.velocity = {
+      get x() { return self.vx; },
+      set x(v) { self.vx = v; },
+      get y() { return self.vy; },
+      set y(v) { self.vy = v; },
+      get z() { return self.vz; },
+      set z(v) { self.vz = v; },
+      set(nx, ny, nz) { self.vx = nx; self.vy = ny; self.vz = nz; },
+    };
 
     this.hurtTimer = 0; // seconds of invulnerability frames (0.5s)
     this.hurtTilt = 0;  // camera roll tilt on hit
@@ -112,6 +137,7 @@ export class PlayerController {
     this.keys = new Set();
     this.pointerLocked = false;
     this.isPaused = false;
+    this.guiOpen = false;
     this.mouseSensitivity = options.sensitivity ?? 0.0022;
     this.lastSpaceTime = 0;
     this.lastWDownTime = 0;
@@ -142,7 +168,12 @@ export class PlayerController {
     this.onDamage = options.onDamage || null;
     this.onDeath = options.onDeath || null;
     this.onEatComplete = options.onEatComplete || null;
+    this.onEatTick = options.onEatTick || null;
     this.onVitalsChange = options.onVitalsChange || null;
+    this.inventory = options.inventory || null;
+    this.selectedHotbarIndex = 0;
+    this.onGetHeldStack = options.onGetHeldStack || null;
+    this.onConsumeHeld = options.onConsumeHeld || null;
 
     this._lookVec = new THREE.Vector3();
     this._eyeOrigin = new THREE.Vector3();
@@ -169,7 +200,7 @@ export class PlayerController {
         }
         return;
       }
-      if (this.isPaused) return;
+      if (this.isPaused || this.guiOpen) return;
 
       if (e.code === 'KeyF' && !e.repeat) {
         this.toggleFlyMode();
@@ -207,15 +238,16 @@ export class PlayerController {
     };
 
     this._onMouseMove = (e) => {
-      if (!this.pointerLocked || this.isPaused) return;
+      if (!this.pointerLocked || this.isPaused || this.guiOpen) return;
       this.applyLookDelta(e.movementX, e.movementY, this.mouseSensitivity);
     };
 
     this._onMouseDown = (e) => {
-      if (this.isPaused || !this.pointerLocked || this.isDead) return;
+      if (this.isPaused || this.guiOpen || !this.pointerLocked || this.isDead) return;
       if (e.button === 0) {
         this.primaryHeld = true;
         this.firstPersonHand.triggerSwing();
+        this.onPrimaryAttack?.();
       } else if (e.button === 1) {
         e.preventDefault();
         this.onPickBlock?.();
@@ -260,20 +292,76 @@ export class PlayerController {
   }
 
   isMiningHeld() {
-    return !this.isDead && ((this.primaryHeld && this.pointerLocked && !this.isPaused) || (this.touchInput.breakHeld && !this.isPaused));
+    return !this.isDead && !this.guiOpen && ((this.primaryHeld && this.pointerLocked && !this.isPaused) || (this.touchInput.breakHeld && !this.isPaused));
   }
 
   isSecondaryHeld() {
-    return !this.isDead && ((this.secondaryHeld && this.pointerLocked && !this.isPaused) || (this.touchInput.useHeld && !this.isPaused));
+    return !this.isDead && !this.guiOpen && ((this.secondaryHeld && this.pointerLocked && !this.isPaused) || (this.touchInput.useHeld && !this.isPaused));
   }
 
   triggerPlaceAction() {
-    if (this.isPaused || this.isDead) return false;
+    if (this.isPaused || this.guiOpen || this.isDead) return false;
     const placed = this.onPlaceAction?.();
     if (placed) {
       this.firstPersonHand.triggerSwing();
     }
     return Boolean(placed);
+  }
+
+  get halfWidth() {
+    return PLAYER_HALF_WIDTH;
+  }
+
+  get height() {
+    return this.getCurrentHitboxHeight();
+  }
+
+  get gameMode() {
+    return this.creativeMode ? 'creative' : 'survival';
+  }
+
+  applyDamage(amount, sourceType = 'generic') {
+    return this.damage(amount, sourceType);
+  }
+
+  getHeldStack() {
+    return this.onGetHeldStack?.() || null;
+  }
+
+  consumeHeldItem(count = 1) {
+    return this.onConsumeHeld?.(count) || false;
+  }
+
+  getXpToNextLevel(level = this.xpLevel) {
+    if (level >= 31) return 9 * level - 158;
+    if (level >= 16) return 5 * level - 38;
+    return 2 * level + 7;
+  }
+
+  addXp(amount) {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    let remaining = amount;
+    this.xpTotal += amount;
+    this.score += amount;
+    while (remaining > 0) {
+      const needed = Math.max(1, this.getXpToNextLevel(this.xpLevel));
+      const curInLevel = this.xpProgress * needed;
+      if (curInLevel + remaining >= needed) {
+        remaining -= (needed - curInLevel);
+        this.xpLevel += 1;
+        this.xpProgress = 0;
+      } else {
+        this.xpProgress = (curInLevel + remaining) / needed;
+        remaining = 0;
+      }
+    }
+    this.onVitalsChange?.();
+  }
+
+  clearEffects() {
+    this.hungerDebuffTimer = 0;
+    this.goldenRegenTimer = 0;
+    this.onVitalsChange?.();
   }
 
   getEyeOrigin() {
@@ -454,11 +542,15 @@ export class PlayerController {
     if (this.health <= 0) {
       this.health = 0;
       this.isDead = true;
+      const deathXp = Math.min(100, this.xpLevel * 7);
+      this.xpLevel = 0;
+      this.xpProgress = 0;
+      this.xpTotal = 0;
       this.stopEating();
       this.primaryHeld = false;
       this.touchInput.breakHeld = false;
       this.keys.clear();
-      this.onDeath?.(sourceType);
+      this.onDeath?.(sourceType, deathXp);
     }
     return true;
   }
@@ -496,6 +588,10 @@ export class PlayerController {
     this.vx = 0;
     this.vy = 0;
     this.vz = 0;
+    this.xpLevel = 0;
+    this.xpProgress = 0;
+    this.xpTotal = 0;
+    this.score = 0;
     this.stopEating();
     if (spawnPose) {
       this.x = spawnPose.x;
@@ -518,6 +614,9 @@ export class PlayerController {
       exhaustion: this.exhaustion,
       airTicks: this.airTicks,
       score: this.score,
+      xpLevel: this.xpLevel,
+      xpProgress: this.xpProgress,
+      xpTotal: this.xpTotal,
       hungerDebuffTimer: this.hungerDebuffTimer,
       fireTicks: this.fireTicks,
     };
@@ -532,6 +631,9 @@ export class PlayerController {
     if (Number.isFinite(s.exhaustion)) this.exhaustion = Math.max(0, s.exhaustion);
     if (Number.isFinite(s.airTicks)) this.airTicks = Math.max(0, Math.min(MAX_AIR_TICKS, s.airTicks));
     if (Number.isFinite(s.score)) this.score = Math.max(0, s.score | 0);
+    if (Number.isFinite(s.xpLevel)) this.xpLevel = Math.max(0, s.xpLevel | 0);
+    if (Number.isFinite(s.xpProgress)) this.xpProgress = Math.max(0, Math.min(1, s.xpProgress));
+    if (Number.isFinite(s.xpTotal)) this.xpTotal = Math.max(0, s.xpTotal | 0);
     if (Number.isFinite(s.hungerDebuffTimer)) this.hungerDebuffTimer = Math.max(0, s.hungerDebuffTimer);
     if (Number.isFinite(s.fireTicks)) this.fireTicks = Math.max(0, s.fireTicks);
     this.isDead = this.health <= 0 && !this.creativeMode;
@@ -540,6 +642,22 @@ export class PlayerController {
 
   _syncVisibility() {
     this.playerModel.setVisible(this.cameraMode !== CAMERA_MODES.FIRST_PERSON);
+  }
+
+  setGuiOpen(open) {
+    this.guiOpen = Boolean(open);
+    if (this.guiOpen) {
+      this.keys.clear();
+      this.primaryHeld = false;
+      this.secondaryHeld = false;
+      this.touchInput.breakHeld = false;
+      this.touchInput.useHeld = false;
+      this.sprintToggled = false;
+      this.stopEating();
+      if (document.pointerLockElement) {
+        document.exitPointerLock?.();
+      }
+    }
   }
 
   setPaused(paused) {
@@ -629,11 +747,18 @@ export class PlayerController {
     // Eating progress tick
     if (this.eatActive) {
       this.eatElapsed += dt;
+      this.eatParticleTimer += dt;
+      if (this.eatParticleTimer >= 0.22) {
+        this.eatParticleTimer = 0;
+        this.onEatTick?.(this.eatItemId);
+      }
       if (this.eatElapsed >= this.eatDuration) {
         const finishedId = this.eatItemId;
         this.stopEating();
         this.onEatComplete?.(finishedId);
       }
+    } else {
+      this.eatParticleTimer = 0;
     }
 
     const prevX = this.x;
@@ -641,15 +766,18 @@ export class PlayerController {
     const prevZ = this.z;
     const wasOnGround = this.onGround;
 
+    const acceptInput = !this.guiOpen;
     let forward = 0;
     let strafe = 0;
-    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) forward += 1;
-    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) forward -= 1;
-    if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) strafe += 1;
-    if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) strafe -= 1;
+    if (acceptInput) {
+      if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) forward += 1;
+      if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) forward -= 1;
+      if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) strafe += 1;
+      if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) strafe -= 1;
 
-    forward += this.touchInput.moveZ;
-    strafe += this.touchInput.moveX;
+      forward += this.touchInput.moveZ;
+      strafe += this.touchInput.moveX;
+    }
 
     const len = Math.hypot(forward, strafe);
     if (len > 1) {
@@ -657,13 +785,14 @@ export class PlayerController {
       strafe /= len;
     }
 
-    const wantJump = this.keys.has('Space') || this.touchInput.jump;
-    const wantCrouch = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchInput.crouch;
-    const rawSprint =
+    const wantJump = acceptInput && (this.keys.has('Space') || this.touchInput.jump);
+    const wantCrouch = acceptInput && (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchInput.crouch);
+    const rawSprint = acceptInput && (
       this.keys.has('ControlLeft') ||
       this.keys.has('ControlRight') ||
       this.sprintToggled ||
-      this.touchInput.sprint;
+      this.touchInput.sprint
+    );
     const wantSprint = (this.creativeMode || this.foodLevel > 6) && !this.eatActive && rawSprint;
 
     // Water, Lava & Ladder submersion probe

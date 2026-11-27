@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#2d63b8">
-  <title>Minecraft Web Edition — Stage 7</title>
+  <title>Minecraft Web Edition — Stage 8</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -42,9 +42,6 @@
 
   <!-- Top-Right Utility HUD (High-responsiveness mobile buttons) -->
   <div id="hud-top-right">
-    <button id="btn-touch-mouse" class="mc-hud-btn hidden" type="button" title="Виртуальная мышь">
-      <span aria-hidden="true">🖱️</span>
-    </button>
     <button id="btn-camera" class="mc-hud-btn" type="button" title="Сменить вид камеры (F5)">
       <span aria-hidden="true">🎥</span><span class="btn-sub">F5</span>
     </button>
@@ -68,15 +65,23 @@
   <!-- Status Toast -->
   <div id="hud-toast" class="hidden" role="status" aria-live="polite"></div>
 
-  <!-- Survival Vitals HUD (Armor, Hearts, Oxygen, Hunger right above Hotbar) -->
+  <!-- Survival Vitals & XP HUD (Armor, Hearts, Oxygen, Hunger, XP right above Hotbar) -->
   <div id="survival-hud" class="hidden" aria-label="Показатели выживания">
-    <div class="vitals-col vitals-left">
-      <div id="hud-armor-row" class="vitals-row hidden" aria-label="Броня"></div>
-      <div id="hud-hearts-row" class="vitals-row" aria-label="Здоровье"></div>
+    <div class="vitals-top-rows">
+      <div class="vitals-col vitals-left">
+        <div id="hud-armor-row" class="vitals-row hidden" aria-label="Броня"></div>
+        <div id="hud-hearts-row" class="vitals-row" aria-label="Здоровье"></div>
+      </div>
+      <div class="vitals-col vitals-right">
+        <div id="hud-oxygen-row" class="vitals-row hidden" aria-label="Кислород"></div>
+        <div id="hud-hunger-row" class="vitals-row" aria-label="Голод"></div>
+      </div>
     </div>
-    <div class="vitals-col vitals-right">
-      <div id="hud-oxygen-row" class="vitals-row hidden" aria-label="Кислород"></div>
-      <div id="hud-hunger-row" class="vitals-row" aria-label="Голод"></div>
+    <div id="hud-xp-row" class="hud-xp-row" aria-label="Опыт">
+      <div id="hud-xp-level" class="hud-xp-level hidden">0</div>
+      <div id="hud-xp-bar" class="hud-xp-bar">
+        <div id="hud-xp-fill" class="hud-xp-fill"></div>
+      </div>
     </div>
   </div>
 
@@ -98,6 +103,12 @@
           <button id="btn-recipe-filter" class="mc-hud-btn inv-tool-btn" type="button" title="Показать только доступные">Все</button>
         </div>
         <div id="inv-recipe-list" class="inv-recipe-list"></div>
+        <div id="inv-recipe-pagination" class="inv-recipe-pagination">
+          <button id="btn-recipe-prev" class="mc-hud-btn inv-tool-btn" type="button" title="Назад">◀</button>
+          <span id="recipe-page-label" class="recipe-page-label">1 / 1</span>
+          <button id="btn-recipe-next" class="mc-hud-btn inv-tool-btn" type="button" title="Вперёд">▶</button>
+        </div>
+        <div id="inv-recipe-preview" class="inv-recipe-preview hidden"></div>
       </div>
 
       <div id="inventory-window" class="mc-modal inv-main-modal">
@@ -152,7 +163,11 @@
     <div id="touch-action-cluster">
       <div class="touch-col">
         <button id="btn-touch-fly" class="mc-touch-btn mc-touch-small hidden" type="button" title="Полёт (или 2×▲)">🕊️</button>
-        <button id="btn-touch-break" class="mc-touch-btn mc-touch-break" type="button" title="Ломать блок">⛏</button>
+        <div class="touch-drop-pair">
+          <button id="btn-hud-drop-one" class="mc-touch-btn mc-touch-mini" type="button" title="Выбросить 1 шт.">1↓</button>
+          <button id="btn-hud-drop-all" class="mc-touch-btn mc-touch-mini" type="button" title="Выбросить весь стак">Q↓</button>
+        </div>
+        <button id="btn-touch-break" class="mc-touch-btn mc-touch-break" type="button" title="Ломать / Атаковать">⚔️</button>
       </div>
       <div class="touch-col">
         <button id="btn-touch-place" class="mc-touch-btn mc-touch-place" type="button" title="Поставить / Использовать">🧱</button>
@@ -196,7 +211,7 @@
       <div class="mc-logo-badge">
         <div class="mc-cube-badge"></div>
         <h1 id="main-title">MINECRAFT WEB</h1>
-        <p class="mc-modal-sub">Этап 7 · Вода и Лава · Пещеры и Озёра · Вёдра · Инвентарь</p>
+        <p class="mc-modal-sub">Этап 8 · Мобы · Бой · Луки · Динамит · Опыт · Частицы</p>
       </div>
       <div class="mc-modal-actions">
         <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">▶ Играть (Миры)</button>
@@ -242,7 +257,12 @@
         <div class="settings-tab-panel" data-tab-panel="graphics">
           <button id="btn-fog-mode" class="mc-menu-btn" type="button">Туман: ВЫКЛ</button>
           <button id="btn-clouds-mode" class="mc-menu-btn" type="button">Облака и небо: ВКЛ</button>
-          <button id="btn-graphics-mode" class="mc-menu-btn" type="button">Графика: Улучшенная (чёткий PixelRatio)</button>
+          <button id="btn-stars-mode" class="mc-menu-btn" type="button">Звёзды ночью: ВКЛ</button>
+          <button id="btn-leaves-mode" class="mc-menu-btn" type="button">Листва: Детальная (Fancy)</button>
+          <button id="btn-smooth-light-mode" class="mc-menu-btn" type="button">Мягкое освещение (AO): ВКЛ</button>
+          <button id="btn-anim-fluid-mode" class="mc-menu-btn" type="button">Анимация воды и лавы: ВКЛ</button>
+          <button id="btn-particles-mode" class="mc-menu-btn" type="button">Частицы: Все</button>
+          <button id="btn-graphics-mode" class="mc-menu-btn" type="button">Разрешение: Улучшенное (чёткий PixelRatio)</button>
           <button id="btn-memory-mode" class="mc-menu-btn" type="button">Память мира: Бесконечная (∞)</button>
 
           <label class="mc-slider-row" for="range-render-dist">
@@ -262,8 +282,8 @@
           <div class="mc-help-box">
             <b>Телефон:</b><br>
             • Левая половина экрана — динамический джойстик (появляется под пальцем)<br>
-            • 2×быстрое движение вперёд с удержанием — бег; 🖱️ — виртуальный курсор как в PojavLauncher<br>
-            • Зажатие 🍖 ест еду; тап/удержание правой половины — обзор, ставить, ломать<br><br>
+            • 2×быстрое движение вперёд с удержанием — бег; виртуальный курсор включается в инвентаре и крафте<br>
+            • Кнопки 1↓ / Q↓ выбрасывают предметы; ⚔️ атакует/ломает; зажатие справа — есть/натягивать лук<br><br>
             <b>ПК:</b> 2×W — бег, E — инвентарь, Q — выбросить, F3/F5 — отладка/камера. (Полёт доступен в мирах режима Креатив!)
           </div>
         </div>

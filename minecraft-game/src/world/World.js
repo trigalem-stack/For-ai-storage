@@ -18,7 +18,11 @@ export class World {
     this.onBlockChanged = options.onBlockChanged || null;
 
     this.worldGen = new WorldGen(seed);
-    this.mesher = new ChunkMesher(atlas);
+    this.mesher = new ChunkMesher(atlas, {
+      fancyLeaves: options.fancyLeaves !== undefined ? options.fancyLeaves : true,
+      smoothLighting: options.smoothLighting !== undefined ? options.smoothLighting : true,
+    });
+    this.animatedFluids = options.animatedFluids !== undefined ? Boolean(options.animatedFluids) : true;
     this.lighting = new LightingEngine();
     this.fluids = new FluidSimulator({ onWashBlock: options.onWashBlock || null });
 
@@ -206,6 +210,29 @@ export class World {
     }
   }
 
+  applyGraphicsSettings({ fancyLeaves, smoothLighting, animatedFluids } = {}) {
+    let needsRemesh = false;
+    if (fancyLeaves !== undefined && this.mesher.fancyLeaves !== Boolean(fancyLeaves)) {
+      this.mesher.fancyLeaves = Boolean(fancyLeaves);
+      needsRemesh = true;
+    }
+    if (smoothLighting !== undefined && this.mesher.smoothLighting !== Boolean(smoothLighting)) {
+      this.mesher.smoothLighting = Boolean(smoothLighting);
+      needsRemesh = true;
+    }
+    if (animatedFluids !== undefined) {
+      this.animatedFluids = Boolean(animatedFluids);
+      if (!this.animatedFluids) {
+        this.mesher.setFluidTime(0);
+      }
+    }
+    if (needsRemesh) {
+      for (const chunk of this.chunks.values()) {
+        if (chunk.isGenerated) chunk.dirty = true;
+      }
+    }
+  }
+
   loadModifiedBlocks(entries) {
     this.modifiedBlocks.clear();
     this.modifiedByChunk.clear();
@@ -333,6 +360,31 @@ export class World {
       sky: chunk.getSkyLight(lx, fy, lz),
       block: chunk.getBlockLight(lx, fy, lz),
     };
+  }
+
+  getSkyLight(wx, wy, wz) {
+    if (wy >= WORLD_HEIGHT) return 15;
+    if (wy < 0) return 0;
+    const fx = Math.floor(wx);
+    const fy = Math.floor(wy);
+    const fz = Math.floor(wz);
+    const cx = Math.floor(fx / CHUNK_SIZE);
+    const cz = Math.floor(fz / CHUNK_SIZE);
+    const chunk = this.chunks.get(chunkKey(cx, cz));
+    if (!chunk || !chunk.isGenerated) return 15;
+    return chunk.getSkyLight(fx - cx * CHUNK_SIZE, fy, fz - cz * CHUNK_SIZE);
+  }
+
+  getBlockLight(wx, wy, wz) {
+    if (wy < 0 || wy >= WORLD_HEIGHT) return 0;
+    const fx = Math.floor(wx);
+    const fy = Math.floor(wy);
+    const fz = Math.floor(wz);
+    const cx = Math.floor(fx / CHUNK_SIZE);
+    const cz = Math.floor(fz / CHUNK_SIZE);
+    const chunk = this.chunks.get(chunkKey(cx, cz));
+    if (!chunk || !chunk.isGenerated) return 0;
+    return chunk.getBlockLight(fx - cx * CHUNK_SIZE, fy, fz - cz * CHUNK_SIZE);
   }
 
   getBiomeAt(wx, wz) {
@@ -729,8 +781,10 @@ export class World {
   }
 
   update(playerX, playerZ, dt = 0.016) {
-    this._fluidAnimTime += dt;
-    this.mesher.setFluidTime(this._fluidAnimTime);
+    if (this.animatedFluids) {
+      this._fluidAnimTime += dt;
+      this.mesher.setFluidTime(this._fluidAnimTime);
+    }
     this.lighting.update(dt, this);
 
     const pcx = Math.floor(playerX / CHUNK_SIZE);

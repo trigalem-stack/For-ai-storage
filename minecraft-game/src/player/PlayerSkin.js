@@ -247,7 +247,7 @@ export class PlayerModel {
       side: THREE.DoubleSide,
     }) : null;
 
-    this.heldExtrudedMat = new THREE.MeshLambertMaterial({
+    this.heldExtrudedMat = new THREE.MeshBasicMaterial({
       vertexColors: true,
       side: THREE.FrontSide,
     });
