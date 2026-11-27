@@ -68,6 +68,25 @@ export class FirstPersonHand {
     this.isMining = false;
     this.isEating = false;
     this.eatTime = 0;
+
+    // Pure-white WebGL crosshair overlay (immune to Android/MIUI Force Dark CSS inversion)
+    const initW = Math.max(1, window.innerWidth || 1280);
+    const initH = Math.max(1, window.innerHeight || 720);
+    this.crosshairScene = new THREE.Scene();
+    this.crosshairCamera = new THREE.OrthographicCamera(0, initW, initH, 0, -1, 1);
+    this.crosshairMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    this.crosshairV = new THREE.Mesh(new THREE.PlaneGeometry(2, 18), this.crosshairMat);
+    this.crosshairH = new THREE.Mesh(new THREE.PlaneGeometry(18, 2), this.crosshairMat);
+    const cx = Math.round(initW * 0.5);
+    const cy = Math.round(initH * 0.5);
+    this.crosshairV.position.set(cx, cy, 0);
+    this.crosshairH.position.set(cx, cy, 0);
+    this.crosshairScene.add(this.crosshairV, this.crosshairH);
   }
 
   // Alias preserved for Stage 2/4 tests
@@ -76,8 +95,20 @@ export class FirstPersonHand {
   }
 
   resize(width, height) {
-    this.camera.aspect = width / Math.max(1, height);
+    const w = Math.max(1, width);
+    const h = Math.max(1, height);
+    this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+
+    this.crosshairCamera.left = 0;
+    this.crosshairCamera.right = w;
+    this.crosshairCamera.top = h;
+    this.crosshairCamera.bottom = 0;
+    this.crosshairCamera.updateProjectionMatrix();
+    const cx = Math.round(w * 0.5);
+    const cy = Math.round(h * 0.5);
+    this.crosshairV.position.set(cx, cy, 0);
+    this.crosshairH.position.set(cx, cy, 0);
   }
 
   setHeldBlock(itemOrId) {
@@ -301,9 +332,28 @@ export class FirstPersonHand {
     renderer.render(this.scene, this.camera);
   }
 
+  renderCrosshair(renderer, width = window.innerWidth, height = window.innerHeight) {
+    const w = Math.max(1, width);
+    const h = Math.max(1, height);
+    if (this.crosshairCamera.right !== w || this.crosshairCamera.top !== h) {
+      this.crosshairCamera.right = w;
+      this.crosshairCamera.top = h;
+      this.crosshairCamera.updateProjectionMatrix();
+      const cx = Math.round(w * 0.5);
+      const cy = Math.round(h * 0.5);
+      this.crosshairV.position.set(cx, cy, 0);
+      this.crosshairH.position.set(cx, cy, 0);
+    }
+    renderer.clearDepth();
+    renderer.render(this.crosshairScene, this.crosshairCamera);
+  }
+
   dispose() {
     this.armMesh.geometry.dispose();
     this.armMaterial.dispose();
+    this.crosshairV.geometry.dispose();
+    this.crosshairH.geometry.dispose();
+    this.crosshairMat.dispose();
     for (const [id, mesh] of this.heldCache.entries()) {
       if (id < 256) mesh.geometry.dispose();
     }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'minecraft-web-stage6-v1';
+const CACHE_NAME = 'minecraft-web-stage6-v2';
 const CORE_ASSETS = [
   './',
   './index.html',

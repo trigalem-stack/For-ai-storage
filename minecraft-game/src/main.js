@@ -226,7 +226,7 @@ class MinecraftGame {
     });
 
     this.virtualMouse = new VirtualMouse({
-      isTouchDevice,
+      isTouchDevice: this.settings.touchMode,
       onPointerMove: (x, y, hoveredEl) => this.inventoryUI?.updateVirtualPointer(x, y, hoveredEl),
       onSlotVirtualClick: (zone, index, button, shiftKey, x, y) =>
         this.inventoryUI?.handleVirtualSlotClick(zone, index, button, shiftKey, x, y),
@@ -354,6 +354,7 @@ class MinecraftGame {
     });
 
     this.setTouchMode(this.settings.touchMode, false);
+    document.body.classList.add('webgl-crosshair');
     this._syncSettingsUI();
     this._applySensitivity();
     this._bindWindowEvents();
@@ -694,7 +695,7 @@ class MinecraftGame {
     this.player.update(0.001);
     this.hud?.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
     if (this.player.isDead) {
-      this.hud?.showDeathScreen(this.player.deathSource || 'generic', this.player.deathScore || 0);
+      this.hud?.showDeathScreen(this.player.lastDamageSource || 'generic', this.player.score || 0);
     }
   }
 
@@ -1323,6 +1324,9 @@ class MinecraftGame {
 
     if (this.player && this.player.cameraMode === CAMERA_MODES.FIRST_PERSON) {
       this.firstPersonHand.render(this.renderer);
+      if (!this.hud.inMainMenu && !this.hud.isPaused && !this.inventoryUI?.isOpen && !this.player.isDead && !this.isSleeping) {
+        this.firstPersonHand.renderCrosshair(this.renderer);
+      }
     }
 
     this.hud.updateDebug({

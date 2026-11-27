@@ -6,11 +6,59 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
+const GL_MOCK_CONSTS = {
+  VERSION: 0x1F02, VENDOR: 0x1F00, RENDERER: 0x1F01, SHADING_LANGUAGE_VERSION: 0x8B8C,
+  MAX_COMBINED_TEXTURE_IMAGE_UNITS: 0x8B4D, MAX_TEXTURE_SIZE: 0x0D33, MAX_CUBE_MAP_TEXTURE_SIZE: 0x851C,
+  MAX_TEXTURE_IMAGE_UNITS: 0x8872, MAX_VERTEX_TEXTURE_IMAGE_UNITS: 0x8B4C, MAX_VERTEX_ATTRIBS: 0x8869,
+  MAX_VERTEX_UNIFORM_VECTORS: 0x8DFB, MAX_FRAGMENT_UNIFORM_VECTORS: 0x8DFD, MAX_VARYING_VECTORS: 0x8DFC,
+  MAX_SAMPLES: 0x8D57, SCISSOR_BOX: 0x0C10, VIEWPORT: 0x0BA2, MAX_COLOR_ATTACHMENTS: 0x8CDF, MAX_DRAW_BUFFERS: 0x8824,
+  ACTIVE_TEXTURE: 0x84E0, FRAMEBUFFER_COMPLETE: 0x8CD5, COMPILE_STATUS: 0x8B81, LINK_STATUS: 0x8B82,
+  ACTIVE_UNIFORMS: 0x8B86, ACTIVE_ATTRIBUTES: 0x8B89, DELETE_STATUS: 0x8B80, VALIDATE_STATUS: 0x8B83,
+  TRIANGLES: 0x0004, UNSIGNED_SHORT: 0x1403, UNSIGNED_INT: 0x1405,
+};
+
+function makeWebGLShim() {
+  return new Proxy({ ...GL_MOCK_CONSTS }, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      if (prop === 'getExtension') return () => ({});
+      if (prop === 'getParameter') {
+        return (p) => {
+          if (p === 0x1F02) return 'WebGL 2.0 (OpenGL ES 3.0)';
+          if (p === 0x8B8C) return 'WebGL GLSL ES 3.00';
+          if (p === 0x1F00 || p === 0x1F01) return 'MockGL';
+          if (p === 0x0C10 || p === 0x0BA2) return [0, 0, 1280, 720];
+          if (p === 0x0D33 || p === 0x851C) return 4096;
+          return 16;
+        };
+      }
+      if (prop === 'getShaderPrecisionFormat') return () => ({ rangeMin: 127, rangeMax: 127, precision: 23 });
+      if (prop === 'getContextAttributes') return () => ({ alpha: true, antialias: false, depth: true, stencil: true });
+      if (prop === 'checkFramebufferStatus') return () => 0x8CD5;
+      if (prop === 'getProgramParameter') return (_p, k) => (k === 0x8B86 || k === 0x8B89 ? 0 : true);
+      if (prop === 'getShaderParameter') return () => true;
+      if (prop === 'getSupportedExtensions') return () => [];
+      if (prop === 'getShaderInfoLog' || prop === 'getProgramInfoLog') return () => '';
+      if (
+        prop === 'createBuffer' || prop === 'createTexture' || prop === 'createFramebuffer' ||
+        prop === 'createProgram' || prop === 'createShader' || prop === 'createVertexArray' ||
+        prop === 'createRenderbuffer' || prop === 'getUniformLocation'
+      ) return () => ({});
+      if (prop === 'getAttribLocation') return () => 0;
+      return () => 0;
+    },
+  });
+}
+
 function makeCanvasShim() {
-  return {
-    width: 16,
-    height: 16,
-    getContext() {
+  const base = makeElementShim('canvas');
+  return Object.assign(base, {
+    width: 1280,
+    height: 720,
+    getContext(kind) {
+      if (kind === 'webgl' || kind === 'webgl2') {
+        return makeWebGLShim();
+      }
       const state = {
         fillStyle: '#000',
         strokeStyle: '#000',
@@ -29,6 +77,9 @@ function makeCanvasShim() {
           if (prop === 'getImageData') {
             return (_x, _y, w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) });
           }
+          if (prop === 'createLinearGradient' || prop === 'createRadialGradient') {
+            return () => ({ addColorStop: () => {} });
+          }
           if (prop === 'measureText') {
             return (str) => ({ width: String(str).length * 7 });
           }
@@ -43,7 +94,7 @@ function makeCanvasShim() {
     toDataURL() {
       return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
     },
-  };
+  });
 }
 
 function makeElementShim(tagName = 'div') {
@@ -104,8 +155,11 @@ if (typeof globalThis.document === 'undefined') {
   let mockPointElement = null;
   globalThis.document = {
     createElement: (tag) => (tag === 'canvas' ? makeCanvasShim() : makeElementShim(tag)),
+    createElementNS: (_ns, tag) => (tag === 'canvas' ? makeCanvasShim() : makeElementShim(tag)),
     getElementById: (id) => {
-      if (!elementsById.has(id)) elementsById.set(id, makeElementShim(id.includes('canvas') ? 'canvas' : 'div'));
+      if (!elementsById.has(id)) {
+        elementsById.set(id, id.includes('canvas') ? makeCanvasShim() : makeElementShim('div'));
+      }
       return elementsById.get(id);
     },
     querySelectorAll: () => [],
@@ -122,7 +176,11 @@ if (typeof globalThis.document === 'undefined') {
     innerWidth: 1280,
     innerHeight: 720,
     devicePixelRatio: 1,
+    matchMedia: () => ({ matches: true }),
+    location: { protocol: 'file:' },
   };
+  globalThis.location = { protocol: 'file:' };
+  globalThis.requestAnimationFrame = () => 1;
 }
 
 async function runStage6Tests() {
@@ -520,6 +578,26 @@ async function runStage6Tests() {
   const offlineHtml = fs.readFileSync(offlinePath, 'utf8');
   assert.ok(!/https?:\/\/(cdn\.|unpkg\.com|jsdelivr)/i.test(offlineHtml), 'Offline bundle must have zero CDN URLs');
   assert.ok(offlineHtml.includes('virtual-cursor') && offlineHtml.includes('death-overlay'), 'Offline bundle must include Stage 6 DOM');
+  assert.ok(offlineHtml.includes('renderCrosshair'), 'Offline bundle must include WebGL pure-white crosshair pass');
+
+  // 8. Force-Dark-proof WebGL crosshair + full main.js boot/enterWorld/loop regression check
+  assert.equal(pHand.crosshairMat.color.getHex(), 0xffffff, 'WebGL crosshair material must be pure white #ffffff');
+  assert.equal(pHand.crosshairMat.toneMapped, false, 'WebGL crosshair must disable toneMapping so white stays #ffffff');
+  assert.equal(pHand.crosshairScene.children.length, 2, 'WebGL crosshair must have vertical + horizontal bars');
+  let clearedDepth = 0;
+  let renderedCrosshair = 0;
+  pHand.renderCrosshair({
+    clearDepth: () => { clearedDepth += 1; },
+    render: (sc) => { if (sc === pHand.crosshairScene) renderedCrosshair += 1; },
+  }, 900, 500);
+  assert.equal(clearedDepth, 1);
+  assert.equal(renderedCrosshair, 1);
+  assert.equal(pHand.crosshairV.position.x, 450);
+  assert.equal(pHand.crosshairV.position.y, 250);
+
+  assert.ok(html.includes('name="color-scheme" content="light only"'), 'index.html must opt out of browser Force Dark');
+  const cssSrc = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
+  assert.ok(cssSrc.includes('body.webgl-crosshair #crosshair::before'), 'styles.css must hide DOM crosshair when WebGL crosshair active');
 
   pSurv.dispose();
   pHand.dispose();
@@ -527,7 +605,37 @@ async function runStage6Tests() {
   world.dispose();
   itemMgr.dispose();
   fallMgr.dispose();
-  console.log('✓ Stage 6 HTML, ServiceWorker & Offline Bundle invariants verified');
+
+  // Boot full main.js entry point and exercise init -> enterWorld -> _loop -> inventory -> death -> respawn -> saveNow
+  await import('../src/main.js');
+  await new Promise((r) => setTimeout(r, 120));
+  const bootStatus = globalThis.document.getElementById('loading-status').textContent;
+  assert.ok(!String(bootStatus).startsWith('Ошибка запуска:'), `main.js threw startup error: ${bootStatus}`);
+  const game = globalThis.window.__MC_GAME__;
+  assert.ok(game && game.isRunning, 'MinecraftGame must finish init() cleanly');
+  assert.equal(game.virtualMouse.touchDevice, game.settings.touchMode, 'VirtualMouse must receive settings.touchMode');
+  assert.ok(globalThis.document.body.classList.contains('webgl-crosshair'), 'main.js must activate webgl-crosshair body class');
+
+  const worlds = await game.saveManager.listWorlds();
+  assert.ok(worlds.length >= 1, 'init() must ensure at least one world');
+  await game.enterWorld(worlds[0].id);
+  game._loop(performance.now() + 16);
+  game.togglePlayerInventory();
+  assert.equal(game.inventoryUI.isOpen, true);
+  game._loop(performance.now() + 32);
+  game.togglePlayerInventory();
+  assert.equal(game.inventoryUI.isOpen, false);
+  game.player.damage(100, 'fall');
+  game._loop(performance.now() + 48);
+  await game.respawnPlayer();
+  game._loop(performance.now() + 64);
+  await game.saveNow();
+
+  clearInterval(game.autosaveTimer);
+  clearTimeout(game.debouncedSaveTimer);
+  game.isRunning = false;
+  game._unloadWorldFromEngine();
+  console.log('✓ Stage 6 HTML, ServiceWorker, WebGL Crosshair, main.js boot & Offline Bundle invariants verified');
   console.log('\nALL STAGE 6 TESTS PASSED!');
 }
 

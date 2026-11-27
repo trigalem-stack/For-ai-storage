@@ -1,4 +1,6 @@
 :root {
+  color-scheme: only light;
+  forced-color-adjust: none;
   --mc-bg-panel: rgba(20, 24, 30, 0.72);
   --mc-border-light: rgba(255, 255, 255, 0.28);
   --mc-border-dark: rgba(0, 0, 0, 0.65);
@@ -91,6 +93,11 @@ body.pseudo-fullscreen {
   top: 8px;
   width: 18px;
   height: 2px;
+}
+
+body.webgl-crosshair #crosshair::before,
+body.webgl-crosshair #crosshair::after {
+  display: none;
 }
 
 /* Sleep Fade Overlay */

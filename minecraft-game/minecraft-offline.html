@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
@@ -10,6 +12,8 @@
   <title>Minecraft Web Edition — Stage 6</title>
   <style>
 :root {
+  color-scheme: only light;
+  forced-color-adjust: none;
   --mc-bg-panel: rgba(20, 24, 30, 0.72);
   --mc-border-light: rgba(255, 255, 255, 0.28);
   --mc-border-dark: rgba(0, 0, 0, 0.65);
@@ -102,6 +106,11 @@ body.pseudo-fullscreen {
   top: 8px;
   width: 18px;
   height: 2px;
+}
+
+body.webgl-crosshair #crosshair::before,
+body.webgl-crosshair #crosshair::after {
+  display: none;
 }
 
 /* Sleep Fade Overlay */
@@ -20300,14 +20309,42 @@ void main() {
       this.isMining = false;
       this.isEating = false;
       this.eatTime = 0;
+      const initW = Math.max(1, window.innerWidth || 1280);
+      const initH = Math.max(1, window.innerHeight || 720);
+      this.crosshairScene = new xo();
+      this.crosshairCamera = new Gs(0, initW, initH, 0, -1, 1);
+      this.crosshairMat = new jn({
+        color: 16777215,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false
+      });
+      this.crosshairV = new Ce(new Fs(2, 18), this.crosshairMat);
+      this.crosshairH = new Ce(new Fs(18, 2), this.crosshairMat);
+      const cx2 = Math.round(initW * 0.5);
+      const cy2 = Math.round(initH * 0.5);
+      this.crosshairV.position.set(cx2, cy2, 0);
+      this.crosshairH.position.set(cx2, cy2, 0);
+      this.crosshairScene.add(this.crosshairV, this.crosshairH);
     }
     // Alias preserved for Stage 2/4 tests
     get currentHeldBlockId() {
       return this.currentHeldId;
     }
     resize(width, height) {
-      this.camera.aspect = width / Math.max(1, height);
+      const w = Math.max(1, width);
+      const h = Math.max(1, height);
+      this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
+      this.crosshairCamera.left = 0;
+      this.crosshairCamera.right = w;
+      this.crosshairCamera.top = h;
+      this.crosshairCamera.bottom = 0;
+      this.crosshairCamera.updateProjectionMatrix();
+      const cx2 = Math.round(w * 0.5);
+      const cy2 = Math.round(h * 0.5);
+      this.crosshairV.position.set(cx2, cy2, 0);
+      this.crosshairH.position.set(cx2, cy2, 0);
     }
     setHeldBlock(itemOrId) {
       this.setHeldItem(itemOrId);
@@ -20502,9 +20539,27 @@ void main() {
       renderer.clearDepth();
       renderer.render(this.scene, this.camera);
     }
+    renderCrosshair(renderer, width = window.innerWidth, height = window.innerHeight) {
+      const w = Math.max(1, width);
+      const h = Math.max(1, height);
+      if (this.crosshairCamera.right !== w || this.crosshairCamera.top !== h) {
+        this.crosshairCamera.right = w;
+        this.crosshairCamera.top = h;
+        this.crosshairCamera.updateProjectionMatrix();
+        const cx2 = Math.round(w * 0.5);
+        const cy2 = Math.round(h * 0.5);
+        this.crosshairV.position.set(cx2, cy2, 0);
+        this.crosshairH.position.set(cx2, cy2, 0);
+      }
+      renderer.clearDepth();
+      renderer.render(this.crosshairScene, this.crosshairCamera);
+    }
     dispose() {
       this.armMesh.geometry.dispose();
       this.armMaterial.dispose();
+      this.crosshairV.geometry.dispose();
+      this.crosshairH.geometry.dispose();
+      this.crosshairMat.dispose();
       for (const [id2, mesh] of this.heldCache.entries()) {
         if (id2 < 256) mesh.geometry.dispose();
       }
@@ -30899,12 +30954,12 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
       this.scene.add(entityAmbient, entitySun);
       this.skyRenderer = new SkyRenderer(this.scene, DEFAULT_WORLD_TIME, 1);
       this.menuPanorama = new MenuPanorama();
-      const isTouchDevice2 = MobileControls.detectTouchDevice();
+      const isTouchDevice = MobileControls.detectTouchDevice();
       this.settings = {
-        touchMode: isTouchDevice2,
-        renderDistance: isTouchDevice2 ? DEFAULT_RENDER_DISTANCE_MOBILE : DEFAULT_RENDER_DISTANCE_PC,
+        touchMode: isTouchDevice,
+        renderDistance: isTouchDevice ? DEFAULT_RENDER_DISTANCE_MOBILE : DEFAULT_RENDER_DISTANCE_PC,
         unlimitedMemory: true,
-        highQuality: !isTouchDevice2,
+        highQuality: !isTouchDevice,
         fogEnabled: false,
         cloudsEnabled: true,
         sensitivity: 1,
@@ -31032,7 +31087,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
         }
       });
       this.virtualMouse = new VirtualMouse({
-        isTouchDevice,
+        isTouchDevice: this.settings.touchMode,
         onPointerMove: (x, y, hoveredEl) => this.inventoryUI?.updateVirtualPointer(x, y, hoveredEl),
         onSlotVirtualClick: (zone, index, button, shiftKey, x, y) => this.inventoryUI?.handleVirtualSlotClick(zone, index, button, shiftKey, x, y),
         onVirtualDrop: (zone, index) => this.inventoryUI?.handleVirtualDrop(zone, index),
@@ -31154,6 +31209,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
         onStatusToast: (msg) => this.hud.showToast(msg)
       });
       this.setTouchMode(this.settings.touchMode, false);
+      document.body.classList.add("webgl-crosshair");
       this._syncSettingsUI();
       this._applySensitivity();
       this._bindWindowEvents();
@@ -31442,7 +31498,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
       this.player.update(1e-3);
       this.hud?.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
       if (this.player.isDead) {
-        this.hud?.showDeathScreen(this.player.deathSource || "generic", this.player.deathScore || 0);
+        this.hud?.showDeathScreen(this.player.lastDamageSource || "generic", this.player.score || 0);
       }
     }
     async enterWorld(worldId) {
@@ -31959,6 +32015,9 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
       this.renderer.render(this.scene, this.camera);
       if (this.player && this.player.cameraMode === CAMERA_MODES.FIRST_PERSON) {
         this.firstPersonHand.render(this.renderer);
+        if (!this.hud.inMainMenu && !this.hud.isPaused && !this.inventoryUI?.isOpen && !this.player.isDead && !this.isSleeping) {
+          this.firstPersonHand.renderCrosshair(this.renderer);
+        }
       }
       this.hud.updateDebug({
         player: this.player,
