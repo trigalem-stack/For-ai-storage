@@ -11,29 +11,60 @@ export class Hud {
   constructor(callbacks = {}) {
     this.callbacks = callbacks;
 
+    this.crosshairEl = document.getElementById('crosshair');
     this.debugPanel = document.getElementById('debug-panel');
     this.pauseOverlay = document.getElementById('pause-overlay');
+    this.mainMenuOverlay = document.getElementById('main-menu-overlay');
+    this.menuHome = document.getElementById('menu-home');
+    this.menuWorlds = document.getElementById('menu-worlds');
+    this.worldsListEl = document.getElementById('worlds-list');
+    this.inputWorldName = document.getElementById('input-world-name');
+    this.inputWorldSeed = document.getElementById('input-world-seed');
+
+    this.settingsOverlay = document.getElementById('settings-overlay');
     this.pcHint = document.getElementById('pc-lock-hint');
     this.toastEl = document.getElementById('hud-toast');
-    this.breakRing = document.getElementById('break-progress-ring');
-    this.breakRingCircle = document.getElementById('break-progress-circle');
 
+    // Top-right HUD buttons
     this.btnCamera = document.getElementById('btn-camera');
     this.btnDebug = document.getElementById('btn-debug');
     this.btnFullscreen = document.getElementById('btn-fullscreen');
     this.btnPause = document.getElementById('btn-pause');
 
+    // Main menu & world manager buttons
+    this.btnMenuPlay = document.getElementById('btn-menu-play');
+    this.btnMenuSettings = document.getElementById('btn-menu-settings');
+    this.btnWorldsBack = document.getElementById('btn-worlds-back');
+    this.btnCreateWorld = document.getElementById('btn-create-world');
+
+    // Pause buttons
     this.btnResume = document.getElementById('btn-resume');
+    this.btnPauseSettings = document.getElementById('btn-pause-settings');
+    this.btnExitToMenu = document.getElementById('btn-exit-to-menu');
+
+    // Settings tabs & controls
+    this.tabButtons = Array.from(document.querySelectorAll('.settings-tab-btn'));
+    this.tabPanels = Array.from(document.querySelectorAll('.settings-tab-panel'));
+    this.btnSettingsClose = document.getElementById('btn-settings-close');
+
     this.btnControlMode = document.getElementById('btn-control-mode');
     this.btnFlyMode = document.getElementById('btn-fly-mode');
     this.btnMemoryMode = document.getElementById('btn-memory-mode');
     this.btnGraphicsMode = document.getElementById('btn-graphics-mode');
-    this.btnNewWorld = document.getElementById('btn-new-world');
+    this.btnFogMode = document.getElementById('btn-fog-mode');
+    this.btnCloudsMode = document.getElementById('btn-clouds-mode');
+    this.btnHintMode = document.getElementById('btn-hint-mode');
+
     this.rangeRenderDist = document.getElementById('range-render-dist');
     this.labelRenderDist = document.getElementById('label-render-dist');
+    this.rangeSensitivity = document.getElementById('range-sensitivity');
+    this.labelSensitivity = document.getElementById('label-sensitivity');
 
     this.debugVisible = false;
     this.isPaused = false;
+    this.inMainMenu = true;
+    this.settingsOrigin = 'menu'; // 'menu' | 'pause'
+    this.hintsEnabled = true;
     this.iosPseudoFullscreen = false;
     this.toastTimer = null;
 
@@ -63,15 +94,84 @@ export class Hud {
 
     this.btnPause?.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.togglePause();
+      if (!this.inMainMenu) this.togglePause();
     });
 
+    // Main Menu navigation
+    this.btnMenuPlay?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      this.menuHome?.classList.add('hidden');
+      this.menuWorlds?.classList.remove('hidden');
+      await this.callbacks.onOpenWorldsManager?.();
+    });
+
+    this.btnMenuSettings?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openSettings('menu');
+    });
+
+    this.btnWorldsBack?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.menuWorlds?.classList.add('hidden');
+      this.menuHome?.classList.remove('hidden');
+    });
+
+    this.btnCreateWorld?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name = this.inputWorldName?.value || '';
+      const rawSeed = (this.inputWorldSeed?.value || '').trim();
+      let parsedSeed = 0;
+      if (rawSeed.length > 0) {
+        const num = Number(rawSeed);
+        if (Number.isFinite(num) && num !== 0) {
+          parsedSeed = num | 0;
+        } else {
+          // String seed hash
+          let h = 2166136261 >>> 0;
+          for (let i = 0; i < rawSeed.length; i++) {
+            h ^= rawSeed.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+          }
+          parsedSeed = (h | 0) || 133742;
+        }
+      }
+      this.callbacks.onCreateWorld?.({ name, seed: parsedSeed });
+    });
+
+    // Pause menu
     this.btnResume?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.setPaused(false);
       this.callbacks.onResume?.();
     });
 
+    this.btnPauseSettings?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.pauseOverlay?.classList.add('hidden');
+      this.openSettings('pause');
+    });
+
+    this.btnExitToMenu?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onExitToMenu?.();
+    });
+
+    // Settings Tabs
+    for (const tabBtn of this.tabButtons) {
+      tabBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const target = tabBtn.dataset.tab;
+        for (const b of this.tabButtons) b.classList.toggle('active', b === tabBtn);
+        for (const p of this.tabPanels) p.classList.toggle('hidden', p.dataset.tabPanel !== target);
+      });
+    }
+
+    this.btnSettingsClose?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closeSettings();
+    });
+
+    // Settings controls
     this.btnControlMode?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.callbacks.onToggleControlMode?.();
@@ -92,9 +192,21 @@ export class Hud {
       this.callbacks.onToggleGraphicsMode?.();
     });
 
-    this.btnNewWorld?.addEventListener('click', (e) => {
+    this.btnFogMode?.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.callbacks.onNewWorld?.();
+      this.callbacks.onToggleFogMode?.();
+    });
+
+    this.btnCloudsMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onToggleCloudsMode?.();
+    });
+
+    this.btnHintMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hintsEnabled = !this.hintsEnabled;
+      this.setHintsEnabledLabel(this.hintsEnabled);
+      this.callbacks.onToggleHints?.(this.hintsEnabled);
     });
 
     this.rangeRenderDist?.addEventListener('input', (e) => {
@@ -102,6 +214,113 @@ export class Hud {
       if (this.labelRenderDist) this.labelRenderDist.textContent = `${val} чанков`;
       this.callbacks.onChangeRenderDistance?.(val);
     });
+
+    this.rangeSensitivity?.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      if (this.labelSensitivity) this.labelSensitivity.textContent = `${Math.round(val * 100)}%`;
+      this.callbacks.onChangeSensitivity?.(val);
+    });
+  }
+
+  openSettings(origin = 'menu') {
+    this.settingsOrigin = origin;
+    this.settingsOverlay?.classList.remove('hidden');
+    if (origin === 'menu') {
+      this.mainMenuOverlay?.classList.add('hidden');
+    }
+  }
+
+  closeSettings() {
+    this.settingsOverlay?.classList.add('hidden');
+    if (this.settingsOrigin === 'menu') {
+      this.mainMenuOverlay?.classList.remove('hidden');
+    } else if (this.isPaused) {
+      this.pauseOverlay?.classList.remove('hidden');
+    }
+  }
+
+  showMainMenu(showWorlds = false) {
+    this.inMainMenu = true;
+    this.setPaused(true);
+    this.pauseOverlay?.classList.add('hidden');
+    this.settingsOverlay?.classList.add('hidden');
+    this.mainMenuOverlay?.classList.remove('hidden');
+    this.menuHome?.classList.toggle('hidden', showWorlds);
+    this.menuWorlds?.classList.toggle('hidden', !showWorlds);
+    this._updateCrosshairVisibility(false);
+  }
+
+  hideMainMenu(cameraMode = CAMERA_MODES.FIRST_PERSON) {
+    this.inMainMenu = false;
+    this.mainMenuOverlay?.classList.add('hidden');
+    this.settingsOverlay?.classList.add('hidden');
+    this.setPaused(false);
+    this._updateCrosshairVisibility(cameraMode === CAMERA_MODES.FIRST_PERSON);
+  }
+
+  renderWorldsList(worlds, activeWorldId) {
+    if (!this.worldsListEl) return;
+    this.worldsListEl.innerHTML = '';
+
+    if (!worlds || worlds.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'world-empty-note';
+      empty.textContent = 'Сохранённых миров пока нет. Создайте новый мир выше!';
+      this.worldsListEl.appendChild(empty);
+      return;
+    }
+
+    for (const w of worlds) {
+      const card = document.createElement('div');
+      card.className = 'world-card';
+      if (w.id === activeWorldId) card.classList.add('current');
+
+      const info = document.createElement('div');
+      info.className = 'world-card-info';
+
+      const title = document.createElement('div');
+      title.className = 'world-card-title';
+      title.textContent = w.name || 'Безымянный мир';
+
+      const meta = document.createElement('div');
+      meta.className = 'world-card-meta';
+      const dateStr = w.updatedAt ? new Date(w.updatedAt).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }) : 'новый';
+      const biomePart = w.biomeName ? ` · ${w.biomeName}` : '';
+      meta.textContent = `Сид: ${w.seed}${biomePart} · Блоков изм.: ${w.modifiedCount ?? 0} · ${dateStr}`;
+
+      info.append(title, meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'world-card-actions';
+
+      const playBtn = document.createElement('button');
+      playBtn.type = 'button';
+      playBtn.className = 'mc-menu-btn mc-menu-primary mc-world-btn';
+      playBtn.textContent = 'Войти';
+      playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.callbacks.onSelectWorld?.(w.id);
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'mc-menu-btn mc-menu-danger mc-world-btn';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Удалить мир';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.callbacks.onDeleteWorld?.(w.id);
+      });
+
+      actions.append(playBtn, delBtn);
+      card.append(info, actions);
+      this.worldsListEl.appendChild(card);
+    }
   }
 
   _bindFullscreenEvents() {
@@ -177,11 +396,18 @@ export class Hud {
 
   setPaused(paused) {
     this.isPaused = Boolean(paused);
-    this.pauseOverlay?.classList.toggle('hidden', !this.isPaused);
+    if (!this.inMainMenu) {
+      this.pauseOverlay?.classList.toggle('hidden', !this.isPaused);
+    }
     this.callbacks.onPauseChange?.(this.isPaused);
   }
 
   togglePause() {
+    if (this.inMainMenu) return;
+    if (!this.settingsOverlay?.classList.contains('hidden')) {
+      this.closeSettings();
+      return;
+    }
     this.setPaused(!this.isPaused);
   }
 
@@ -189,9 +415,7 @@ export class Hud {
     if (this.btnControlMode) {
       this.btnControlMode.textContent = isTouch ? 'Управление: Телефон (Touch)' : 'Управление: ПК (Мышь + WASD)';
     }
-    if (this.pcHint) {
-      this.pcHint.classList.toggle('touch-hidden', isTouch);
-    }
+    this._refreshHintVisibility();
   }
 
   setFlyModeLabel(isFly) {
@@ -211,9 +435,29 @@ export class Hud {
   setGraphicsModeLabel(highQuality) {
     if (this.btnGraphicsMode) {
       this.btnGraphicsMode.textContent = highQuality
-        ? 'Графика: Высокая (чёткий PixelRatio)'
-        : 'Графика: Производительная (60 FPS)';
+        ? 'Графика: Улучшенная (чёткий PixelRatio)'
+        : 'Графика: Производительная (макс. FPS)';
     }
+  }
+
+  setFogEnabledLabel(enabled) {
+    if (this.btnFogMode) {
+      this.btnFogMode.textContent = enabled ? 'Туман: ВКЛ' : 'Туман: ВЫКЛ';
+    }
+  }
+
+  setCloudsEnabledLabel(enabled) {
+    if (this.btnCloudsMode) {
+      this.btnCloudsMode.textContent = enabled ? 'Облака и небо: ВКЛ' : 'Облака: ВЫКЛ';
+    }
+  }
+
+  setHintsEnabledLabel(enabled) {
+    this.hintsEnabled = Boolean(enabled);
+    if (this.btnHintMode) {
+      this.btnHintMode.textContent = this.hintsEnabled ? 'Подсказки управления: ВКЛ' : 'Подсказки управления: ВЫКЛ';
+    }
+    this._refreshHintVisibility();
   }
 
   setRenderDistanceUI(dist) {
@@ -221,25 +465,30 @@ export class Hud {
     if (this.labelRenderDist) this.labelRenderDist.textContent = `${dist} чанков`;
   }
 
-  setPointerLocked(locked) {
-    if (this.pcHint) {
-      this.pcHint.classList.toggle('hidden', locked || this.isPaused);
-    }
+  setSensitivityUI(mult) {
+    if (this.rangeSensitivity) this.rangeSensitivity.value = String(mult);
+    if (this.labelSensitivity) this.labelSensitivity.textContent = `${Math.round(mult * 100)}%`;
   }
 
-  setBreakProgress(progress) {
-    if (!this.breakRing || !this.breakRingCircle) return;
-    if (progress <= 0) {
-      this.breakRing.classList.add('hidden');
-      return;
-    }
-    this.breakRing.classList.remove('hidden');
-    const circumference = 100.53; // 2 * PI * 16
-    const offset = circumference * (1 - Math.min(1, progress));
-    this.breakRingCircle.style.strokeDashoffset = String(offset.toFixed(2));
+  setPointerLocked(locked) {
+    this._pointerLocked = Boolean(locked);
+    this._refreshHintVisibility();
+  }
+
+  _refreshHintVisibility() {
+    if (!this.pcHint) return;
+    const isTouch = document.body.classList.contains('touch-mode');
+    const hide = !this.hintsEnabled || isTouch || this._pointerLocked || this.isPaused || this.inMainMenu;
+    this.pcHint.classList.toggle('hidden', hide);
+  }
+
+  _updateCrosshairVisibility(visible) {
+    if (!this.crosshairEl) return;
+    this.crosshairEl.classList.toggle('hidden', !visible);
   }
 
   onCameraModeChanged(mode) {
+    this._updateCrosshairVisibility(!this.inMainMenu && mode === CAMERA_MODES.FIRST_PERSON);
     const name = CAMERA_MODE_NAMES[mode] || CAMERA_MODE_NAMES[CAMERA_MODES.FIRST_PERSON];
     this.showToast(`Камера: ${name}`);
   }
@@ -254,7 +503,7 @@ export class Hud {
     }, durationMs);
   }
 
-  updateDebug({ player, world, renderer, targetHit, itemCount }) {
+  updateDebug({ player, world, targetHit }) {
     this.fpsFrames++;
     const now = performance.now();
     const elapsed = now - this.fpsLastTime;
@@ -264,27 +513,30 @@ export class Hud {
       this.fpsLastTime = now;
     }
 
-    if (!this.debugVisible || !this.debugPanel) return;
+    if (!this.debugVisible || !this.debugPanel || !world || !player) return;
 
     const cx = Math.floor(player.x / CHUNK_SIZE);
     const cz = Math.floor(player.z / CHUNK_SIZE);
-    const lx = ((Math.floor(player.x) % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-    const lz = ((Math.floor(player.z) % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-    const info = renderer.info;
-    const mem = performance.memory
-      ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)} MB (лимит: ∞)`
-      : '∞ (без ограничений)';
+    const biomeName = world.getBiomeNameAt(player.x, player.z);
+    const modeLabel = player.flyMode
+      ? 'Полёт'
+      : player.isSwimming
+        ? 'Плавание'
+        : player.isCrouching
+          ? 'Присед'
+          : player.isSprinting
+            ? 'Бег'
+            : 'Ходьба';
     const hitDesc = targetHit
-      ? `${targetHit.x}, ${targetHit.y}, ${targetHit.z} [${BlockRegistry.get(targetHit.blockId).name}]`
-      : 'нет';
+      ? `${BlockRegistry.get(targetHit.blockId).name} (${targetHit.x}, ${targetHit.y}, ${targetHit.z})`
+      : '—';
 
+    // Compact clean F3 panel with essential info
     this.debugPanel.textContent = [
-      `Minecraft Web Edition (Этап 2) | FPS: ${this.currentFps}`,
-      `XYZ: ${player.x.toFixed(2)} / ${player.y.toFixed(2)} / ${player.z.toFixed(2)} | ${player.isCrouching ? 'Присед' : player.isSprinting ? 'Бег' : player.flyMode ? 'Полёт' : 'Ходьба'}`,
-      `Chunk: ${cx}, ${cz} (local ${lx}, ${Math.floor(player.y)}, ${lz}) | Facing: ${player.getFacingCardinal()}`,
-      `Target: ${hitDesc} | Drops: ${itemCount ?? 0}`,
-      `Chunks: ${world.chunks.size} active / ${world.unlimitedMemory ? `∞ (${world.chunkDataCache.size} cached)` : 'Economy'} | Edits: ${world.modifiedBlocks.size}`,
-      `Triangles: ${info.render.triangles} | Calls: ${info.render.calls} | Mem: ${mem} | Seed: ${world.seed}`,
+      `FPS: ${this.currentFps} | XYZ: ${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}`,
+      `Biome: ${biomeName}`,
+      `Chunk: ${cx}, ${cz} | ${player.getFacingCardinal()} | ${modeLabel} | Chunks: ${world.chunks.size}`,
+      `Target: ${hitDesc}`,
     ].join('\n');
   }
 }

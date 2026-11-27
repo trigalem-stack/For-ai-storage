@@ -42,7 +42,7 @@ export function raycastVoxel(world, origin, direction, maxDistance = REACH_DISTA
   for (let iter = 0; iter < 128 && t <= maxDistance; iter++) {
     if (vy >= 0 && vy < WORLD_HEIGHT) {
       const id = world.getBlock(vx, vy, vz);
-      if (BlockRegistry.isSolid(id)) {
+      if (BlockRegistry.isTargetable(id)) {
         return {
           x: vx,
           y: vy,
@@ -118,8 +118,12 @@ export class SelectionBox {
       this.mesh.visible = false;
       return;
     }
+    const def = BlockRegistry.get(hit.blockId);
+    const sx = def.inset > 0 ? 1 - def.inset * 2 + 0.005 : def.isCross ? 0.78 : 1.004;
+    const sy = def.isCross ? 0.85 : 1.004;
+    this.mesh.scale.set(sx, sy, sx);
     this.mesh.visible = true;
-    this.mesh.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+    this.mesh.position.set(hit.x + 0.5, hit.y + (def.isCross ? 0.43 : 0.5), hit.z + 0.5);
   }
 
   dispose(scene) {

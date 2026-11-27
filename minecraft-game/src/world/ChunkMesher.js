@@ -1,14 +1,16 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { BLOCK_IDS, BlockRegistry } from '../blocks/BlockRegistry.js';
 import { AO_CURVE, CHUNK_SIZE, FACE_SHADE, WORLD_HEIGHT } from '../constants.js';
+import { BiomeManager } from './BiomeManager.js';
 
 // Each face defines:
-// key, normal [nx, ny, nz], shade, and 4 CCW vertices [dx, dy, dz, ox, oy, oz, uIdx, vIdx]
+// key, normal [nx, ny, nz], shade, hemisphere tint, and 4 CCW vertices [dx, dy, dz, ox, oy, oz, uIdx, vIdx]
 const FACES = [
   {
     key: 'top',
     nx: 0, ny: 1, nz: 0,
     shade: FACE_SHADE.TOP,
+    hemi: [1.02, 1.01, 0.97],
     corners: [
       [0, 1, 1, -1, 0,  1, 0, 0],
       [1, 1, 1,  1, 0,  1, 1, 0],
@@ -20,6 +22,7 @@ const FACES = [
     key: 'bottom',
     nx: 0, ny: -1, nz: 0,
     shade: FACE_SHADE.BOTTOM,
+    hemi: [0.94, 0.96, 1.04],
     corners: [
       [0, 0, 0, -1, 0, -1, 0, 0],
       [1, 0, 0,  1, 0, -1, 1, 0],
@@ -31,6 +34,7 @@ const FACES = [
     key: 'south',
     nx: 0, ny: 0, nz: 1,
     shade: FACE_SHADE.SOUTH,
+    hemi: [1.00, 1.00, 1.01],
     corners: [
       [0, 0, 1, -1, -1, 0, 0, 0],
       [1, 0, 1,  1, -1, 0, 1, 0],
@@ -42,6 +46,7 @@ const FACES = [
     key: 'north',
     nx: 0, ny: 0, nz: -1,
     shade: FACE_SHADE.NORTH,
+    hemi: [0.97, 0.99, 1.03],
     corners: [
       [1, 0, 0,  1, -1, 0, 0, 0],
       [0, 0, 0, -1, -1, 0, 1, 0],
@@ -53,6 +58,7 @@ const FACES = [
     key: 'east',
     nx: 1, ny: 0, nz: 0,
     shade: FACE_SHADE.EAST,
+    hemi: [0.99, 0.99, 1.02],
     corners: [
       [1, 0, 1, 0, -1,  1, 0, 0],
       [1, 0, 0, 0, -1, -1, 1, 0],
@@ -64,12 +70,37 @@ const FACES = [
     key: 'west',
     nx: -1, ny: 0, nz: 0,
     shade: FACE_SHADE.WEST,
+    hemi: [0.96, 0.98, 1.04],
     corners: [
       [0, 0, 0, 0, -1, -1, 0, 0],
       [0, 0, 1, 0, -1,  1, 1, 0],
       [0, 1, 1, 0,  1,  1, 1, 1],
       [0, 1, 0, 0,  1, -1, 0, 1],
     ],
+  },
+];
+
+// Cross-mesh diagonal planes (X-shaped plants: Tall Grass, Flowers, Mushrooms, Dead Bush, Vines)
+const CROSS_PLANES = [
+  {
+    verts: [
+      [0.14, 0, 0.14, 0, 0],
+      [0.86, 0, 0.86, 1, 0],
+      [0.86, 1, 0.86, 1, 1],
+      [0.14, 1, 0.14, 0, 1],
+    ],
+    nx: 0.707, ny: 0.25, nz: -0.707,
+    shade: 0.92,
+  },
+  {
+    verts: [
+      [0.14, 0, 0.86, 0, 0],
+      [0.86, 0, 0.14, 1, 0],
+      [0.86, 1, 0.14, 1, 1],
+      [0.14, 1, 0.86, 0, 1],
+    ],
+    nx: 0.707, ny: 0.25, nz: 0.707,
+    shade: 0.88,
   },
 ];
 
@@ -138,8 +169,13 @@ export class ChunkMesher {
   constructor(atlas) {
     this.atlas = atlas;
 
-    // Pre-cache linear brightness lookup table for all (faceShade * AO_CURVE) combinations
-    this.aoLinearLUT = AO_CURVE.map((v) => v);
+    // Precompute linear-space shade * AO table (6 faces * 4 AO levels = 24 floats) to avoid Math.pow per vertex
+    this.shadeAoLUT = new Float32Array(6 * 4);
+    for (let f = 0; f < 6; f++) {
+      for (let ao = 0; ao < 4; ao++) {
+        this.shadeAoLUT[f * 4 + ao] = Math.pow(FACES[f].shade * AO_CURVE[ao], 2.2);
+      }
+    }
 
     this.opaqueMaterial = new THREE.MeshBasicMaterial({
       map: atlas.texture,
@@ -161,21 +197,16 @@ export class ChunkMesher {
       vertexColors: true,
       fog: true,
       transparent: true,
-      opacity: 0.78,
+      opacity: 0.92,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
 
-    // Reusable scratch buffers shared across builds (single-threaded main-thread safe)
     this._opaqueBuf = new ScratchMeshBuffer(4096);
     this._cutoutBuf = new ScratchMeshBuffer(1024);
     this._waterBuf = new ScratchMeshBuffer(1024);
   }
 
-  /**
-   * Builds opaque, cutout (leaves), and water BufferGeometries for a single chunk.
-   * Skips empty sky layers via chunk.minY..chunk.maxY and reuses preallocated TypedArrays.
-   */
   buildChunkGeometries(chunk, getWorldBlock) {
     const opaqueBuf = this._opaqueBuf;
     const cutoutBuf = this._cutoutBuf;
@@ -187,6 +218,8 @@ export class ChunkMesher {
     const baseX = chunk.cx * CHUNK_SIZE;
     const baseZ = chunk.cz * CHUNK_SIZE;
     const blocks = chunk.blocks;
+    const biomes = chunk.biomes;
+    const lut = this.shadeAoLUT;
 
     const getBlockAtWorld = (wx, wy, wz) => {
       if (wy < 0 || wy >= WORLD_HEIGHT) return 0;
@@ -235,11 +268,65 @@ export class ChunkMesher {
           if (id === BLOCK_IDS.AIR) continue;
 
           const def = BlockRegistry.get(id);
+          const biomeId = biomes[z * CHUNK_SIZE + x];
           const wx = baseX + x;
-          const isWater = def.isLiquid;
-          const buf = isWater ? waterBuf : (def.isCutout ? cutoutBuf : opaqueBuf);
 
-          const waterTopDrop = isWater && getBlockAtWorld(wx, y + 1, wz) !== BLOCK_IDS.WATER ? 0.12 : 0;
+          // 1. Cross-mesh plants (2 diagonal planes in cutoutBuf)
+          if (def.isCross) {
+            const uv = this.atlas.getUV(def.faces.top);
+            const tint = BiomeManager.getTintForBlock(biomeId, def.tintType);
+            const tr = tint ? tint[0] : 1;
+            const tg = tint ? tint[1] : 1;
+            const tb = tint ? tint[2] : 1;
+
+            for (let p = 0; p < 2; p++) {
+              cutoutBuf.ensureQuadCapacity();
+              const plane = CROSS_PLANES[p];
+              const baseVert = cutoutBuf.vertexCount;
+              let pOff = baseVert * 3;
+              let uOff = baseVert * 2;
+              const baseLum = Math.pow(plane.shade, 2.2);
+
+              for (let i = 0; i < 4; i++) {
+                const v = plane.verts[i];
+                const vertLum = v[1] === 0 ? baseLum * 0.86 : baseLum;
+                cutoutBuf.positions[pOff] = x + v[0];
+                cutoutBuf.positions[pOff + 1] = y + v[1];
+                cutoutBuf.positions[pOff + 2] = z + v[2];
+
+                cutoutBuf.normals[pOff] = plane.nx;
+                cutoutBuf.normals[pOff + 1] = plane.ny;
+                cutoutBuf.normals[pOff + 2] = plane.nz;
+
+                cutoutBuf.uvs[uOff] = v[3] === 0 ? uv.u0 : uv.u1;
+                cutoutBuf.uvs[uOff + 1] = v[4] === 0 ? uv.vBottom : uv.vTop;
+
+                cutoutBuf.colors[pOff] = vertLum * tr;
+                cutoutBuf.colors[pOff + 1] = vertLum * tg;
+                cutoutBuf.colors[pOff + 2] = vertLum * tb;
+
+                pOff += 3;
+                uOff += 2;
+              }
+
+              const idxOff = cutoutBuf.indexCount;
+              cutoutBuf.indices[idxOff] = baseVert;
+              cutoutBuf.indices[idxOff + 1] = baseVert + 1;
+              cutoutBuf.indices[idxOff + 2] = baseVert + 2;
+              cutoutBuf.indices[idxOff + 3] = baseVert;
+              cutoutBuf.indices[idxOff + 4] = baseVert + 2;
+              cutoutBuf.indices[idxOff + 5] = baseVert + 3;
+              cutoutBuf.vertexCount += 4;
+              cutoutBuf.indexCount += 6;
+            }
+            continue;
+          }
+
+          // 2. Standard cubic blocks (and slightly inset Cactus)
+          const isTranslucent = def.isLiquid || def.isTransparent;
+          const buf = isTranslucent ? waterBuf : (def.isCutout ? cutoutBuf : opaqueBuf);
+          const waterTopDrop = def.isLiquid && getBlockAtWorld(wx, y + 1, wz) !== BLOCK_IDS.WATER ? 0.12 : 0;
+          const inset = def.inset || 0;
 
           for (let f = 0; f < 6; f++) {
             const face = FACES[f];
@@ -253,7 +340,14 @@ export class ChunkMesher {
             if (def.isOpaque) {
               if (BlockRegistry.isOpaque(neighborId)) continue;
             } else {
-              if (neighborId === id || BlockRegistry.isOpaque(neighborId)) continue;
+              // For cactus (inset > 0), still render side faces even next to opaque blocks, only cull top/bottom if covered
+              if (inset > 0) {
+                if ((face.ny !== 0) && (neighborId === id || BlockRegistry.isOpaque(neighborId))) continue;
+              } else if (def.isLiquid) {
+                if (neighborId === id || neighborId === BLOCK_IDS.ICE || BlockRegistry.isOpaque(neighborId)) continue;
+              } else {
+                if (neighborId === id || BlockRegistry.isOpaque(neighborId)) continue;
+              }
             }
 
             buf.ensureQuadCapacity();
@@ -264,21 +358,44 @@ export class ChunkMesher {
             const v0 = uv.vBottom;
             const v1 = uv.vTop;
 
+            // Only apply biome grass tint to grass TOP face (side face includes brown dirt) and leaves
+            const applyTint =
+              def.tintType &&
+              (def.id !== BLOCK_IDS.GRASS || face.key === 'top');
+            const tint = applyTint ? BiomeManager.getTintForBlock(biomeId, def.tintType) : null;
+            const tr = (tint ? tint[0] : 1) * face.hemi[0];
+            const tg = (tint ? tint[1] : 1) * face.hemi[1];
+            const tb = (tint ? tint[2] : 1) * face.hemi[2];
+
             const baseVert = buf.vertexCount;
             let pOff = baseVert * 3;
             let uOff = baseVert * 2;
-            const shade = face.shade;
 
             for (let i = 0; i < 4; i++) {
               const corner = face.corners[i];
+              let dx = corner[0];
               let dy = corner[1];
+              let dz = corner[2];
+
               if (waterTopDrop > 0 && dy === 1) {
                 dy -= waterTopDrop;
               }
+              if (inset > 0) {
+                if (face.nx === 0) {
+                  dx = dx === 0 ? inset : 1 - inset;
+                } else {
+                  dx = face.nx > 0 ? 1 - inset : inset;
+                }
+                if (face.nz === 0) {
+                  dz = dz === 0 ? inset : 1 - inset;
+                } else {
+                  dz = face.nz > 0 ? 1 - inset : inset;
+                }
+              }
 
-              buf.positions[pOff] = x + corner[0];
+              buf.positions[pOff] = x + dx;
               buf.positions[pOff + 1] = y + dy;
-              buf.positions[pOff + 2] = z + corner[2];
+              buf.positions[pOff + 2] = z + dz;
 
               buf.normals[pOff] = face.nx;
               buf.normals[pOff + 1] = face.ny;
@@ -287,16 +404,15 @@ export class ChunkMesher {
               buf.uvs[uOff] = corner[6] === 0 ? u0 : u1;
               buf.uvs[uOff + 1] = corner[7] === 0 ? v0 : v1;
 
-              const ao = isWater
+              const ao = (isTranslucent || inset > 0)
                 ? 3
                 : computeVertexAO(nbx, nby, nbz, face.nx, face.ny, face.nz, corner[3], corner[4], corner[5]);
               aoValues[i] = ao;
 
-              const brightness = shade * AO_CURVE[ao];
-              const linearBrightness = Math.pow(brightness, 2.2);
-              buf.colors[pOff] = linearBrightness;
-              buf.colors[pOff + 1] = linearBrightness;
-              buf.colors[pOff + 2] = linearBrightness;
+              const lum = lut[f * 4 + ao];
+              buf.colors[pOff] = lum * tr;
+              buf.colors[pOff + 1] = lum * tg;
+              buf.colors[pOff + 2] = lum * tb;
 
               pOff += 3;
               uOff += 2;

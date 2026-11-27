@@ -1,4 +1,5 @@
 import * as THREE from '../../vendor/three.module.min.js';
+import { BLOCK_IDS, BlockRegistry } from '../blocks/BlockRegistry.js';
 import {
   BASE_FOV,
   CAMERA_MODES,
@@ -13,9 +14,12 @@ import {
   PLAYER_EYE_HEIGHT,
   PLAYER_HALF_WIDTH,
   PLAYER_HEIGHT,
-  SEA_LEVEL,
+  PLAYER_SWIM_EYE_HEIGHT,
+  PLAYER_SWIM_HEIGHT,
   SPRINT_FOV_BOOST,
   SPRINT_SPEED,
+  SWIM_SPEED,
+  SWIM_SPRINT_SPEED,
   TERMINAL_VELOCITY,
   WALK_SPEED,
   WORLD_HEIGHT,
@@ -44,6 +48,7 @@ export class PlayerController {
     this.onGround = false;
     this.isCrouching = false;
     this.isSprinting = false;
+    this.isSwimming = false;
     this.sprintToggled = false;
     this.jumpCooldown = 0;
     this.currentFov = BASE_FOV;
@@ -57,9 +62,10 @@ export class PlayerController {
     this.keys = new Set();
     this.pointerLocked = false;
     this.isPaused = false;
-    this.mouseSensitivity = 0.0022;
+    this.mouseSensitivity = options.sensitivity ?? 0.0022;
     this.lastSpaceTime = 0;
-    this.lastWTime = 0;
+    this.lastWDownTime = 0;
+    this.wTapReleased = false;
     this.primaryHeld = false;
 
     // External mobile input bridge (updated by MobileControls)
@@ -74,6 +80,7 @@ export class PlayerController {
 
     // Action & HUD callbacks
     this.onPlaceAction = options.onPlaceAction || null;
+    this.onPickBlock = options.onPickBlock || null;
     this.onCameraModeChange = options.onCameraModeChange || null;
     this.onToggleDebug = options.onToggleDebug || null;
     this.onTogglePause = options.onTogglePause || null;
@@ -120,10 +127,11 @@ export class PlayerController {
       }
       if (e.code === 'KeyW' && !e.repeat) {
         const now = performance.now();
-        if (now - this.lastWTime < 280) {
+        if (this.wTapReleased && now - this.lastWDownTime < 340) {
           this.sprintToggled = true;
+          this.wTapReleased = false;
         }
-        this.lastWTime = now;
+        this.lastWDownTime = now;
       }
       this.keys.add(e.code);
     };
@@ -132,6 +140,11 @@ export class PlayerController {
       this.keys.delete(e.code);
       if (e.code === 'KeyW') {
         this.sprintToggled = false;
+        if (performance.now() - this.lastWDownTime < 340) {
+          this.wTapReleased = true;
+        } else {
+          this.wTapReleased = false;
+        }
       }
     };
 
@@ -145,6 +158,9 @@ export class PlayerController {
       if (e.button === 0) {
         this.primaryHeld = true;
         this.firstPersonHand.triggerSwing();
+      } else if (e.button === 1) {
+        e.preventDefault();
+        this.onPickBlock?.();
       } else if (e.button === 2) {
         this.triggerPlaceAction();
       }
@@ -208,7 +224,9 @@ export class PlayerController {
   }
 
   getCurrentHitboxHeight() {
-    return this.isCrouching ? PLAYER_CROUCH_HEIGHT : PLAYER_HEIGHT;
+    if (this.isSwimming) return PLAYER_SWIM_HEIGHT;
+    if (this.isCrouching) return PLAYER_CROUCH_HEIGHT;
+    return PLAYER_HEIGHT;
   }
 
   cycleCameraMode() {
@@ -227,6 +245,7 @@ export class PlayerController {
   toggleFlyMode() {
     this.flyMode = !this.flyMode;
     this.vy = 0;
+    if (this.flyMode) this.isSwimming = false;
     this.onFlyModeChange?.(this.flyMode);
     return this.flyMode;
   }
@@ -269,16 +288,18 @@ export class PlayerController {
     if (Number.isFinite(pose.pitch)) this.pitch = pose.pitch;
     if (Number.isFinite(pose.cameraMode)) this.setCameraMode(pose.cameraMode);
     if (typeof pose.flyMode === 'boolean') this.flyMode = pose.flyMode;
+    this.vx = 0;
     this.vy = 0;
+    this.vz = 0;
   }
 
   getFacingCardinal() {
     const dirX = -Math.sin(this.yaw);
     const dirZ = -Math.cos(this.yaw);
     if (Math.abs(dirZ) >= Math.abs(dirX)) {
-      return dirZ < 0 ? 'North (-Z)' : 'South (+Z)';
+      return dirZ < 0 ? 'N (-Z)' : 'S (+Z)';
     }
-    return dirX > 0 ? 'East (+X)' : 'West (-X)';
+    return dirX > 0 ? 'E (+X)' : 'W (-X)';
   }
 
   update(dt) {
@@ -309,9 +330,30 @@ export class PlayerController {
       this.sprintToggled ||
       this.touchInput.sprint;
 
+    // Water submersion probe
+    const feetInWater = this.world.getBlock(this.x, this.y + 0.12, this.z) === BLOCK_IDS.WATER;
+    const waistInWater = this.world.getBlock(this.x, this.y + 0.72, this.z) === BLOCK_IDS.WATER;
+    const headInWater = this.world.getBlock(this.x, this.y + 1.48, this.z) === BLOCK_IDS.WATER;
+    const inWater = feetInWater || waistInWater;
+
+    // 1-block-tall swim mode activates ONLY when fully submerged in water & sprinting!
+    // Never activates by sprinting on dry land, and safely stays crouched/swimming under 1-block ceilings until clear.
+    let nextSwim = false;
+    if (!this.flyMode && headInWater && wantSprint && forward > 0.25) {
+      nextSwim = true;
+    } else if (!this.flyMode && this.isSwimming) {
+      if (inWater && forward > 0.1 && wantSprint) {
+        nextSwim = true;
+      } else if (collidesWithWorld(this.world, this.x, this.y, this.z, PLAYER_HALF_WIDTH, PLAYER_HEIGHT)) {
+        // Keep low profile until clearing 1-block overhead tunnel
+        nextSwim = true;
+      }
+    }
+    this.isSwimming = nextSwim;
+
     // Crouch ceiling check: cannot uncrouch if standing height (1.8) collides overhead
-    let nextCrouch = !this.flyMode && wantCrouch;
-    if (!nextCrouch && this.isCrouching && !this.flyMode) {
+    let nextCrouch = !this.flyMode && !this.isSwimming && wantCrouch;
+    if (!nextCrouch && !this.isSwimming && this.isCrouching && !this.flyMode) {
       if (collidesWithWorld(this.world, this.x, this.y, this.z, PLAYER_HALF_WIDTH, PLAYER_HEIGHT)) {
         nextCrouch = true;
       }
@@ -334,16 +376,40 @@ export class PlayerController {
     let speed = WALK_SPEED;
     if (this.flyMode) {
       speed = this.isSprinting ? FLY_SPRINT_SPEED : FLY_SPEED;
+    } else if (this.isSwimming) {
+      speed = this.isSprinting ? SWIM_SPRINT_SPEED : SWIM_SPEED;
+    } else if (inWater) {
+      speed = this.isSprinting ? SWIM_SPEED * 1.1 : SWIM_SPEED * 0.85;
     } else if (this.isCrouching) {
       speed = CROUCH_SPEED;
     } else if (this.isSprinting) {
       speed = SPRINT_SPEED;
     }
 
+    // Check ice slipperiness below feet
+    const belowBlockId = this.onGround ? this.world.getBlock(this.x, this.y - 0.12, this.z) : 0;
+    const belowDef = BlockRegistry.get(belowBlockId);
+    const isOnIce = !this.flyMode && this.onGround && belowDef.slipperiness > 0;
+
     const activeHeight = this.getCurrentHitboxHeight();
     if (this.jumpCooldown > 0) this.jumpCooldown = Math.max(0, this.jumpCooldown - dt);
 
-    // Substep physics for tunneling immunity even during frame hiccups
+    // Smooth horizontal velocity (instant grip on normal ground, icy inertia on Ice, gentle drift in water)
+    const targetVx = moveDirX * speed;
+    const targetVz = moveDirZ * speed;
+    if (isOnIce) {
+      const iceGrip = Math.min(1, dt * 3.6);
+      this.vx += (targetVx - this.vx) * iceGrip;
+      this.vz += (targetVz - this.vz) * iceGrip;
+    } else if (inWater && !this.flyMode) {
+      const waterGrip = Math.min(1, dt * 9.5);
+      this.vx += (targetVx - this.vx) * waterGrip;
+      this.vz += (targetVz - this.vz) * waterGrip;
+    } else {
+      this.vx = targetVx;
+      this.vz = targetVz;
+    }
+
     const substeps = Math.max(1, Math.ceil(dt / 0.016));
     const subDt = dt / substeps;
     let anyWallHit = false;
@@ -357,9 +423,9 @@ export class PlayerController {
         const res = moveAABB(
           this.world,
           this,
-          moveDirX * speed * subDt,
+          this.vx * subDt,
           vert * speed * subDt,
-          moveDirZ * speed * subDt,
+          this.vz * subDt,
           PLAYER_HALF_WIDTH,
           PLAYER_HEIGHT,
           false
@@ -371,15 +437,37 @@ export class PlayerController {
         this.vy = 0;
         if (res.hitWall) anyWallHit = true;
       } else {
-        const inWater = this.y < SEA_LEVEL + 0.4 && this.world.getBlock(this.x, this.y + 0.35, this.z) === 12;
+        const subFeetWater = this.world.getBlock(this.x, this.y + 0.1, this.z) === BLOCK_IDS.WATER;
+        const subWaistWater = this.world.getBlock(this.x, this.y + 0.65, this.z) === BLOCK_IDS.WATER;
+        const subHeadWater = this.world.getBlock(this.x, this.y + 1.35, this.z) === BLOCK_IDS.WATER;
+        const subInWater = subFeetWater || subWaistWater;
         let dy;
 
-        if (inWater) {
-          speed = this.isSprinting ? WALK_SPEED * 0.85 : WALK_SPEED * 0.62;
+        if (subInWater) {
+          // 3D pitch swim + jump ascent + clean shore hop onto 1-block bank!
           if (wantJump) {
-            this.vy = 4.4;
+            const nearShoreWall = len > 0.05 && collidesWithWorld(
+              this.world,
+              this.x + moveDirX * 0.36,
+              this.y + 0.32,
+              this.z + moveDirZ * 0.36,
+              PLAYER_HALF_WIDTH,
+              0.8
+            );
+            if (!subHeadWater && (nearShoreWall || !subWaistWater)) {
+              // Strong hop onto dry shore block from water!
+              this.vy = Math.max(this.vy, 7.15);
+            } else {
+              this.vy = Math.min(4.8, this.vy + 26.0 * subDt);
+            }
+          } else if (wantCrouch) {
+            this.vy = Math.max(-5.2, this.vy - 24.0 * subDt);
+          } else if (this.isSwimming && forward > 0.25) {
+            const swimVertTarget = Math.sin(this.pitch) * speed;
+            this.vy += (swimVertTarget - this.vy) * Math.min(1, subDt * 8);
           } else {
-            this.vy = Math.max(-3.2, this.vy - GRAVITY * 0.25 * subDt);
+            // Gentle sinking in deep water when idle
+            this.vy = Math.max(-2.1, this.vy - GRAVITY * 0.16 * subDt);
           }
           dy = this.vy * subDt;
         } else {
@@ -396,12 +484,12 @@ export class PlayerController {
         const res = moveAABB(
           this.world,
           this,
-          moveDirX * speed * subDt,
+          this.vx * subDt,
           dy,
-          moveDirZ * speed * subDt,
+          this.vz * subDt,
           PLAYER_HALF_WIDTH,
           activeHeight,
-          this.isCrouching
+          this.isCrouching && !subInWater
         );
 
         this.x = res.x;
@@ -414,13 +502,17 @@ export class PlayerController {
       }
     }
 
-    if (anyWallHit && !this.flyMode) {
+    if (anyWallHit && !this.flyMode && !inWater) {
       this.isSprinting = false;
       this.sprintToggled = false;
     }
 
-    // Smooth camera eye-height transition on crouch/uncrouch
-    const targetEye = this.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
+    // Smooth camera eye-height transition
+    const targetEye = this.isSwimming
+      ? PLAYER_SWIM_EYE_HEIGHT
+      : this.isCrouching
+        ? PLAYER_CROUCH_EYE_HEIGHT
+        : PLAYER_EYE_HEIGHT;
     this.currentEyeHeight += (targetEye - this.currentEyeHeight) * Math.min(1, dt * 16);
 
     // Smooth sprint FOV boost (+10 deg)
@@ -436,9 +528,9 @@ export class PlayerController {
     }
 
     // Walk animation phase
-    const horizontalSpeed = Math.hypot(moveDirX, moveDirZ) * speed;
+    const horizontalSpeed = Math.hypot(this.vx, this.vz);
     const isMoving = len > 0.05;
-    const targetBlend = isMoving && (this.onGround || this.flyMode) ? Math.min(1, len) : 0;
+    const targetBlend = isMoving && (this.onGround || this.flyMode || inWater) ? Math.min(1, len) : 0;
     this.moveBlend += (targetBlend - this.moveBlend) * Math.min(1, dt * 12);
     if (isMoving) {
       this.walkPhase += dt * (4.2 + horizontalSpeed * 1.15);
@@ -454,7 +546,7 @@ export class PlayerController {
       walkPhase: this.walkPhase,
       moveBlend: this.moveBlend,
       swingProgress: this.firstPersonHand.getSwingProgress(),
-      isCrouching: this.isCrouching,
+      isCrouching: this.isCrouching || this.isSwimming,
       time: this.time,
     });
 
@@ -493,7 +585,7 @@ export class PlayerController {
       const cy = eyeY + lookY * sign * step;
       const cz = eyeZ + lookZ * sign * step;
       const b = this.world.getBlock(cx, cy, cz);
-      if (b !== 0 && b !== 12) {
+      if (b !== 0 && b !== BLOCK_IDS.WATER) {
         dist = Math.max(0.5, step - 0.25);
         break;
       }

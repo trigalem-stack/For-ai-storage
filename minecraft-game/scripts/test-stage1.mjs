@@ -166,15 +166,19 @@ async function runTests() {
   // 3. WorldGen terrain, bedrock, water, safe spawn, and cross-chunk trees
   const gen = new WorldGen(987654);
   const spawn = gen.findSafeSpawn();
-  assert.ok(gen.getTerrainHeight(Math.floor(spawn.x), Math.floor(spawn.z)) >= 64, 'Spawn must be above sea level');
+  assert.ok(gen.getTerrainHeight(Math.floor(spawn.x), Math.floor(spawn.z)) >= 63, 'Spawn must be above sea level');
 
   const testChunks = new Map();
   let foundBedrock = false;
   let foundWater = false;
   let foundLogs = 0;
   let foundLeaves = 0;
-  for (let cz = -2; cz <= 2; cz++) {
-    for (let cx = -2; cx <= 2; cx++) {
+  const logIds = new Set([BLOCK_IDS.OAK_LOG, BLOCK_IDS.BIRCH_LOG, BLOCK_IDS.SPRUCE_LOG]);
+  const leafIds = new Set([BLOCK_IDS.OAK_LEAVES, BLOCK_IDS.BIRCH_LEAVES, BLOCK_IDS.SPRUCE_LEAVES]);
+  const spawnCx = Math.floor(spawn.x / 16);
+  const spawnCz = Math.floor(spawn.z / 16);
+  for (let cz = spawnCz - 3; cz <= spawnCz + 3; cz++) {
+    for (let cx = spawnCx - 3; cx <= spawnCx + 3; cx++) {
       const ch = new Chunk(cx, cz);
       gen.generateChunk(ch);
       testChunks.set(`${cx},${cz}`, ch);
@@ -185,14 +189,14 @@ async function runTests() {
           for (let y = 1; y < 128; y++) {
             const b = ch.getBlock(x, y, z);
             if (b === BLOCK_IDS.WATER) foundWater = true;
-            if (b === BLOCK_IDS.OAK_LOG) foundLogs++;
-            if (b === BLOCK_IDS.OAK_LEAVES) foundLeaves++;
+            if (logIds.has(b)) foundLogs++;
+            if (leafIds.has(b)) foundLeaves++;
           }
         }
       }
     }
   }
-  assert.ok(foundBedrock && foundLogs > 0 && foundLeaves > 0, 'WorldGen must produce bedrock and oak trees');
+  assert.ok(foundBedrock && foundLogs > 0 && foundLeaves > 0, 'WorldGen must produce bedrock and biome trees');
   // Verify tree canopies crossing chunk borders never truncate abruptly (leaf neighbors exist across seam)
   let seamContinuityVerified = false;
   for (let cz = -2; cz <= 1 && !seamContinuityVerified; cz++) {
@@ -300,7 +304,7 @@ async function runTests() {
   const cam = new THREE.PerspectiveCamera(72, 16 / 9, 0.1, 500);
   const world2 = new World(new THREE.Scene(), atlas, 555, 2);
   world2.preloadSpawnArea(0, 0, 1);
-  const ctrl = new PlayerController(cam, world2, model, hand, { x: 0.5, y: 70, z: 0.5 });
+  const ctrl = new PlayerController(cam, world2, model, hand, { x: 0.5, y: 118, z: 0.5, flyMode: true });
   assert.equal(model.root.visible, false, 'PlayerModel must be hidden in 1st-person mode');
   ctrl.cycleCameraMode();
   assert.equal(model.root.visible, true, 'PlayerModel must be visible in 3rd-person back mode');

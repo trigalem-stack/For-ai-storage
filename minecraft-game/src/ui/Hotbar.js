@@ -5,16 +5,25 @@ export class Hotbar {
   constructor(atlas, options = {}) {
     this.atlas = atlas;
     this.onChange = options.onChange || null;
+    this.creativeMode = options.creativeMode !== undefined ? Boolean(options.creativeMode) : true;
     this.slots = new Array(HOTBAR_SIZE).fill(null);
     this.selectedIndex = 0;
 
     this.container = document.getElementById('hotbar');
     this.itemLabelEl = document.getElementById('hotbar-item-name');
+    this.paletteBtn = document.getElementById('btn-creative-palette');
+    this.paletteOverlay = document.getElementById('creative-palette-overlay');
+    this.paletteGrid = document.getElementById('creative-palette-grid');
+    this.paletteCloseBtn = document.getElementById('btn-close-palette');
+
     this.slotEls = [];
     this.labelTimer = null;
+    this.paletteOpen = false;
+    this.onPaletteToggle = options.onPaletteToggle || null;
 
     this._initStarterKit();
     this._buildDom();
+    this._buildCreativePalette();
     this._bindInput();
     this.render();
   }
@@ -23,13 +32,13 @@ export class Hotbar {
     this.slots = [
       { id: BLOCK_IDS.COBBLESTONE, count: 64 },
       { id: BLOCK_IDS.OAK_PLANKS, count: 64 },
-      { id: BLOCK_IDS.DIRT, count: 64 },
-      { id: BLOCK_IDS.OAK_LOG, count: 64 },
       { id: BLOCK_IDS.SAND, count: 64 },
-      { id: BLOCK_IDS.OAK_LEAVES, count: 32 },
-      null,
-      null,
-      null,
+      { id: BLOCK_IDS.GRAVEL, count: 64 },
+      { id: BLOCK_IDS.OAK_LOG, count: 64 },
+      { id: BLOCK_IDS.BIRCH_LOG, count: 64 },
+      { id: BLOCK_IDS.ICE, count: 64 },
+      { id: BLOCK_IDS.POPPY, count: 64 },
+      { id: BLOCK_IDS.DIAMOND_ORE, count: 64 },
     ];
     this.selectedIndex = 0;
   }
@@ -38,6 +47,11 @@ export class Hotbar {
     this._initStarterKit();
     this.render();
     this.onChange?.(this.getSelectedSlot(), true);
+  }
+
+  setCreativeMode(enabled) {
+    this.creativeMode = Boolean(enabled);
+    this.render();
   }
 
   loadState(savedHotbar) {
@@ -76,6 +90,29 @@ export class Hotbar {
     this.onChange?.(this.getSelectedSlot(), true);
   }
 
+  setSlotBlock(blockId, index = this.selectedIndex) {
+    const slotIdx = Math.max(0, Math.min(HOTBAR_SIZE - 1, index));
+    if (!blockId || blockId <= 0) {
+      this.slots[slotIdx] = null;
+    } else {
+      this.slots[slotIdx] = { id: blockId, count: MAX_STACK_SIZE };
+    }
+    this.selectedIndex = slotIdx;
+    this.render();
+    this._showSelectedName();
+    this.onChange?.(this.getSelectedSlot(), true);
+  }
+
+  pickBlock(blockId) {
+    if (!blockId || blockId <= 0) return;
+    const existingIdx = this.slots.findIndex((s) => s && s.id === blockId);
+    if (existingIdx >= 0) {
+      this.selectSlot(existingIdx);
+      return;
+    }
+    this.setSlotBlock(blockId, this.selectedIndex);
+  }
+
   canAccept(blockId) {
     if (!blockId) return false;
     for (let i = 0; i < HOTBAR_SIZE; i++) {
@@ -86,10 +123,6 @@ export class Hotbar {
     return false;
   }
 
-  /**
-   * Adds picked-up block items into matching stacks first, then empty slots.
-   * Returns leftover count that did not fit.
-   */
   addItem(blockId, amount = 1) {
     if (!blockId || amount <= 0) return amount;
     let remaining = amount;
@@ -118,9 +151,14 @@ export class Hotbar {
     return remaining;
   }
 
-  consumeSelected(amount = 1) {
+  /**
+   * Consumes item from selected slot. In Creative mode blocks are infinite unless force=true.
+   */
+  consumeSelected(amount = 1, force = false) {
     const slot = this.slots[this.selectedIndex];
-    if (!slot || slot.count < amount) return false;
+    if (!slot || slot.count <= 0) return false;
+    if (this.creativeMode && !force) return true;
+    if (slot.count < amount) return false;
     slot.count -= amount;
     if (slot.count <= 0) {
       this.slots[this.selectedIndex] = null;
@@ -128,6 +166,52 @@ export class Hotbar {
     this.render();
     this.onChange?.(this.getSelectedSlot(), true);
     return true;
+  }
+
+  togglePalette(forceState) {
+    if (!this.paletteOverlay) return false;
+    const next = forceState !== undefined ? Boolean(forceState) : !this.paletteOpen;
+    this.paletteOpen = next;
+    this.paletteOverlay.classList.toggle('hidden', !next);
+    this.onPaletteToggle?.(next);
+    return next;
+  }
+
+  _buildCreativePalette() {
+    if (!this.paletteGrid) return;
+    this.paletteGrid.innerHTML = '';
+    const blocks = BlockRegistry.getPlaceableBlocks();
+    for (const def of blocks) {
+      const itemBtn = document.createElement('button');
+      itemBtn.type = 'button';
+      itemBtn.className = 'palette-block-btn';
+      itemBtn.title = def.name;
+
+      const img = document.createElement('img');
+      img.src = this.atlas.getBlockIconDataURL(def);
+      img.alt = def.name;
+      img.draggable = false;
+
+      const label = document.createElement('span');
+      label.textContent = def.name;
+
+      itemBtn.append(img, label);
+      itemBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.setSlotBlock(def.id, this.selectedIndex);
+        this.togglePalette(false);
+      });
+      this.paletteGrid.appendChild(itemBtn);
+    }
+
+    this.paletteCloseBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.togglePalette(false);
+    });
+    this.paletteBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.togglePalette();
+    });
   }
 
   _showSelectedName() {
@@ -187,6 +271,8 @@ export class Hotbar {
         if (n >= 1 && n <= HOTBAR_SIZE) {
           this.selectSlot(n - 1);
         }
+      } else if (e.code === 'KeyE' && !e.repeat) {
+        this.togglePalette();
       }
     };
 
@@ -212,8 +298,9 @@ export class Hotbar {
         const def = BlockRegistry.get(slot.id);
         ui.icon.src = this.atlas.getBlockIconDataURL(def);
         ui.icon.classList.remove('hidden');
-        ui.count.textContent = slot.count > 1 ? String(slot.count) : '';
-        ui.count.classList.toggle('hidden', slot.count <= 1);
+        const showCount = !this.creativeMode && slot.count > 1;
+        ui.count.textContent = showCount ? String(slot.count) : '';
+        ui.count.classList.toggle('hidden', !showCount);
       } else {
         ui.icon.classList.add('hidden');
         ui.count.classList.add('hidden');

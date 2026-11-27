@@ -1,5 +1,8 @@
-// Multitouch mobile controls using explicit touch.identifier tracking
-// so left-thumb joystick, right-thumb look/tap/hold-break, and action buttons work simultaneously.
+// Dynamic Multitouch Mobile Controls:
+// - Left half of screen = dynamic floating joystick appearing right under thumb touch!
+// - Right half of screen = camera swipe look, short tap place, hold break
+// - Double-push forward on joystick (hold on 2nd push) = Sprint!
+// - Ergonomic, generously sized action buttons with zero accidental look-zone hijack
 
 export class MobileControls {
   constructor(playerController, callbacks = {}) {
@@ -7,9 +10,10 @@ export class MobileControls {
     this.callbacks = callbacks;
 
     this.root = document.getElementById('mobile-controls');
+    this.moveZone = document.getElementById('touch-move-zone');
+    this.lookZone = document.getElementById('touch-look-zone');
     this.joystickBase = document.getElementById('touch-joystick-base');
     this.joystickKnob = document.getElementById('touch-joystick-knob');
-    this.lookZone = document.getElementById('touch-look-zone');
 
     this.btnJump = document.getElementById('btn-touch-jump');
     this.btnCrouch = document.getElementById('btn-touch-crouch');
@@ -22,11 +26,15 @@ export class MobileControls {
     this.crouchToggled = false;
     this.lastJumpTapTime = 0;
 
-    // Independent touch identifier state
+    // Floating joystick state
     this.joystickTouchId = null;
     this.joystickCenter = { x: 0, y: 0 };
-    this.maxRadius = 46;
+    this.maxRadius = 48;
+    this.lastForwardStartTime = 0;
+    this.forwardTapReleased = false;
+    this.sprintLocked = false;
 
+    // Camera look state
     this.lookTouchId = null;
     this.lookStartPos = { x: 0, y: 0 };
     this.lastLookPos = { x: 0, y: 0 };
@@ -68,31 +76,42 @@ export class MobileControls {
     }
   }
 
+  _hideFloatingJoystick() {
+    if (this.joystickBase) {
+      this.joystickBase.classList.remove('active', 'sprinting');
+      this.joystickBase.style.left = '';
+      this.joystickBase.style.top = '';
+    }
+    if (this.joystickKnob) {
+      this.joystickKnob.style.transform = 'translate(-50%, -50%)';
+    }
+  }
+
   _resetAllInputs() {
     clearTimeout(this.longPressTimer);
     this.joystickTouchId = null;
     this.lookTouchId = null;
     this.crouchToggled = false;
     this.longPressTriggered = false;
+    this.sprintLocked = false;
     this.player.touchInput.moveX = 0;
     this.player.touchInput.moveZ = 0;
     this.player.touchInput.jump = false;
     this.player.touchInput.crouch = false;
     this.player.touchInput.sprint = false;
     this.player.touchInput.breakHeld = false;
-    if (this.joystickKnob) {
-      this.joystickKnob.style.transform = 'translate(-50%, -50%)';
-    }
-    this.joystickBase?.classList.remove('sprinting');
+    this._hideFloatingJoystick();
     this.btnCrouch?.classList.remove('active');
     this.btnBreak?.classList.remove('pressed');
+    this.btnJump?.classList.remove('pressed');
+    this.btnPlace?.classList.remove('pressed');
   }
 
   _bindEvents() {
     if (!this.root) return;
 
-    // Virtual Joystick (left thumb)
-    this.joystickBase?.addEventListener('touchstart', (e) => {
+    // Entire left half of screen spawns the joystick right where user's finger touches!
+    this.moveZone?.addEventListener('touchstart', (e) => {
       if (!this.enabled) return;
       e.preventDefault();
       e.stopPropagation();
@@ -101,14 +120,31 @@ export class MobileControls {
       const touch = e.changedTouches[0];
       if (!touch) return;
       this.joystickTouchId = touch.identifier;
-      const rect = this.joystickBase.getBoundingClientRect();
-      this.joystickCenter.x = rect.left + rect.width * 0.5;
-      this.joystickCenter.y = rect.top + rect.height * 0.5;
-      this.maxRadius = Math.max(34, rect.width * 0.42);
+
+      const r = this.maxRadius;
+      const cx = Math.max(r + 8, Math.min(window.innerWidth * 0.48 - r, touch.clientX));
+      const cy = Math.max(r + 56, Math.min(window.innerHeight - r - 8, touch.clientY));
+      this.joystickCenter.x = cx;
+      this.joystickCenter.y = cy;
+
+      if (this.joystickBase) {
+        this.joystickBase.style.left = `${cx}px`;
+        this.joystickBase.style.top = `${cy}px`;
+        this.joystickBase.classList.add('active');
+      }
+
+      // Quick double-tap + hold forward on left half engages sprint cleanly
+      const now = performance.now();
+      if (this.forwardTapReleased && now - this.lastForwardStartTime < 380) {
+        this.sprintLocked = true;
+        this.forwardTapReleased = false;
+      }
+      this.lastForwardStartTime = now;
+
       this._updateJoystick(touch.clientX, touch.clientY);
     }, { passive: false });
 
-    // Camera look zone: swipe to look, short tap to place, hold stationary (>260ms) to break
+    // Right half of screen controls camera look (swipe = look, quick tap = place, long hold = break)
     this.lookZone?.addEventListener('touchstart', (e) => {
       if (!this.enabled) return;
       e.preventDefault();
@@ -131,7 +167,7 @@ export class MobileControls {
           this.longPressTriggered = true;
           this.player.touchInput.breakHeld = true;
         }
-      }, 260);
+      }, 240);
     }, { passive: false });
 
     this._onTouchMove = (e) => {
@@ -164,13 +200,16 @@ export class MobileControls {
         const t = e.changedTouches[i];
         if (t.identifier === this.joystickTouchId) {
           this.joystickTouchId = null;
+          this.sprintLocked = false;
+          if (performance.now() - this.lastForwardStartTime < 360) {
+            this.forwardTapReleased = true;
+          } else {
+            this.forwardTapReleased = false;
+          }
           this.player.touchInput.moveX = 0;
           this.player.touchInput.moveZ = 0;
           this.player.touchInput.sprint = false;
-          if (this.joystickKnob) {
-            this.joystickKnob.style.transform = 'translate(-50%, -50%)';
-          }
-          this.joystickBase?.classList.remove('sprinting');
+          this._hideFloatingJoystick();
         }
         if (t.identifier === this.lookTouchId) {
           clearTimeout(this.longPressTimer);
@@ -189,16 +228,37 @@ export class MobileControls {
     window.addEventListener('touchend', this._onTouchEnd, { passive: false });
     window.addEventListener('touchcancel', this._onTouchEnd, { passive: false });
 
-    // Jump button: hold to jump/ascend + quick double-tap (<300ms) toggles Fly Mode
-    if (this.btnJump) {
-      let jumpTouchId = null;
-      this.btnJump.addEventListener('touchstart', (e) => {
+    // Helper for reliable ergonomic action buttons
+    const bindHoldBtn = (btn, onPress, onRelease) => {
+      if (!btn) return;
+      let activeId = null;
+      btn.addEventListener('touchstart', (e) => {
         if (!this.enabled) return;
         e.preventDefault();
         e.stopPropagation();
         const t = e.changedTouches[0];
-        if (t) jumpTouchId = t.identifier;
+        if (t) activeId = t.identifier;
+        btn.classList.add('pressed');
+        onPress(e);
+      }, { passive: false });
 
+      const finish = (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === activeId) {
+            activeId = null;
+            btn.classList.remove('pressed');
+            onRelease?.();
+          }
+        }
+      };
+      btn.addEventListener('touchend', finish, { passive: false });
+      btn.addEventListener('touchcancel', finish, { passive: false });
+    };
+
+    // Jump button: hold to jump/ascend + quick double-tap (<300ms) toggles Fly Mode
+    bindHoldBtn(
+      this.btnJump,
+      () => {
         const now = performance.now();
         if (now - this.lastJumpTapTime < 300) {
           const active = this.player.toggleFlyMode();
@@ -208,98 +268,51 @@ export class MobileControls {
         } else {
           this.lastJumpTapTime = now;
         }
-
         this.player.touchInput.jump = true;
-        this.btnJump.classList.add('pressed');
-      }, { passive: false });
+      },
+      () => {
+        this.player.touchInput.jump = false;
+      }
+    );
 
-      const endJump = (e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          if (e.changedTouches[i].identifier === jumpTouchId) {
-            jumpTouchId = null;
-            this.player.touchInput.jump = false;
-            this.btnJump.classList.remove('pressed');
-          }
-        }
-      };
-      this.btnJump.addEventListener('touchend', endJump, { passive: false });
-      this.btnJump.addEventListener('touchcancel', endJump, { passive: false });
-    }
-
-    // Crouch / Descend button: Bedrock-style toggle on ground (safe edge guard), hold-to-descend in fly mode
-    if (this.btnCrouch) {
-      let crouchTouchId = null;
-      this.btnCrouch.addEventListener('touchstart', (e) => {
-        if (!this.enabled) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const t = e.changedTouches[0];
-        if (t) crouchTouchId = t.identifier;
-
+    // Crouch / Descend button
+    bindHoldBtn(
+      this.btnCrouch,
+      () => {
         if (this.player.flyMode) {
           this.player.touchInput.crouch = true;
-          this.btnCrouch.classList.add('pressed');
         } else {
           this.crouchToggled = !this.crouchToggled;
           this.player.touchInput.crouch = this.crouchToggled;
           this.btnCrouch.classList.toggle('active', this.crouchToggled);
         }
-      }, { passive: false });
-
-      const endCrouch = (e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          if (e.changedTouches[i].identifier === crouchTouchId) {
-            crouchTouchId = null;
-            this.btnCrouch.classList.remove('pressed');
-            if (this.player.flyMode) {
-              this.player.touchInput.crouch = false;
-            }
-          }
+      },
+      () => {
+        if (this.player.flyMode) {
+          this.player.touchInput.crouch = false;
         }
-      };
-      this.btnCrouch.addEventListener('touchend', endCrouch, { passive: false });
-      this.btnCrouch.addEventListener('touchcancel', endCrouch, { passive: false });
-    }
+      }
+    );
 
-    // Dedicated Break button (hold to mine)
-    if (this.btnBreak) {
-      let breakTouchId = null;
-      this.btnBreak.addEventListener('touchstart', (e) => {
-        if (!this.enabled) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const t = e.changedTouches[0];
-        if (t) breakTouchId = t.identifier;
+    // Dedicated Break button (instant creative break + hold repeat)
+    bindHoldBtn(
+      this.btnBreak,
+      () => {
         this.player.touchInput.breakHeld = true;
-        this.btnBreak.classList.add('pressed');
-      }, { passive: false });
+      },
+      () => {
+        this.player.touchInput.breakHeld = false;
+      }
+    );
 
-      const endBreak = (e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-          if (e.changedTouches[i].identifier === breakTouchId) {
-            breakTouchId = null;
-            this.player.touchInput.breakHeld = false;
-            this.btnBreak.classList.remove('pressed');
-          }
-        }
-      };
-      this.btnBreak.addEventListener('touchend', endBreak, { passive: false });
-      this.btnBreak.addEventListener('touchcancel', endBreak, { passive: false });
-    }
-
-    // Dedicated Place button (tap to place)
-    if (this.btnPlace) {
-      this.btnPlace.addEventListener('touchstart', (e) => {
-        if (!this.enabled) return;
-        e.preventDefault();
-        e.stopPropagation();
-        this.btnPlace.classList.add('pressed');
+    // Dedicated Place button
+    bindHoldBtn(
+      this.btnPlace,
+      () => {
         this.player.triggerPlaceAction();
-      }, { passive: false });
-      const endPlace = () => this.btnPlace.classList.remove('pressed');
-      this.btnPlace.addEventListener('touchend', endPlace, { passive: false });
-      this.btnPlace.addEventListener('touchcancel', endPlace, { passive: false });
-    }
+      },
+      null
+    );
 
     // Fly quick toggle button
     if (this.btnFly) {
@@ -341,7 +354,8 @@ export class MobileControls {
 
     this.player.touchInput.moveX = normX;
     this.player.touchInput.moveZ = normZ;
-    const autoSprint = mag > 0.88 && normZ > 0.55;
+    const isForwardPush = normZ > 0.45;
+    const autoSprint = isForwardPush && (this.sprintLocked || (mag > 0.90 && normZ > 0.72));
     this.player.touchInput.sprint = autoSprint;
     this.joystickBase?.classList.toggle('sprinting', autoSprint);
   }

@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { BlockRegistry } from '../blocks/BlockRegistry.js';
-import { CHUNK_FRAME_BUDGET_MS, CHUNK_SIZE, WORLD_HEIGHT } from '../constants.js';
+import { BIOME_NAMES, CHUNK_FRAME_BUDGET_MS, CHUNK_SIZE, WORLD_HEIGHT } from '../constants.js';
 import { Chunk, chunkKey } from './Chunk.js';
 import { ChunkMesher } from './ChunkMesher.js';
 import { WorldGen } from './WorldGen.js';
@@ -12,14 +12,16 @@ export class World {
     this.seed = seed;
     this.renderDistance = renderDistance;
     this.unlimitedMemory = options.unlimitedMemory !== undefined ? Boolean(options.unlimitedMemory) : true;
+    this.fogEnabled = options.fogEnabled !== undefined ? Boolean(options.fogEnabled) : false;
+    this.onBlockChanged = options.onBlockChanged || null;
 
     this.worldGen = new WorldGen(seed);
     this.mesher = new ChunkMesher(atlas);
 
     // Active chunks (within render distance + hysteresis)
     this.chunks = new Map(); // key -> Chunk
-    // Unlimited RAM cache of visited/modified chunk voxel arrays (keeps VRAM low when unloaded from GPU)
-    this.chunkDataCache = new Map(); // key -> { blocks: Uint8Array, minY, maxY }
+    // Unlimited RAM cache of visited/modified chunk voxel + biome arrays (keeps VRAM low when unloaded)
+    this.chunkDataCache = new Map(); // key -> { blocks, biomes, minY, maxY }
     // Delta map of player-modified blocks + per-chunk O(1) lookup index
     this.modifiedBlocks = new Map(); // "wx,wy,wz" -> blockId
     this.modifiedByChunk = new Map(); // "cx,cz" -> Array<[lx, wy, lz, id]>
@@ -28,10 +30,112 @@ export class World {
     this.lastPlayerChunkZ = null;
     this.pendingCoords = [];
 
-    // Sky & atmospheric fog synced to render distance
-    this.skyColor = new THREE.Color('#87bdff');
+    // Offline Blob Web Worker pool for smooth zero-copy chunk generation
+    this.workers = [];
+    this.workerUrl = null;
+    this.inFlightKeys = new Set();
+    this.nextWorkerIdx = 0;
+    this.disposed = false;
+    if (options.useWorkers !== false && typeof Worker !== 'undefined') {
+      this._initWorkers();
+    }
+
+    // Sky & optional atmospheric fog
+    this.skyColor = new THREE.Color('#8ec5ff');
     this.scene.background = this.skyColor;
     this._updateFog();
+  }
+
+  _initWorkers() {
+    try {
+      const url = WorldGen.createWorkerBlobUrl();
+      if (!url) return;
+      this.workerUrl = url;
+      const count = typeof navigator !== 'undefined'
+        ? Math.min(2, Math.max(1, (navigator.hardwareConcurrency || 2) - 1))
+        : 1;
+
+      for (let i = 0; i < count; i++) {
+        const w = new Worker(url);
+        w.onmessage = (e) => this._handleWorkerMessage(e.data);
+        w.onerror = () => {
+          // Silently fall back to synchronous generation if Worker runtime blocks Blob
+          this._terminateWorkers();
+        };
+        this.workers.push(w);
+      }
+    } catch {
+      this._terminateWorkers();
+    }
+  }
+
+  _terminateWorkers() {
+    for (const w of this.workers) {
+      try {
+        w.terminate();
+      } catch {
+        // Ignore terminate error
+      }
+    }
+    this.workers = [];
+    this.inFlightKeys.clear();
+    if (this.workerUrl) {
+      try {
+        URL.revokeObjectURL(this.workerUrl);
+      } catch {
+        // Ignore revoke error
+      }
+      this.workerUrl = null;
+    }
+  }
+
+  _handleWorkerMessage(data) {
+    if (this.disposed || !data) return;
+    const { cx, cz, blocks, biomes, minY, maxY } = data;
+    const key = chunkKey(cx, cz);
+    this.inFlightKeys.delete(key);
+
+    if (this.chunks.has(key)) return;
+
+    // Discard if chunk wandered far past unload radius while generating in background
+    if (this.lastPlayerChunkX !== null && this.lastPlayerChunkZ !== null) {
+      const dx = cx - this.lastPlayerChunkX;
+      const dz = cz - this.lastPlayerChunkZ;
+      const maxRadiusSq = (this.renderDistance + 3) * (this.renderDistance + 3);
+      if (dx * dx + dz * dz > maxRadiusSq) {
+        if (this.unlimitedMemory) {
+          this.chunkDataCache.set(key, {
+            blocks: new Uint8Array(blocks),
+            biomes: new Uint8Array(biomes),
+            minY,
+            maxY,
+          });
+        }
+        return;
+      }
+    }
+
+    const chunk = new Chunk(cx, cz);
+    chunk.blocks = new Uint8Array(blocks);
+    chunk.biomes = new Uint8Array(biomes);
+    chunk.minY = minY;
+    chunk.maxY = maxY;
+    chunk.isGenerated = true;
+    chunk.dirty = true;
+
+    this._applyModifiedBlocksToChunk(chunk);
+
+    if (this.unlimitedMemory) {
+      this.chunkDataCache.set(key, {
+        blocks: chunk.blocks,
+        biomes: chunk.biomes,
+        minY: chunk.minY,
+        maxY: chunk.maxY,
+      });
+    }
+
+    this.chunks.set(key, chunk);
+    this._markNeighborsDirty(cx, cz);
   }
 
   setRenderDistance(distance) {
@@ -41,10 +145,14 @@ export class World {
     this._updateFog();
   }
 
+  setFogEnabled(enabled) {
+    this.fogEnabled = Boolean(enabled);
+    this._updateFog();
+  }
+
   setUnlimitedMemory(enabled) {
     this.unlimitedMemory = Boolean(enabled);
     if (!this.unlimitedMemory) {
-      // Evict unmodified out-of-range cached chunks in economy mode
       for (const key of this.chunkDataCache.keys()) {
         if (!this.chunks.has(key)) {
           this.chunkDataCache.delete(key);
@@ -89,8 +197,12 @@ export class World {
   }
 
   _updateFog() {
-    const farDist = Math.max(24, this.renderDistance * CHUNK_SIZE - 4);
-    const nearDist = Math.max(12, farDist * 0.48);
+    if (!this.fogEnabled) {
+      this.scene.fog = null;
+      return;
+    }
+    const farDist = Math.max(28, this.renderDistance * CHUNK_SIZE - 4);
+    const nearDist = Math.max(14, farDist * 0.55);
     if (!this.scene.fog) {
       this.scene.fog = new THREE.Fog(this.skyColor, nearDist, farDist);
     } else {
@@ -118,11 +230,28 @@ export class World {
     return chunk.getBlock(lx, fy, lz);
   }
 
+  getBiomeAt(wx, wz) {
+    const fx = Math.floor(wx);
+    const fz = Math.floor(wz);
+    const cx = Math.floor(fx / CHUNK_SIZE);
+    const cz = Math.floor(fz / CHUNK_SIZE);
+    const chunk = this.chunks.get(chunkKey(cx, cz));
+    if (chunk && chunk.isGenerated) {
+      return chunk.getBiome(fx - cx * CHUNK_SIZE, fz - cz * CHUNK_SIZE);
+    }
+    return this.worldGen.getBiomeAt(fx, fz);
+  }
+
+  getBiomeNameAt(wx, wz) {
+    const id = this.getBiomeAt(wx, wz);
+    return BIOME_NAMES[id] || BIOME_NAMES[0];
+  }
+
   /**
-   * Sets a block at world coordinates, records offline delta, and optionally rebuilds
-   * the current + bordering neighbor chunks immediately in the same frame (zero hole artifacts).
+   * Sets a block at world coordinates, records offline delta, optionally rebuilds bordering
+   * neighbor chunks immediately, and triggers gravity checks for sand/gravel when edited.
    */
-  setBlock(wx, wy, wz, id, rebuildImmediate = true) {
+  setBlock(wx, wy, wz, id, rebuildImmediate = true, triggerGravity = true) {
     if (wy < 0 || wy >= WORLD_HEIGHT) return false;
     const fx = Math.floor(wx);
     const fy = Math.floor(wy);
@@ -145,9 +274,11 @@ export class World {
     const existingMod = cMods.find((m) => m[0] === lx && m[1] === fy && m[2] === lz);
     if (existingMod) existingMod[3] = id;
     else cMods.push([lx, fy, lz, id]);
+
     if (this.unlimitedMemory) {
       this.chunkDataCache.set(chunk.key, {
         blocks: chunk.blocks,
+        biomes: chunk.biomes,
         minY: chunk.minY,
         maxY: chunk.maxY,
       });
@@ -167,7 +298,6 @@ export class World {
     if (lz === 0) pushNeighborIfPresent(cx, cz - 1);
     if (lz === CHUNK_SIZE - 1) pushNeighborIfPresent(cx, cz + 1);
 
-    // Diagonal neighbors matter for corner AO when breaking/placing right on chunk corners
     if (lx === 0 && lz === 0) pushNeighborIfPresent(cx - 1, cz - 1);
     if (lx === CHUNK_SIZE - 1 && lz === 0) pushNeighborIfPresent(cx + 1, cz - 1);
     if (lx === 0 && lz === CHUNK_SIZE - 1) pushNeighborIfPresent(cx - 1, cz + 1);
@@ -178,12 +308,13 @@ export class World {
         this._rebuildChunkMesh(target);
       }
     }
+
+    if (triggerGravity && this.onBlockChanged) {
+      this.onBlockChanged(fx, fy, fz, id);
+    }
     return true;
   }
 
-  /**
-   * Finds the highest solid block top Y at (wx, wz) for safe initial spawning.
-   */
   getSurfaceHeightAt(wx, wz) {
     const fx = Math.floor(wx);
     const fz = Math.floor(wz);
@@ -227,7 +358,7 @@ export class World {
     const coords = this._collectSpiralCoords(pcx, pcz, radius);
 
     for (const [cx, cz] of coords) {
-      this._ensureChunkGenerated(cx, cz);
+      this._ensureChunkGeneratedSync(cx, cz);
     }
     for (const [cx, cz] of coords) {
       const chunk = this.getChunk(cx, cz);
@@ -261,7 +392,7 @@ export class World {
     }
   }
 
-  _ensureChunkGenerated(cx, cz) {
+  _ensureChunkGeneratedSync(cx, cz) {
     const key = chunkKey(cx, cz);
     let chunk = this.chunks.get(key);
     if (!chunk) {
@@ -269,6 +400,7 @@ export class World {
       const cached = this.chunkDataCache.get(key);
       if (cached) {
         chunk.blocks = cached.blocks;
+        chunk.biomes = cached.biomes;
         chunk.minY = cached.minY;
         chunk.maxY = cached.maxY;
         chunk.isGenerated = true;
@@ -280,6 +412,7 @@ export class World {
         if (this.unlimitedMemory) {
           this.chunkDataCache.set(key, {
             blocks: chunk.blocks,
+            biomes: chunk.biomes,
             minY: chunk.minY,
             maxY: chunk.maxY,
           });
@@ -289,6 +422,30 @@ export class World {
       this._markNeighborsDirty(cx, cz);
     }
     return chunk;
+  }
+
+  _requestChunkAsyncOrSync(cx, cz) {
+    const key = chunkKey(cx, cz);
+    if (this.chunks.has(key)) return true;
+
+    // Instant RAM cache restoration without touching workers
+    if (this.chunkDataCache.has(key)) {
+      this._ensureChunkGeneratedSync(cx, cz);
+      return true;
+    }
+
+    if (this.workers.length > 0) {
+      if (this.inFlightKeys.has(key)) return true;
+      if (this.inFlightKeys.size >= 8) return false; // Wait for in-flight workers
+      this.inFlightKeys.add(key);
+      const worker = this.workers[this.nextWorkerIdx % this.workers.length];
+      this.nextWorkerIdx++;
+      worker.postMessage({ seed: this.seed, cx, cz });
+      return true;
+    }
+
+    this._ensureChunkGeneratedSync(cx, cz);
+    return true;
   }
 
   _rebuildChunkMesh(chunk) {
@@ -355,10 +512,6 @@ export class World {
     chunk.hasMeshed = true;
   }
 
-  /**
-   * Streams chunks around the player within <= 3.5 ms per frame,
-   * disposing GPU meshes on distant chunks while keeping unlimited RAM cache when enabled.
-   */
   update(playerX, playerZ) {
     const pcx = Math.floor(playerX / CHUNK_SIZE);
     const pcz = Math.floor(playerZ / CHUNK_SIZE);
@@ -375,6 +528,7 @@ export class World {
           if (this.unlimitedMemory) {
             this.chunkDataCache.set(key, {
               blocks: chunk.blocks,
+              biomes: chunk.biomes,
               minY: chunk.minY,
               maxY: chunk.maxY,
             });
@@ -392,11 +546,16 @@ export class World {
     const startTime = performance.now();
 
     while (this.pendingCoords.length > 0) {
-      if (performance.now() - startTime >= CHUNK_FRAME_BUDGET_MS) return;
-      const [cx, cz] = this.pendingCoords.shift();
-      if (!this.chunks.has(chunkKey(cx, cz))) {
-        this._ensureChunkGenerated(cx, cz);
+      if (performance.now() - startTime >= CHUNK_FRAME_BUDGET_MS) break;
+      const [cx, cz] = this.pendingCoords[0];
+      const key = chunkKey(cx, cz);
+      if (this.chunks.has(key)) {
+        this.pendingCoords.shift();
+        continue;
       }
+      const dispatched = this._requestChunkAsyncOrSync(cx, cz);
+      if (!dispatched) break;
+      this.pendingCoords.shift();
     }
 
     const dirtyChunks = [];
@@ -417,6 +576,8 @@ export class World {
   }
 
   dispose() {
+    this.disposed = true;
+    this._terminateWorkers();
     for (const chunk of this.chunks.values()) {
       chunk.disposeMeshes(this.scene);
     }

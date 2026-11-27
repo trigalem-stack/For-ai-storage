@@ -168,6 +168,23 @@ export class TextureAtlas {
     const sideLeftRec = this.getUV(blockDef.faces.west);
     const sideRightRec = this.getUV(blockDef.faces.south);
 
+    if (blockDef.isCross) {
+      g.drawImage(
+        this.canvas,
+        topRec.cx * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
+        topRec.cy * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
+        ATLAS_TILE_INNER,
+        ATLAS_TILE_INNER,
+        2,
+        2,
+        28,
+        28
+      );
+      const url = c.toDataURL();
+      this.previewCache.set(cacheKey, url);
+      return url;
+    }
+
     const drawIsoFace = (rec, a, b, cc, d, e, f, brightness) => {
       g.save();
       g.transform(a, b, cc, d, e, f);
@@ -473,14 +490,445 @@ export class TextureAtlas {
       return dirtPixel(x, y, 13);
     });
 
-    // 14. Water (translucent blue pixel ripples)
-    const waterBase = hexToRgb('#356ae0');
+    // 14. Water (translucent crisp turquoise-blue ripples)
+    const waterBase = hexToRgb('#2d74e2');
     this.addTile('water', (x, y) => {
       const wave = Math.sin((x * 0.8 + y * 0.45)) * 0.5 + 0.5;
       const n = pxHash(1301, x, y);
-      const delta = wave * 18 + (n - 0.5) * 14 - 4;
+      const delta = wave * 20 + (n - 0.5) * 14 - 4;
       const rgb = shadeRgb(waterBase, delta);
-      return [rgb[0], rgb[1], rgb[2], 195];
+      return [rgb[0], rgb[1], rgb[2], 192];
+    });
+
+    this._generateStage3Tiles(stoneBase, dirtPixel);
+  }
+
+  _generateStage3Tiles(stoneBase, dirtPixel) {
+    // Helper for stone-embedded mineral ores
+    const stonePixel = (x, y, seedShift = 0) => {
+      const n = pxHash(404 + seedShift, x, y);
+      const streak = pxHash(405 + seedShift, Math.floor(x / 3), y);
+      if (streak < 0.16 && n < 0.65) return shadeRgb(stoneBase, -22);
+      if (streak > 0.86 && n > 0.4) return shadeRgb(stoneBase, 18);
+      if (n < 0.18) return shadeRgb(stoneBase, -15);
+      if (n < 0.45) return shadeRgb(stoneBase, -6);
+      if (n > 0.85) return shadeRgb(stoneBase, 14);
+      if (n > 0.68) return shadeRgb(stoneBase, 6);
+      return stoneBase;
+    };
+
+    const drawOreTile = (name, maskRows, brightRgb, darkRgb, highlightRgb, seed) => {
+      this.addTile(name, (x, y) => {
+        const ch = maskRows[y][x];
+        if (ch === '2') return highlightRgb;
+        if (ch === '1') return pxHash(seed, x, y) > 0.45 ? brightRgb : darkRgb;
+        if (ch === 's') return shadeRgb(stonePixel(x, y, seed), -18);
+        return stonePixel(x, y, seed);
+      });
+    };
+
+    const drawSpriteTile = (name, rows, palette) => {
+      this.addTile(name, (x, y) => {
+        const ch = rows[y][x];
+        if (ch === '.' || !palette[ch]) return [0, 0, 0, 0];
+        return [...palette[ch], 255];
+      });
+    };
+
+    // 15-17. Sandstone (top, bottom, side)
+    const sandstoneBase = hexToRgb('#dfd5a8');
+    this.addTile('sandstone_top', (x, y) => {
+      const n = pxHash(1401, x, y);
+      if (x === 0 || y === 0 || x === 15 || y === 15) return shadeRgb(sandstoneBase, -14 + n * 8);
+      return shadeRgb(sandstoneBase, (n - 0.5) * 18 + 6);
+    });
+    this.addTile('sandstone_bottom', (x, y) => {
+      const n = pxHash(1402, x, y);
+      return shadeRgb(sandstoneBase, (n - 0.5) * 26 - 10);
+    });
+    this.addTile('sandstone_side', (x, y) => {
+      const n = pxHash(1403, x, y);
+      if (y <= 2) return shadeRgb(sandstoneBase, (n - 0.5) * 14 + 8);
+      if (y === 3 || y === 7 || y === 11) return shadeRgb(sandstoneBase, -22 + n * 10);
+      if (y === 5 && x % 4 === 2) return shadeRgb(sandstoneBase, -18);
+      if (y === 6 && x % 4 === 0) return shadeRgb(sandstoneBase, 14);
+      return shadeRgb(sandstoneBase, (n - 0.5) * 20 - (y > 11 ? 6 : 0));
+    });
+
+    // 18. Gravel (mixed multi-tone pebbles)
+    const gravelBase = hexToRgb('#847f7c');
+    this.addTile('gravel', (x, y) => {
+      const pebble = pxHash(1501, Math.floor(x / 2), Math.floor(y / 2));
+      const grain = pxHash(1502, x, y);
+      if (pebble < 0.22) return shadeRgb(gravelBase, -26 + grain * 10);
+      if (pebble < 0.45) return shadeRgb([152, 138, 128], (grain - 0.5) * 14);
+      if (pebble > 0.80) return shadeRgb([168, 166, 162], (grain - 0.5) * 12);
+      return shadeRgb(gravelBase, (grain - 0.5) * 28);
+    });
+
+    // 19. Clay (smooth cool grey-blue clay)
+    const clayBase = hexToRgb('#9fa7b3');
+    this.addTile('clay', (x, y) => {
+      const clump = pxHash(1601, x >> 1, y >> 1);
+      const n = pxHash(1602, x, y);
+      return shadeRgb(clayBase, (clump - 0.5) * 18 + (n - 0.5) * 10);
+    });
+
+    // 20. Ice (semi-transparent pale blue with diagonal shine streaks)
+    const iceBase = hexToRgb('#8cb8ff');
+    this.addTile('ice', (x, y) => {
+      const diag = (x + y) % 16;
+      const border = x === 0 || x === 15 || y === 0 || y === 15;
+      if (diag === 4 || diag === 5 || (diag === 11 && x > 4 && x < 12)) {
+        return [228, 245, 255, 205];
+      }
+      if (border) return [185, 222, 255, 200];
+      const n = pxHash(1701, x, y);
+      const rgb = shadeRgb(iceBase, (n - 0.5) * 18);
+      return [rgb[0], rgb[1], rgb[2], 180];
+    });
+
+    // 21-23. Birch Log & Leaves
+    const birchBark = hexToRgb('#e5e3dc');
+    this.addTile('birch_log_side', (x, y) => {
+      const darkPatch =
+        (y === 2 && x >= 3 && x <= 7) ||
+        (y === 5 && x >= 10 && x <= 14) ||
+        (y === 8 && x >= 1 && x <= 4) ||
+        (y === 11 && x >= 6 && x <= 11) ||
+        (y === 14 && x >= 11 && x <= 14) ||
+        (y === 13 && x >= 2 && x <= 4);
+      if (darkPatch) {
+        return shadeRgb([46, 44, 42], pxHash(1801, x, y) * 18);
+      }
+      const n = pxHash(1802, x, y);
+      if (y % 4 === 0 && n < 0.35) return shadeRgb(birchBark, -22);
+      return shadeRgb(birchBark, (n - 0.5) * 14);
+    });
+    this.addTile('birch_log_top', (x, y) => {
+      if (x === 0 || x === 15 || y === 0 || y === 15) return shadeRgb(birchBark, -20);
+      const dx = Math.abs(x - 7.5);
+      const dy = Math.abs(y - 7.5);
+      const ring = Math.floor(Math.max(dx, dy)) % 2 === 1;
+      return shadeRgb(hexToRgb('#c8af80'), (ring ? -18 : 8) + (pxHash(1805, x, y) - 0.5) * 12);
+    });
+    const birchLeaf = hexToRgb('#74a846');
+    this.addTile('birch_leaves', (x, y) => {
+      const hole = pxHash(1810, x, y);
+      if (hole < 0.22 && pxHash(1811, x >> 1, y >> 1) < 0.72) return [0, 0, 0, 0];
+      const shade = pxHash(1812, x, y);
+      return [...shadeRgb(birchLeaf, (shade - 0.5) * 42), 255];
+    });
+
+    // 24-26. Spruce Log & Leaves
+    const spruceBark = hexToRgb('#412c1a');
+    this.addTile('spruce_log_side', (x, y) => {
+      const stripe = (x % 3 === 1) ? -14 : 6;
+      const n = pxHash(1901, x, y);
+      return shadeRgb(spruceBark, stripe + (n - 0.5) * 16);
+    });
+    this.addTile('spruce_log_top', (x, y) => {
+      if (x === 0 || x === 15 || y === 0 || y === 15) return spruceBark;
+      const dx = Math.abs(x - 7.5);
+      const dy = Math.abs(y - 7.5);
+      const ring = Math.floor(Math.max(dx, dy)) % 2 === 1;
+      return shadeRgb(hexToRgb('#8a6642'), (ring ? -16 : 6) + (pxHash(1905, x, y) - 0.5) * 12);
+    });
+    const spruceLeaf = hexToRgb('#315d34');
+    this.addTile('spruce_leaves', (x, y) => {
+      const hole = pxHash(1910, x, y);
+      if (hole < 0.18 && pxHash(1911, x >> 1, y >> 1) < 0.65) return [0, 0, 0, 0];
+      const shade = pxHash(1912, x, y);
+      return [...shadeRgb(spruceLeaf, (shade - 0.5) * 34), 255];
+    });
+
+    // 27-29. Cactus (top, bottom, side with vertical ribs & pale spines)
+    const cactusGreen = hexToRgb('#4f8f34');
+    this.addTile('cactus_side', (x, y) => {
+      if ((x === 1 || x === 5 || x === 10 || x === 14) && (y % 4 === 1 || y % 4 === 3)) {
+        return [225, 224, 186]; // spines
+      }
+      if (x % 4 === 0) return shadeRgb(cactusGreen, -24);
+      if (x % 4 === 2) return shadeRgb(cactusGreen, 14);
+      return shadeRgb(cactusGreen, (pxHash(2001, x, y) - 0.5) * 16);
+    });
+    this.addTile('cactus_top', (x, y) => {
+      if (x <= 1 || x >= 14 || y <= 1 || y >= 14) return shadeRgb(cactusGreen, -16);
+      if (x >= 5 && x <= 10 && y >= 5 && y <= 10) return shadeRgb(cactusGreen, 18);
+      return shadeRgb(cactusGreen, (pxHash(2002, x, y) - 0.5) * 14);
+    });
+    this.addTile('cactus_bottom', (x, y) => shadeRgb(cactusGreen, -28 + (pxHash(2003, x, y) - 0.5) * 16));
+
+    // 30-32. Granite, Diorite, Andesite
+    const graniteBase = hexToRgb('#9d6f5c');
+    this.addTile('granite', (x, y) => {
+      const n = pxHash(2101, x, y);
+      if (n < 0.16) return [196, 154, 138];
+      if (n > 0.84) return [114, 77, 65];
+      return shadeRgb(graniteBase, (n - 0.5) * 24);
+    });
+    const dioriteBase = hexToRgb('#c8c8cc');
+    this.addTile('diorite', (x, y) => {
+      const n = pxHash(2102, x, y);
+      if (n < 0.18) return [92, 92, 98];
+      if (n > 0.82) return [236, 236, 240];
+      return shadeRgb(dioriteBase, (n - 0.5) * 26);
+    });
+    const andesiteBase = hexToRgb('#8b8d8e');
+    this.addTile('andesite', (x, y) => {
+      const n = pxHash(2103, x, y);
+      const cl = pxHash(2104, x >> 1, y >> 1);
+      return shadeRgb(andesiteBase, (n - 0.5) * 22 + (cl - 0.5) * 18);
+    });
+
+    // 33-39. Classical Ores
+    const orePatternA = [
+      '................',
+      '..11s...........',
+      '.1211s....11s...',
+      '..111.....121...',
+      '......s....1....',
+      '...s111.........',
+      '..s1211s...11...',
+      '...s11....1211s.',
+      '..........111s..',
+      '.11s............',
+      '1211s....11s....',
+      '.111....1211....',
+      '.........11s....',
+      '...11s..........',
+      '..1211......11s.',
+      '...11.......121.',
+    ];
+    const orePatternB = [
+      '................',
+      '....11s.........',
+      '...1211s...11s..',
+      '....11....121...',
+      '...........1....',
+      '.11s............',
+      '1211.....s111...',
+      '.11s....s1211s..',
+      '.........111s...',
+      '....11s.........',
+      '...1211...11s...',
+      '....11...1211...',
+      '..........11....',
+      '.11s............',
+      '1211.....11s....',
+      '.11.....1211....',
+    ];
+    drawOreTile('coal_ore', orePatternA, [30, 30, 32], [18, 18, 20], [52, 52, 56], 2201);
+    drawOreTile('iron_ore', orePatternB, [216, 175, 146], [176, 134, 108], [242, 212, 188], 2202);
+    drawOreTile('gold_ore', orePatternA, [252, 224, 72], [212, 168, 36], [255, 248, 152], 2203);
+    drawOreTile('lapis_ore', orePatternB, [46, 94, 214], [24, 56, 158], [96, 146, 250], 2204);
+    drawOreTile('redstone_ore', orePatternA, [232, 34, 26], [164, 18, 14], [255, 104, 86], 2205);
+    drawOreTile('diamond_ore', orePatternB, [74, 232, 226], [36, 178, 178], [176, 255, 252], 2206);
+    drawOreTile('emerald_ore', [
+      '................',
+      '........21......',
+      '...21...11s.....',
+      '...11s..........',
+      '......211.......',
+      '......111s......',
+      '..........21....',
+      '..21......11s...',
+      '..11s...........',
+      '......21........',
+      '......11s..21...',
+      '...........11s..',
+      '...21...........',
+      '...11s....21....',
+      '..........11s...',
+      '................',
+    ], [26, 212, 92], [18, 156, 62], [136, 255, 166], 2207);
+
+    // 40-47. Cross-mesh Plants (16x16 pixel art sprites)
+    drawSpriteTile('tall_grass', [
+      '................',
+      '.......g........',
+      '..g....g....l...',
+      '..g...lg...lg...',
+      '..lg..lg...l....',
+      '..lg..dg..lg..g.',
+      '.l.g..dg..lg..g.',
+      '.lgd..dg.dlg.lg.',
+      '..dg.ldg.dlg.dg.',
+      '..dg.ldg..dg.dg.',
+      '.ldg.ddg..dgldg.',
+      '.ddg.ddg..dgddg.',
+      '.ddg.ddg.lddddg.',
+      '..dd.ddd.dddddd.',
+      '..dd.ddd.dddddd.',
+      '..dd.ddd.dddddd.',
+    ], {
+      g: [104, 174, 58],
+      l: [132, 202, 74],
+      d: [74, 134, 38],
+    });
+
+    drawSpriteTile('poppy', [
+      '................',
+      '................',
+      '......rrr.......',
+      '....rrRRRrr.....',
+      '....rRkkkRr.....',
+      '....rrRrrRr.....',
+      '.....rrrrr......',
+      '......ggg.......',
+      '.......g........',
+      '......lg........',
+      '.......g........',
+      '.......g.g......',
+      '.....g.gg.......',
+      '......gg........',
+      '.......g........',
+      '.......g........',
+    ], {
+      r: [212, 26, 28],
+      R: [248, 58, 52],
+      k: [34, 18, 18],
+      g: [68, 138, 42],
+      l: [96, 172, 60],
+    });
+
+    drawSpriteTile('dandelion', [
+      '................',
+      '................',
+      '.....yyyy.......',
+      '....yYYYYy......',
+      '....yYooYy......',
+      '....yyyyyy......',
+      '......gg........',
+      '.......g........',
+      '......lg........',
+      '.......g........',
+      '.....g.g........',
+      '......gg........',
+      '.......g.g......',
+      '.......gg.......',
+      '.......g........',
+      '.......g........',
+    ], {
+      y: [244, 212, 32],
+      Y: [255, 244, 88],
+      o: [204, 148, 18],
+      g: [68, 138, 42],
+      l: [96, 172, 60],
+    });
+
+    drawSpriteTile('dead_bush', [
+      '................',
+      '..b..........b..',
+      '...b...b....b...',
+      '...b..b....b....',
+      '....b.b...b..b..',
+      '.b...bb..b..b...',
+      '..b..bb.bb.b....',
+      '...b..bbb.b.....',
+      '....b.bbb.......',
+      '.....bbbb.b.....',
+      '......bb.b......',
+      '......bbb.......',
+      '......bb........',
+      '......bb........',
+      '......bb........',
+      '......bb........',
+    ], {
+      b: [132, 92, 52],
+    });
+
+    drawSpriteTile('red_mushroom', [
+      '................',
+      '................',
+      '................',
+      '................',
+      '.....rrrrr......',
+      '....rWrrrWr.....',
+      '...rrWrrrWrr....',
+      '...rrrrWrrrr....',
+      '...rWrrrrrWr....',
+      '....sssssss.....',
+      '......sss.......',
+      '......sss.......',
+      '......sss.......',
+      '......sss.......',
+      '......sss.......',
+      '......sss.......',
+    ], {
+      r: [212, 36, 32],
+      W: [246, 240, 232],
+      s: [216, 200, 178],
+    });
+
+    drawSpriteTile('brown_mushroom', [
+      '................',
+      '................',
+      '................',
+      '................',
+      '.....bbbbb......',
+      '....bBbbbBb.....',
+      '...bbbbBbbbb....',
+      '...bBbbbbbbB....',
+      '....sssssss.....',
+      '......sss.......',
+      '......sss.......',
+      '......sss.......',
+      '......sss.......',
+      '......sss.......',
+      '......sss.......',
+      '......sss.......',
+    ], {
+      b: [150, 108, 72],
+      B: [184, 140, 98],
+      s: [216, 200, 178],
+    });
+
+    drawSpriteTile('blue_orchid', [
+      '................',
+      '.....bb.bb......',
+      '....bBbbbBb.....',
+      '.....bBWBb......',
+      '....bbbbb.......',
+      '......g..bb.....',
+      '......g.bBBb....',
+      '.....lg..bb.....',
+      '......g.g.......',
+      '.......gg.......',
+      '.......g........',
+      '......lg........',
+      '.......g........',
+      '.......g........',
+      '.......g........',
+      '.......g........',
+    ], {
+      b: [42, 168, 224],
+      B: [98, 214, 250],
+      W: [242, 250, 255],
+      g: [56, 126, 46],
+      l: [84, 162, 68],
+    });
+
+    drawSpriteTile('vine', [
+      '.g..gg...g..g...',
+      '.g..g....g..lg..',
+      '.lg.g...lg...g..',
+      '..g.lg..g....g..',
+      '..g..g..g...lg..',
+      '.lg..g..lg..g...',
+      '.g..lg...g..g...',
+      '.g..g....g..lg..',
+      '.g..g...lg...g..',
+      '.lg.lg..g....g..',
+      '..g..g..g...lg..',
+      '..g..g..lg..g...',
+      '....lg...g..g...',
+      '....g....g......',
+      '.........g......',
+      '................',
+    ], {
+      g: [66, 132, 46],
+      l: [94, 164, 64],
     });
   }
 }

@@ -12,6 +12,8 @@ export class Chunk {
 
     // Compact flat typed array (32 KB per chunk)
     this.blocks = new Uint8Array(CHUNK_VOLUME);
+    // Biome ID per (x, z) column (256 bytes per chunk)
+    this.biomes = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
 
     // Non-air vertical bounds to skip empty sky layers during meshing
     this.minY = 0;
@@ -49,6 +51,16 @@ export class Chunk {
     }
     this.dirty = true;
     return true;
+  }
+
+  getBiome(x, z) {
+    if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) return 0;
+    return this.biomes[z * CHUNK_SIZE + x];
+  }
+
+  setBiome(x, z, biomeId) {
+    if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) return;
+    this.biomes[z * CHUNK_SIZE + x] = biomeId;
   }
 
   recomputeVerticalBounds() {

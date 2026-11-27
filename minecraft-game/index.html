@@ -6,26 +6,18 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#1e2a38">
-  <title>Minecraft Web Edition — Stage 2</title>
+  <meta name="theme-color" content="#2d63b8">
+  <title>Minecraft Web Edition — Stage 3</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <canvas id="game-canvas" aria-label="Minecraft 3D World"></canvas>
 
-  <!-- Center Crosshair + Circular Mining Progress Ring -->
-  <div id="crosshair-wrap" aria-hidden="true">
-    <div id="crosshair"></div>
-    <svg id="break-progress-ring" class="hidden" viewBox="0 0 40 40" width="40" height="40">
-      <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="3"></circle>
-      <circle id="break-progress-circle" cx="20" cy="20" r="16" fill="none" stroke="#ffffff" stroke-width="3"
-        stroke-dasharray="100.53" stroke-dashoffset="100.53" stroke-linecap="butt"
-        transform="rotate(-90 20 20)"></circle>
-    </svg>
-  </div>
+  <!-- Crisp White Crosshair (hidden in F5 3rd-person camera modes) -->
+  <div id="crosshair" aria-hidden="true"></div>
 
-  <!-- Top-Left F3 Debug Panel -->
+  <!-- Compact Top-Left F3 Debug Panel -->
   <pre id="debug-panel" class="hidden" aria-live="polite"></pre>
 
   <!-- Top-Right Utility HUD -->
@@ -46,24 +38,39 @@
   </div>
 
   <!-- PC Pointer Lock Hint -->
-  <div id="pc-lock-hint">
-    Кликните по экрану · <b>ЛКМ</b> ломать · <b>ПКМ</b> ставить · <b>1–9 / Колесо</b> хотбар · <b>2×Space / F</b> полёт · <b>Shift</b> присед (защита края) · <b>F5</b> камера
+  <div id="pc-lock-hint" class="hidden">
+    Клик по миру · <b>ЛКМ</b> ломать · <b>ПКМ</b> ставить · <b>СКМ</b> пипетка · <b>E</b> блоки · <b>2×W</b> бег · <b>2×Space / F</b> полёт · <b>F5</b> камера
   </div>
 
   <!-- Status Toast -->
   <div id="hud-toast" class="hidden" role="status" aria-live="polite"></div>
 
-  <!-- 9-Slot Minecraft Hotbar -->
+  <!-- 9-Slot Minecraft Hotbar + Creative Palette Button -->
   <div id="hotbar-wrapper">
     <div id="hotbar-item-name" class="hidden"></div>
-    <div id="hotbar" role="toolbar" aria-label="Хотбар блоков"></div>
+    <div class="hotbar-row">
+      <div id="hotbar" role="toolbar" aria-label="Хотбар блоков"></div>
+      <button id="btn-creative-palette" class="hotbar-palette-btn" type="button" title="Все блоки (E)">☰</button>
+    </div>
   </div>
 
-  <!-- Mobile Multitouch Controls -->
-  <div id="mobile-controls" class="hidden">
-    <div id="touch-look-zone" aria-label="Зона обзора, тап поставить, удержание ломать"></div>
+  <!-- Creative Block Catalog Overlay -->
+  <div id="creative-palette-overlay" class="hidden" role="dialog" aria-modal="true" aria-label="Каталог блоков">
+    <div class="mc-modal mc-palette-modal">
+      <div class="palette-header">
+        <h2>Выбор блока (Креатив)</h2>
+        <button id="btn-close-palette" class="mc-hud-btn" type="button">✕</button>
+      </div>
+      <div id="creative-palette-grid" class="palette-grid"></div>
+    </div>
+  </div>
 
-    <div id="touch-joystick-base" aria-label="Виртуальный джойстик движения">
+  <!-- Mobile Multitouch Controls: Left Half = Dynamic Floating Joystick, Right Half = Camera + Big Action Buttons -->
+  <div id="mobile-controls" class="hidden">
+    <div id="touch-move-zone" aria-label="Зона динамического джойстика"></div>
+    <div id="touch-look-zone" aria-label="Зона обзора камеры"></div>
+
+    <div id="touch-joystick-base" aria-hidden="true">
       <div class="joystick-ring"></div>
       <div id="touch-joystick-knob"></div>
     </div>
@@ -71,37 +78,113 @@
     <div id="touch-action-cluster">
       <div class="touch-col">
         <button id="btn-touch-fly" class="mc-touch-btn mc-touch-small" type="button" title="Полёт (или 2×▲)">🕊️</button>
-        <button id="btn-touch-break" class="mc-touch-btn mc-touch-break" type="button" title="Ломать блок (удерживать)">⛏</button>
+        <button id="btn-touch-break" class="mc-touch-btn mc-touch-break" type="button" title="Ломать блок">⛏</button>
       </div>
       <div class="touch-col">
         <button id="btn-touch-place" class="mc-touch-btn mc-touch-place" type="button" title="Поставить блок">🧱</button>
       </div>
       <div class="touch-vert-pair">
-        <button id="btn-touch-jump" class="mc-touch-btn" type="button" title="Прыжок / 2× Полёт">▲</button>
-        <button id="btn-touch-crouch" class="mc-touch-btn" type="button" title="Присед (защита края) / Вниз">▼</button>
+        <button id="btn-touch-jump" class="mc-touch-btn mc-touch-move" type="button" title="Прыжок / Всплыть / 2× Полёт">▲</button>
+        <button id="btn-touch-crouch" class="mc-touch-btn mc-touch-move" type="button" title="Присед / Нырнуть / Вниз">▼</button>
       </div>
     </div>
   </div>
 
-  <!-- Pause / Settings Modal -->
+  <!-- Main Menu & World Manager -->
+  <div id="main-menu-overlay" role="dialog" aria-modal="true" aria-labelledby="main-title">
+    <div id="menu-home" class="mc-modal mc-main-card">
+      <div class="mc-logo-badge">
+        <div class="mc-cube-badge"></div>
+        <h1 id="main-title">MINECRAFT WEB</h1>
+        <p class="mc-modal-sub">Этап 3 · Биомы · 3D-пещеры · Каньоны · Руды · Креатив</p>
+      </div>
+      <div class="mc-modal-actions">
+        <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">▶ Играть (Миры)</button>
+        <button id="btn-menu-settings" class="mc-menu-btn mc-btn-lg" type="button">⚙ Настройки</button>
+      </div>
+    </div>
+
+    <div id="menu-worlds" class="mc-modal mc-worlds-card hidden">
+      <div class="palette-header">
+        <h2>Мои миры</h2>
+        <button id="btn-worlds-back" class="mc-menu-btn mc-back-btn" type="button">← Назад</button>
+      </div>
+
+      <div class="create-world-box">
+        <input id="input-world-name" class="mc-input" type="text" maxlength="32" placeholder="Название мира (например: Горы)">
+        <input id="input-world-seed" class="mc-input" type="text" maxlength="24" placeholder="Сид (необязательно)">
+        <button id="btn-create-world" class="mc-menu-btn mc-menu-primary" type="button">+ Создать новый мир</button>
+      </div>
+
+      <div id="worlds-list" class="worlds-list"></div>
+    </div>
+  </div>
+
+  <!-- Scrollable Tabbed Settings Modal (accessible from Main Menu and Pause) -->
+  <div id="settings-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="mc-modal mc-settings-modal">
+      <div class="palette-header">
+        <h2 id="settings-title">Настройки</h2>
+        <button id="btn-settings-close" class="mc-menu-btn mc-menu-primary mc-back-btn" type="button">Готово</button>
+      </div>
+
+      <div class="settings-tabs" role="tablist">
+        <button type="button" class="settings-tab-btn active" data-tab="graphics">Графика</button>
+        <button type="button" class="settings-tab-btn" data-tab="controls">Управление</button>
+        <button type="button" class="settings-tab-btn" data-tab="other">Интерфейс</button>
+      </div>
+
+      <div class="settings-scroll-body">
+        <div class="settings-tab-panel" data-tab-panel="graphics">
+          <button id="btn-fog-mode" class="mc-menu-btn" type="button">Туман: ВЫКЛ</button>
+          <button id="btn-clouds-mode" class="mc-menu-btn" type="button">Облака и небо: ВКЛ</button>
+          <button id="btn-graphics-mode" class="mc-menu-btn" type="button">Графика: Улучшенная (чёткий PixelRatio)</button>
+          <button id="btn-memory-mode" class="mc-menu-btn" type="button">Память мира: Бесконечная (∞)</button>
+
+          <label class="mc-slider-row" for="range-render-dist">
+            <span>Дальность прорисовки: <strong id="label-render-dist">6 чанков</strong></span>
+            <input id="range-render-dist" type="range" min="2" max="16" step="1" value="6">
+          </label>
+        </div>
+
+        <div class="settings-tab-panel hidden" data-tab-panel="controls">
+          <button id="btn-control-mode" class="mc-menu-btn" type="button">Управление: ПК (Мышь + WASD)</button>
+          <button id="btn-fly-mode" class="mc-menu-btn" type="button">Полёт (2×Space / F): ВЫКЛ</button>
+
+          <label class="mc-slider-row" for="range-sensitivity">
+            <span>Чувствительность камеры: <strong id="label-sensitivity">100%</strong></span>
+            <input id="range-sensitivity" type="range" min="0.4" max="2.2" step="0.1" value="1.0">
+          </label>
+
+          <div class="mc-help-box">
+            <b>Телефон:</b><br>
+            • Левая половина экрана — динамический джойстик (появляется под пальцем)<br>
+            • 2×быстрое движение вперёд с удержанием — бег; в воде под поверхностью — быстрое плавание (пролезает в 1 блок!)<br>
+            • Правая половина — обзор, короткий тап ставит блок, удержание ломает<br><br>
+            <b>ПК:</b> 2×W — бег, 2×Space / F — полёт, E — выбор блоков, СКМ — пипетка.
+          </div>
+        </div>
+
+        <div class="settings-tab-panel hidden" data-tab-panel="other">
+          <button id="btn-hint-mode" class="mc-menu-btn" type="button">Подсказки управления: ВКЛ</button>
+          <div class="mc-help-box">
+            Все миры, постройки, инвентарь и настройки автоматически сохраняются локально в IndexedDB вашего устройства (100% оффлайн).
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause Overlay -->
   <div id="pause-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
     <div class="mc-modal">
-      <h1 id="pause-title">Меню и Настройки (Этап 2)</h1>
-      <p class="mc-modal-sub">Оффлайн AABB-физика · DDA Рейкастинг · IndexedDB</p>
+      <h1 id="pause-title">Пауза</h1>
+      <p class="mc-modal-sub">Мир сохраняется автоматически в IndexedDB</p>
 
       <div class="mc-modal-actions">
         <button id="btn-resume" class="mc-menu-btn mc-menu-primary" type="button">Продолжить игру</button>
-        <button id="btn-control-mode" class="mc-menu-btn" type="button">Управление: ПК (Мышь + WASD)</button>
-        <button id="btn-fly-mode" class="mc-menu-btn" type="button">Полёт (2×Space / F): ВЫКЛ</button>
-        <button id="btn-memory-mode" class="mc-menu-btn" type="button">Память мира: Бесконечная (∞)</button>
-        <button id="btn-graphics-mode" class="mc-menu-btn" type="button">Графика: Высокая (чёткий PixelRatio)</button>
-
-        <label class="mc-slider-row" for="range-render-dist">
-          <span>Дальность прорисовки: <strong id="label-render-dist">6 чанков</strong></span>
-          <input id="range-render-dist" type="range" min="2" max="16" step="1" value="6">
-        </label>
-
-        <button id="btn-new-world" class="mc-menu-btn mc-menu-danger" type="button">Создать новый мир (новый сид)</button>
+        <button id="btn-pause-settings" class="mc-menu-btn" type="button">⚙ Настройки</button>
+        <button id="btn-exit-to-menu" class="mc-menu-btn mc-menu-danger" type="button">Сохранить и выйти в меню миров</button>
       </div>
     </div>
   </div>

@@ -1,16 +1,22 @@
-// Offline IndexedDB save manager for world seed, modified blocks, hotbar, player pose, and settings.
-// Gracefully falls back to in-memory storage if IndexedDB is restricted.
+// Offline IndexedDB v2 save manager:
+// - Global user settings (graphics, fog, render distance, memory mode, sensitivity, touch mode)
+// - Multi-world manager (list, create, load, save, delete worlds with modifiedBlocks & hotbar)
+// - Seamless migration from Stage 1-2 'active_world' & in-memory fallback when IndexedDB is unavailable
 
 const DB_NAME = 'minecraft_browser_clone_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'world_saves';
-const ACTIVE_SAVE_KEY = 'active_world';
+const LEGACY_SAVE_KEY = 'active_world';
+const SETTINGS_KEY = 'global_settings';
+const WORLDS_INDEX_KEY = 'worlds_index';
+const WORLD_PREFIX = 'world_data:';
 
 export class SaveManager {
   constructor() {
     this.db = null;
-    this.memoryFallback = null;
+    this.memoryStore = new Map();
     this.available = typeof indexedDB !== 'undefined';
+    this.activeWorldId = 'world_default';
   }
 
   async init() {
@@ -27,6 +33,7 @@ export class SaveManager {
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });
+      await this._migrateLegacyIfNeeded();
       return true;
     } catch {
       this.available = false;
@@ -35,41 +42,31 @@ export class SaveManager {
     }
   }
 
-  async loadState() {
+  async _getRaw(key) {
     if (!this.db) {
-      return this.memoryFallback ? { ...this.memoryFallback } : null;
+      return this.memoryStore.has(key) ? this.memoryStore.get(key) : null;
     }
     try {
       return await new Promise((resolve, reject) => {
         const tx = this.db.transaction(STORE_NAME, 'readonly');
         const store = tx.objectStore(STORE_NAME);
-        const req = store.get(ACTIVE_SAVE_KEY);
-        req.onsuccess = () => resolve(req.result || null);
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result ?? null);
         req.onerror = () => reject(req.error);
       });
     } catch {
-      return this.memoryFallback ? { ...this.memoryFallback } : null;
+      return this.memoryStore.has(key) ? this.memoryStore.get(key) : null;
     }
   }
 
-  async saveState(state) {
-    const payload = {
-      version: 2,
-      worldSeed: state.worldSeed,
-      player: state.player,
-      settings: state.settings,
-      hotbar: state.hotbar || null,
-      modifiedBlocks: Array.isArray(state.modifiedBlocks) ? state.modifiedBlocks : [],
-      updatedAt: Date.now(),
-    };
-    this.memoryFallback = payload;
-
+  async _putRaw(key, value) {
+    this.memoryStore.set(key, value);
     if (!this.db) return false;
     try {
       await new Promise((resolve, reject) => {
         const tx = this.db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
-        const req = store.put(payload, ACTIVE_SAVE_KEY);
+        const req = store.put(value, key);
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
       });
@@ -79,19 +76,195 @@ export class SaveManager {
     }
   }
 
-  async clearState() {
-    this.memoryFallback = null;
+  async _deleteRaw(key) {
+    this.memoryStore.delete(key);
     if (!this.db) return;
     try {
       await new Promise((resolve, reject) => {
         const tx = this.db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
-        const req = store.delete(ACTIVE_SAVE_KEY);
+        const req = store.delete(key);
         req.onsuccess = () => resolve();
         req.onerror = () => reject(req.error);
       });
     } catch {
-      // Ignore storage errors
+      // Ignore storage delete errors
     }
+  }
+
+  async _migrateLegacyIfNeeded() {
+    const existingIndex = await this._getRaw(WORLDS_INDEX_KEY);
+    if (Array.isArray(existingIndex)) return;
+
+    const legacy = await this._getRaw(LEGACY_SAVE_KEY);
+    if (legacy && Number.isFinite(legacy.worldSeed)) {
+      const id = 'world_1';
+      const now = legacy.updatedAt || Date.now();
+      const worldPayload = {
+        version: 3,
+        id,
+        name: 'Мой мир',
+        worldSeed: legacy.worldSeed,
+        player: legacy.player || null,
+        hotbar: legacy.hotbar || null,
+        modifiedBlocks: Array.isArray(legacy.modifiedBlocks) ? legacy.modifiedBlocks : [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      const meta = {
+        id,
+        name: 'Мой мир',
+        seed: legacy.worldSeed,
+        createdAt: now,
+        updatedAt: now,
+        biomeName: '',
+        modifiedCount: worldPayload.modifiedBlocks.length,
+      };
+      await this._putRaw(WORLD_PREFIX + id, worldPayload);
+      await this._putRaw(WORLDS_INDEX_KEY, [meta]);
+      if (legacy.settings) {
+        await this._putRaw(SETTINGS_KEY, legacy.settings);
+      }
+      this.activeWorldId = id;
+    } else {
+      await this._putRaw(WORLDS_INDEX_KEY, []);
+    }
+  }
+
+  async loadSettings() {
+    return (await this._getRaw(SETTINGS_KEY)) || null;
+  }
+
+  async saveSettings(settings) {
+    if (!settings) return false;
+    return this._putRaw(SETTINGS_KEY, {
+      ...settings,
+      updatedAt: Date.now(),
+    });
+  }
+
+  async listWorlds() {
+    const list = await this._getRaw(WORLDS_INDEX_KEY);
+    if (!Array.isArray(list)) return [];
+    return [...list].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  }
+
+  async createWorld({ name, seed }) {
+    const list = await this.listWorlds();
+    const id = `world_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
+    const now = Date.now();
+    const cleanName = (name || '').trim() || `Мир ${list.length + 1}`;
+    const cleanSeed = Number.isFinite(seed) && seed !== 0
+      ? (seed | 0)
+      : ((Math.floor(Math.random() * 0x7fffffff) + 1) | 0);
+
+    const worldData = {
+      version: 3,
+      id,
+      name: cleanName,
+      worldSeed: cleanSeed,
+      player: null,
+      hotbar: null,
+      modifiedBlocks: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    const meta = {
+      id,
+      name: cleanName,
+      seed: cleanSeed,
+      createdAt: now,
+      updatedAt: now,
+      biomeName: '',
+      modifiedCount: 0,
+    };
+    list.unshift(meta);
+    await this._putRaw(WORLD_PREFIX + id, worldData);
+    await this._putRaw(WORLDS_INDEX_KEY, list);
+    this.activeWorldId = id;
+    return meta;
+  }
+
+  async loadWorld(worldId) {
+    this.activeWorldId = worldId;
+    const data = await this._getRaw(WORLD_PREFIX + worldId);
+    return data ? { ...data } : null;
+  }
+
+  async saveWorld(worldId, state) {
+    if (!worldId) return false;
+    this.activeWorldId = worldId;
+    const now = Date.now();
+    const existing = await this._getRaw(WORLD_PREFIX + worldId);
+    const name = state.worldName || existing?.name || 'Мой мир';
+    const createdAt = existing?.createdAt || now;
+    const mods = Array.isArray(state.modifiedBlocks) ? state.modifiedBlocks : [];
+
+    const payload = {
+      version: 3,
+      id: worldId,
+      name,
+      worldSeed: state.worldSeed,
+      player: state.player,
+      hotbar: state.hotbar || null,
+      modifiedBlocks: mods,
+      createdAt,
+      updatedAt: now,
+    };
+
+    const ok = await this._putRaw(WORLD_PREFIX + worldId, payload);
+
+    const list = (await this._getRaw(WORLDS_INDEX_KEY)) || [];
+    const meta = {
+      id: worldId,
+      name,
+      seed: state.worldSeed,
+      createdAt,
+      updatedAt: now,
+      biomeName: state.biomeName || existing?.biomeName || '',
+      modifiedCount: mods.length,
+    };
+    const idx = list.findIndex((w) => w.id === worldId);
+    if (idx >= 0) list[idx] = meta;
+    else list.unshift(meta);
+    await this._putRaw(WORLDS_INDEX_KEY, list);
+
+    if (state.settings) {
+      await this.saveSettings(state.settings);
+    }
+    return ok;
+  }
+
+  async deleteWorld(worldId) {
+    await this._deleteRaw(WORLD_PREFIX + worldId);
+    const list = (await this._getRaw(WORLDS_INDEX_KEY)) || [];
+    const next = list.filter((w) => w.id !== worldId);
+    await this._putRaw(WORLDS_INDEX_KEY, next);
+    if (this.activeWorldId === worldId) {
+      this.activeWorldId = next[0]?.id || 'world_default';
+    }
+    return next;
+  }
+
+  // Backward-compatible single-state API used by Stage 1-2 unit tests
+  async loadState() {
+    const data = await this._getRaw(WORLD_PREFIX + this.activeWorldId);
+    if (data) {
+      const settings = await this.loadSettings();
+      return { ...data, settings: settings || data.settings || null };
+    }
+    return this._getRaw(LEGACY_SAVE_KEY);
+  }
+
+  async saveState(state) {
+    if (state.settings) {
+      await this.saveSettings(state.settings);
+    }
+    return this.saveWorld(this.activeWorldId, state);
+  }
+
+  async clearState() {
+    await this.deleteWorld(this.activeWorldId);
+    await this._deleteRaw(LEGACY_SAVE_KEY);
   }
 }
