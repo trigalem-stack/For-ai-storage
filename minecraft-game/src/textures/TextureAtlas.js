@@ -58,6 +58,32 @@ export class TextureAtlas {
     this.texture.wrapT = THREE.ClampToEdgeWrapping;
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.texture.needsUpdate = true;
+
+    this.waterTileTexture = this._createRepeatTileTexture('water');
+    this.lavaTileTexture = this._createRepeatTileTexture('lava');
+  }
+
+  _createRepeatTileTexture(tileName) {
+    const px = this.getTilePixels16(tileName);
+    const c = document.createElement('canvas');
+    c.width = ATLAS_TILE_INNER;
+    c.height = ATLAS_TILE_INNER;
+    const g = c.getContext('2d', { alpha: true });
+    g.imageSmoothingEnabled = false;
+    if (px) {
+      const img = g.createImageData(ATLAS_TILE_INNER, ATLAS_TILE_INNER);
+      img.data.set(px);
+      g.putImageData(img, 0, 0);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
   }
 
   /**
@@ -555,12 +581,14 @@ export class TextureAtlas {
       return dirtPixel(x, y, 13);
     });
 
-    // 14. Water (translucent crisp turquoise-blue ripples)
+    // 14. Water (seamless 16x16 turquoise-blue ripples)
     const waterBase = hexToRgb('#2d74e2');
     this.addTile('water', (x, y) => {
-      const wave = Math.sin((x * 0.8 + y * 0.45)) * 0.5 + 0.5;
+      const u = (x / 16) * Math.PI * 2;
+      const v = (y / 16) * Math.PI * 2;
+      const wave = Math.sin(u * 2 + Math.cos(v)) * 0.5 + 0.5;
       const n = pxHash(1301, x, y);
-      const delta = wave * 20 + (n - 0.5) * 14 - 4;
+      const delta = wave * 24 + (n - 0.5) * 14 - 4;
       const rgb = shadeRgb(waterBase, delta);
       return [rgb[0], rgb[1], rgb[2], 192];
     });
@@ -1372,6 +1400,28 @@ export class TextureAtlas {
       }
       const cellShade = (cell - 2) * 11;
       return shadeRgb([120, 122, 120], cellShade + (n - 0.5) * 18);
+    });
+
+    // Stage 7: Lava (seamless fiery orange-yellow magma veins) & Obsidian (deep purple-black crystal)
+    this.addTile('lava', (x, y) => {
+      const u = (x / 16) * Math.PI * 2;
+      const v = (y / 16) * Math.PI * 2;
+      const cell = Math.sin(u * 2 + Math.cos(v * 2)) * Math.cos(v * 2 - Math.sin(u));
+      const n = pxHash(3201, x, y);
+      const hot = cell * 0.5 + 0.5 + (n - 0.5) * 0.28;
+      if (hot > 0.78) return [255, 232, 118, 255];
+      if (hot > 0.54) return [248, 128, 24, 255];
+      if (hot > 0.28) return [214, 62, 12, 255];
+      return [142, 28, 8, 255];
+    });
+
+    this.addTile('obsidian', (x, y) => {
+      const n = pxHash(3205, x, y);
+      const vein = pxHash(3206, Math.floor(x / 2), Math.floor(y / 2));
+      if (vein > 0.76 && n > 0.48) return shadeRgb([58, 34, 92], (n - 0.5) * 24);
+      if (n > 0.85) return shadeRgb([42, 28, 66], 10);
+      if (n < 0.22) return [12, 10, 18];
+      return shadeRgb([22, 18, 34], (n - 0.5) * 18);
     });
 
     // Stage 5 & 6 All 16x16 Item Pixel Sprites

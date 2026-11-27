@@ -552,7 +552,7 @@ export function createChunkGeneratorKernel(cfg) {
       }
     }
 
-    // 2. 4x4x4 Coarse Lattice (5 x YCells x 5) for 3D Spaghetti + Cheese Caves (20x speedup!)
+    // 2. Conservative 4x4x4 Bounding Lattice for fast empty-rock skipping + domain-warped column coordinates
     const maxCaveY = Math.min(WORLD_HEIGHT - 4, maxColHeight + 2);
     const gridYCount = Math.ceil((maxCaveY + 1) / 4) + 1;
     const gridStrideY = gridYCount;
@@ -561,41 +561,61 @@ export function createChunkGeneratorKernel(cfg) {
     const caveBLat = new Float32Array(5 * gridStrideX);
     const cheeseLat = new Float32Array(5 * gridStrideX);
 
+    // Precompute smooth 2D domain warp per column to eliminate straight ~100-block noise stripes
+    const warpXArr = new Float32Array(CHUNK_SIZE * CHUNK_SIZE);
+    const warpZArr = new Float32Array(CHUNK_SIZE * CHUNK_SIZE);
+    for (let z = 0; z < CHUNK_SIZE; z++) {
+      const wz = baseZ + z;
+      for (let x = 0; x < CHUNK_SIZE; x++) {
+        const wx = baseX + x;
+        const idx = z * CHUNK_SIZE + x;
+        warpXArr[idx] = ctx.weirdNoise.noise2D(wx * 0.015 + 17.3, wz * 0.015 - 23.1) * 14.0;
+        warpZArr[idx] = ctx.detailNoise.noise2D(wx * 0.015 - 41.7, wz * 0.015 + 11.9) * 14.0;
+      }
+    }
+
     for (let gx = 0; gx < 5; gx++) {
       const wx = baseX + gx * 4;
+      const wOffX = ctx.weirdNoise.noise2D(wx * 0.015 + 17.3, (baseZ + 8) * 0.015 - 23.1) * 14.0;
       for (let gz = 0; gz < 5; gz++) {
         const wz = baseZ + gz * 4;
+        const wOffZ = ctx.detailNoise.noise2D((baseX + 8) * 0.015 - 41.7, wz * 0.015 + 11.9) * 14.0;
+        const sx = (wx + wOffX) * 0.036;
+        const sz = (wz + wOffZ) * 0.036;
+        const cxC = wx * 0.022;
+        const czC = wz * 0.022;
         const offBase = gx * gridStrideX + gz * gridStrideY;
         for (let gy = 0; gy < gridYCount; gy++) {
           const wy = gy * 4;
           const idx = offBase + gy;
-          caveALat[idx] = ctx.caveNoiseA.noise3D(wx * 0.036, wy * 0.048, wz * 0.036);
-          caveBLat[idx] = ctx.caveNoiseB.noise3D(wx * 0.036 + 73.1, wy * 0.048 - 19.7, wz * 0.036 + 31.4);
+          caveALat[idx] = ctx.caveNoiseA.noise3D(sx, wy * 0.048, sz);
+          caveBLat[idx] = ctx.caveNoiseB.noise3D(sx + 73.1, wy * 0.048 - 19.7, sz + 31.4);
           cheeseLat[idx] = wy <= 50
-            ? ctx.cheeseNoise.noise3D(wx * 0.022, wy * 0.034, wz * 0.022)
+            ? ctx.cheeseNoise.noise3D(cxC, wy * 0.034, czC)
             : -1;
         }
       }
     }
 
-    // 3. Populate solid layers, water/ice, and carve 3D caves & ravines
+    // 3. Populate solid layers, water/ice, and carve 1x1x1 smooth caves & winding ravines
     const slice = CHUNK_SIZE * CHUNK_SIZE;
     let mountainCols = 0;
 
     for (let z = 0; z < CHUNK_SIZE; z++) {
       const wz = baseZ + z;
       const gz = z >> 2;
-      const fz = (z & 3) * 0.25;
 
       for (let x = 0; x < CHUNK_SIZE; x++) {
         const wx = baseX + x;
         const gx = x >> 2;
-        const fx = (x & 3) * 0.25;
 
         const colIdx = z * CHUNK_SIZE + x;
         const h = heightMap[colIdx];
         const biome = biomes[colIdx];
         if (biome === BI.MOUNTAINS) mountainCols++;
+
+        const wxWarped = wx + warpXArr[colIdx];
+        const wzWarped = wz + warpZArr[colIdx];
 
         // Slope approximation within chunk for rocky cliffs in mountains
         const hL = x > 0 ? heightMap[colIdx - 1] : h;
@@ -604,10 +624,21 @@ export function createChunkGeneratorKernel(cfg) {
         const hD = z < 15 ? heightMap[colIdx + CHUNK_SIZE] : h;
         const maxSlope = Math.max(Math.abs(h - hL), Math.abs(h - hR), Math.abs(h - hU), Math.abs(h - hD));
 
-        // 2D Ravine channel check
-        const ravNoise = Math.abs(ctx.ravineNoise.fbm2D(wx * 0.0085 - 31.1, wz * 0.0085 + 17.6, 2, 0.5, 2.0));
-        const inRavine = ravNoise < 0.026;
-        const ravineBottom = inRavine ? 16 + Math.floor(hash2D(ctx.seed ^ 0x88, wx >> 1, wz >> 1) * 10) : 999;
+        // Regional, strongly warped winding ravines (eliminates ~100-block straight grid fissures!)
+        const ravRegion = ctx.contNoise.noise2D(wx * 0.0019 + 41.3, wz * 0.0019 - 17.9);
+        let inRavine = false;
+        let ravNoise = 1.0;
+        let ravineBottom = 999;
+        if (ravRegion > 0.20) {
+          const rwX = wx + ctx.detailNoise.noise2D(wx * 0.011 + 5.1, wz * 0.011 - 9.2) * 34.0;
+          const rwZ = wz + ctx.weirdNoise.noise2D(wx * 0.011 - 14.3, wz * 0.011 + 22.8) * 34.0;
+          ravNoise = Math.abs(ctx.ravineNoise.fbm2D(rwX * 0.0082 - 31.1, rwZ * 0.0082 + 17.6, 2, 0.5, 2.0));
+          const ravTh = Math.min(0.025, (ravRegion - 0.20) * 0.14);
+          if (ravNoise < ravTh) {
+            inRavine = true;
+            ravineBottom = 14 + Math.floor(hash2D(ctx.seed ^ 0x88, wx >> 1, wz >> 1) * 10);
+          }
+        }
 
         // Safe cave roof under lakes/oceans/rivers so water never drains endlessly
         const caveTopLimit = h <= SEA_LEVEL ? Math.max(5, h - 3) : h + 1;
@@ -682,62 +713,57 @@ export function createChunkGeneratorKernel(cfg) {
             blockId = B.SANDSTONE;
           }
 
-          // Carve 3D caves & ravines above bedrock floor (y >= 5)
+          // Carve organic 1x1x1 caves & ravines above bedrock floor (y >= 5), using 4x4x4 cell as conservative solid-skip
           if (y >= 5 && y <= caveTopLimit && blockId !== B.BEDROCK) {
             const gy = y >> 2;
-            const fy = (y & 3) * 0.25;
+            const a0 = caveALat[c00 + gy];
+            const a1 = caveALat[c10 + gy];
+            const a2 = caveALat[c01 + gy];
+            const a3 = caveALat[c11 + gy];
+            const a4 = caveALat[c00 + gy + 1];
+            const a5 = caveALat[c10 + gy + 1];
+            const a6 = caveALat[c01 + gy + 1];
+            const a7 = caveALat[c11 + gy + 1];
 
-            const a000 = caveALat[c00 + gy];
-            const a100 = caveALat[c10 + gy];
-            const a010 = caveALat[c01 + gy];
-            const a110 = caveALat[c11 + gy];
-            const a001 = caveALat[c00 + gy + 1];
-            const a101 = caveALat[c10 + gy + 1];
-            const a011 = caveALat[c01 + gy + 1];
-            const a111 = caveALat[c11 + gy + 1];
-            const nA = lerp(
-              lerp(lerp(a000, a100, fx), lerp(a010, a110, fx), fz),
-              lerp(lerp(a001, a101, fx), lerp(a011, a111, fx), fz),
-              fy
-            );
+            const b0 = caveBLat[c00 + gy];
+            const b1 = caveBLat[c10 + gy];
+            const b2 = caveBLat[c01 + gy];
+            const b3 = caveBLat[c11 + gy];
+            const b4 = caveBLat[c00 + gy + 1];
+            const b5 = caveBLat[c10 + gy + 1];
+            const b6 = caveBLat[c01 + gy + 1];
+            const b7 = caveBLat[c11 + gy + 1];
 
-            const b000 = caveBLat[c00 + gy];
-            const b100 = caveBLat[c10 + gy];
-            const b010 = caveBLat[c01 + gy];
-            const b110 = caveBLat[c11 + gy];
-            const b001 = caveBLat[c00 + gy + 1];
-            const b101 = caveBLat[c10 + gy + 1];
-            const b011 = caveBLat[c01 + gy + 1];
-            const b111 = caveBLat[c11 + gy + 1];
-            const nB = lerp(
-              lerp(lerp(b000, b100, fx), lerp(b010, b110, fx), fz),
-              lerp(lerp(b001, b101, fx), lerp(b011, b111, fx), fz),
-              fy
-            );
+            // Bounding check: can spaghetti OR cheese OR ravine enter this 4x4x4 cell?
+            const minAbsA = Math.min(Math.abs(a0), Math.abs(a1), Math.abs(a2), Math.abs(a3), Math.abs(a4), Math.abs(a5), Math.abs(a6), Math.abs(a7));
+            const minAbsB = Math.min(Math.abs(b0), Math.abs(b1), Math.abs(b2), Math.abs(b3), Math.abs(b4), Math.abs(b5), Math.abs(b6), Math.abs(b7));
+            const crossesA = (Math.min(a0, a1, a2, a3, a4, a5, a6, a7) <= 0 && Math.max(a0, a1, a2, a3, a4, a5, a6, a7) >= 0);
+            const crossesB = (Math.min(b0, b1, b2, b3, b4, b5, b6, b7) <= 0 && Math.max(b0, b1, b2, b3, b4, b5, b6, b7) >= 0);
+            const maySpaghetti = (crossesA || minAbsA < 0.36) && (crossesB || minAbsB < 0.36);
 
-            // Spaghetti tunnels (slightly narrower near surface, still breaking through to surface!)
-            const spagTh = y > 52 ? 0.088 : 0.105;
-            let carved = Math.abs(nA) < spagTh && Math.abs(nB) < spagTh;
-
-            // Cheese caverns at depth Y=8..46
-            if (!carved && y >= 8 && y <= 46) {
-              const ch000 = cheeseLat[c00 + gy];
-              const ch100 = cheeseLat[c10 + gy];
-              const ch010 = cheeseLat[c01 + gy];
-              const ch110 = cheeseLat[c11 + gy];
-              const ch001 = cheeseLat[c00 + gy + 1];
-              const ch101 = cheeseLat[c10 + gy + 1];
-              const ch011 = cheeseLat[c01 + gy + 1];
-              const ch111 = cheeseLat[c11 + gy + 1];
-              const cheese = lerp(
-                lerp(lerp(ch000, ch100, fx), lerp(ch010, ch110, fx), fz),
-                lerp(lerp(ch001, ch101, fx), lerp(ch011, ch111, fx), fz),
-                fy
+            let mayCheese = false;
+            if (y <= 48) {
+              const maxCh = Math.max(
+                cheeseLat[c00 + gy], cheeseLat[c10 + gy], cheeseLat[c01 + gy], cheeseLat[c11 + gy],
+                cheeseLat[c00 + gy + 1], cheeseLat[c10 + gy + 1], cheeseLat[c01 + gy + 1], cheeseLat[c11 + gy + 1]
               );
+              mayCheese = maxCh > 0.08;
+            }
+
+            let carved = false;
+            if (maySpaghetti) {
+              const yWarp = y + Math.sin(wx * 0.09 + wz * 0.07) * 1.4;
+              const nA = ctx.caveNoiseA.noise3D(wxWarped * 0.036, yWarp * 0.048, wzWarped * 0.036);
+              const nB = ctx.caveNoiseB.noise3D(wxWarped * 0.036 + 73.1, yWarp * 0.048 - 19.7, wzWarped * 0.036 + 31.4);
+              const spagTh = y > 52 ? 0.088 : 0.105;
+              carved = Math.abs(nA) < spagTh && Math.abs(nB) < spagTh;
+            }
+
+            if (!carved && mayCheese && y >= 8 && y <= 46) {
+              const cheese = ctx.cheeseNoise.noise3D(wx * 0.022, y * 0.034, wz * 0.022);
               if (cheese > 0.37) carved = true;
             }
 
-            // Narrow deep ravines
             if (!carved && inRavine && y >= ravineBottom) {
               const widthFactor = 0.017 + 0.009 * Math.sin(y * 0.14);
               if (ravNoise < widthFactor) carved = true;
@@ -747,6 +773,23 @@ export function createChunkGeneratorKernel(cfg) {
           }
 
           blocks[y * slice + colIdx] = blockId;
+        }
+
+        // Deep underground lava lakes at Y=5..10 inside carved caverns
+        if (B.LAVA && h >= 22) {
+          for (let y = 5; y <= 10; y++) {
+            const idx = y * slice + colIdx;
+            if (blocks[idx] === B.AIR && blocks[(y - 1) * slice + colIdx] !== B.AIR) {
+              blocks[idx] = B.LAVA;
+            }
+          }
+          // Fill continuous vertical air up to Y=10 if floor already got lava
+          for (let y = 6; y <= 10; y++) {
+            const idx = y * slice + colIdx;
+            if (blocks[idx] === B.AIR && blocks[(y - 1) * slice + colIdx] === B.LAVA) {
+              blocks[idx] = B.LAVA;
+            }
+          }
         }
 
         // Water basins up to SEA_LEVEL (+ Ice surface in Snowy Taiga)
@@ -958,6 +1001,119 @@ export function createChunkGeneratorKernel(cfg) {
       }
     }
 
+    // 6.5. Stage 7 Fluid Features: Surface Lava Pools, Underground Water Basins, and Embedded Rock Springs
+    const springIndices = [];
+    const isWallRock = (id) =>
+      id === B.STONE || id === B.DEEPSLATE || id === B.GRANITE || id === B.DIORITE ||
+      id === B.ANDESITE || id === B.DIRT || id === B.SANDSTONE || id === B.COBBLESTONE;
+
+    // 6.5a Surface Lava Pools (rare ~4% of dry chunks outside spawn area, enclosed by stone rim)
+    if (B.LAVA && (Math.abs(cx) > 1 || Math.abs(cz) > 1) && chunkRand() < 0.045) {
+      const px = 4 + Math.floor(chunkRand() * 8);
+      const pz = 4 + Math.floor(chunkRand() * 8);
+      const colIdx = pz * CHUNK_SIZE + px;
+      const py = heightMap[colIdx];
+      const pBiome = biomes[colIdx];
+      if (
+        py >= SEA_LEVEL + 2 &&
+        py < 88 &&
+        pBiome !== BI.SNOWY_TAIGA &&
+        pBiome !== BI.SWAMP
+      ) {
+        // Ensure no tree logs directly over pool site
+        let hasTree = false;
+        for (let dz = -3; dz <= 3 && !hasTree; dz++) {
+          for (let dx = -3; dx <= 3; dx++) {
+            const up = getBlockSafe(blocks, px + dx, py + 2, pz + dz);
+            if (up === B.OAK_LOG || up === B.BIRCH_LOG || up === B.SPRUCE_LOG || up === B.WATER) {
+              hasTree = true;
+              break;
+            }
+          }
+        }
+        if (!hasTree) {
+          const rx = 1.6 + chunkRand() * 1.4;
+          const rz = 1.6 + chunkRand() * 1.4;
+          for (let dz = -3; dz <= 3; dz++) {
+            for (let dx = -3; dx <= 3; dx++) {
+              const lx = px + dx;
+              const lz = pz + dz;
+              if (lx <= 0 || lx >= 15 || lz <= 0 || lz >= 15) continue;
+              const d = Math.hypot(dx / rx, dz / rz);
+              if (d <= 1.0) {
+                setBlockSafe(blocks, lx, py - 1, lz, B.STONE);
+                setBlockSafe(blocks, lx, py, lz, B.LAVA);
+                for (let ay = 1; ay <= 3; ay++) {
+                  setBlockSafe(blocks, lx, py + ay, lz, B.AIR);
+                }
+              } else if (d <= 1.45) {
+                const cur = getBlockSafe(blocks, lx, py, lz);
+                if (cur === B.AIR || cur === B.GRASS || cur === B.SAND || cur === B.DIRT) {
+                  setBlockSafe(blocks, lx, py, lz, chunkRand() < 0.35 ? B.COBBLESTONE : B.STONE);
+                }
+                setBlockSafe(blocks, lx, py - 1, lz, B.STONE);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 6.5b Underground Water Pools in calm caverns (Y=18..36)
+    if (chunkRand() < 0.22) {
+      const wx0 = 3 + Math.floor(chunkRand() * 10);
+      const wz0 = 3 + Math.floor(chunkRand() * 10);
+      const baseWy = 18 + Math.floor(chunkRand() * 18);
+      if (baseWy + 4 < heightMap[wz0 * CHUNK_SIZE + wx0]) {
+        const centerId = getBlockSafe(blocks, wx0, baseWy, wz0);
+        const floorId = getBlockSafe(blocks, wx0, baseWy - 1, wz0);
+        if (centerId === B.AIR && isWallRock(floorId)) {
+          for (let dz = -2; dz <= 2; dz++) {
+            for (let dx = -2; dx <= 2; dx++) {
+              const lx = wx0 + dx;
+              const lz = wz0 + dz;
+              if (lx <= 0 || lx >= 15 || lz <= 0 || lz >= 15) continue;
+              if (dx * dx + dz * dz <= 4 && getBlockSafe(blocks, lx, baseWy, lz) === B.AIR && isWallRock(getBlockSafe(blocks, lx, baseWy - 1, lz))) {
+                setBlockSafe(blocks, lx, baseWy, lz, B.WATER);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 6.5c Embedded Mountain Water Springs & Deep Cave Lava Springs (never floating in open sky!)
+    for (let attempt = 0; attempt < 18 && springIndices.length < 2; attempt++) {
+      const lx = 1 + Math.floor(chunkRand() * 14);
+      const lz = 1 + Math.floor(chunkRand() * 14);
+      const colH = heightMap[lz * CHUNK_SIZE + lx];
+      const useLava = B.LAVA && attempt >= 10;
+      const minSy = useLava ? 12 : (biomes[lz * CHUNK_SIZE + lx] === BI.MOUNTAINS ? SEA_LEVEL + 6 : 16);
+      const maxSy = useLava ? Math.min(34, colH - 6) : Math.min(WORLD_HEIGHT - 8, colH - 2);
+      if (maxSy <= minSy) continue;
+
+      const sy = minSy + Math.floor(chunkRand() * (maxSy - minSy));
+      const curId = getBlockSafe(blocks, lx, sy, lz);
+      if (!isWallRock(curId)) continue;
+      if (!isWallRock(getBlockSafe(blocks, lx, sy + 1, lz))) continue;
+      if (!isWallRock(getBlockSafe(blocks, lx, sy - 1, lz))) continue;
+
+      let airCount = 0;
+      let rockCount = 0;
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      for (let d = 0; d < 4; d++) {
+        const nid = getBlockSafe(blocks, lx + dirs[d][0], sy, lz + dirs[d][1]);
+        if (nid === B.AIR) airCount++;
+        else if (isWallRock(nid)) rockCount++;
+      }
+
+      if (airCount === 1 && rockCount === 3) {
+        const fluidId = useLava ? B.LAVA : B.WATER;
+        setBlockSafe(blocks, lx, sy, lz, fluidId);
+        springIndices.push((sy * CHUNK_SIZE + lz) * CHUNK_SIZE + lx);
+      }
+    }
+
     // 7. Compute tight non-air vertical bounds
     let minY = WORLD_HEIGHT - 1;
     let maxY = 0;
@@ -976,6 +1132,7 @@ export function createChunkGeneratorKernel(cfg) {
     return {
       blocks,
       biomes,
+      fluidSprings: new Uint16Array(springIndices),
       minY: minY <= maxY ? minY : 0,
       maxY: minY <= maxY ? maxY : 0,
     };

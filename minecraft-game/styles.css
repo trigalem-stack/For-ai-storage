@@ -971,7 +971,6 @@ body.webgl-crosshair #crosshair::after {
   position: fixed;
   inset: 0;
   background: rgba(8, 12, 20, 0.72);
-  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1230,16 +1229,87 @@ body.webgl-crosshair #crosshair::after {
   gap: 3px;
 }
 
-.inv-creative-catalog {
+.inv-creative-shell {
   width: 100%;
-  max-height: 184px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.inv-creative-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.inv-cat-btn {
+  flex: 1 1 auto;
+  min-width: 58px;
+  height: 24px;
+  padding: 0 7px;
+  border: 2px solid #373737;
+  background: #a5a5a5;
+  color: #1f2228;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.inv-cat-btn.active {
+  background: #5cb832;
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+.inv-creative-body {
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+  width: 100%;
+}
+
+.inv-creative-catalog {
+  flex: 1 1 auto;
+  max-height: 246px;
   overflow-y: auto;
+  scrollbar-width: none;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
   gap: 3px;
   padding: 4px;
   background: #8b8b8b;
   border: 2px solid #373737;
+}
+
+.inv-creative-catalog::-webkit-scrollbar {
+  display: none;
+}
+
+.inv-creative-scrollbar {
+  position: relative;
+  width: 14px;
+  flex-shrink: 0;
+  background: #555961;
+  border: 2px solid #2b2e34;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.inv-creative-thumb {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 0;
+  height: 36px;
+  background: #d8dce4;
+  border: 1px solid #ffffff;
+  box-shadow: inset -1px -1px 0 #70747d;
+  cursor: grab;
+}
+
+.inv-creative-thumb:active {
+  background: #f0f4ff;
 }
 
 .inv-creative-item {
@@ -1254,7 +1324,8 @@ body.webgl-crosshair #crosshair::after {
   cursor: pointer;
 }
 
-.inv-creative-item:hover {
+.inv-creative-item:hover,
+.inv-creative-item.vm-hover {
   background: #c8d6ea;
 }
 
@@ -1262,6 +1333,11 @@ body.webgl-crosshair #crosshair::after {
   width: 28px;
   height: 28px;
   image-rendering: pixelated;
+}
+
+.inv-slot.drag-preview {
+  box-shadow: inset 0 0 0 2px #78ebff;
+  background: #a4b8ca;
 }
 
 .inv-slot-grid-9 {
@@ -1425,6 +1501,43 @@ body.webgl-crosshair #crosshair::after {
   z-index: 17;
   background: radial-gradient(circle at center, rgba(16, 14, 10, 0.35) 20%, rgba(12, 10, 8, 0.88) 100%);
   box-shadow: inset 0 0 100px 45px rgba(0, 0, 0, 0.78);
+}
+
+#fluid-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
+}
+
+#fluid-overlay.water {
+  opacity: 1;
+  background: rgba(24, 86, 168, 0.42);
+  box-shadow: inset 0 0 70px 18px rgba(10, 42, 92, 0.65);
+}
+
+#fluid-overlay.lava {
+  opacity: 1;
+  background: rgba(220, 62, 10, 0.62);
+  box-shadow: inset 0 0 90px 30px rgba(120, 14, 0, 0.85);
+}
+
+#fluid-overlay.burning {
+  opacity: 1;
+  box-shadow: inset 0 -55px 46px -10px rgba(255, 110, 10, 0.75), inset 0 -22px 24px -4px rgba(255, 210, 40, 0.7);
+  animation: fireFlicker 0.24s infinite alternate;
+}
+
+#fluid-overlay.lava.burning {
+  background: rgba(220, 62, 10, 0.68);
+  box-shadow: inset 0 0 95px 32px rgba(145, 22, 0, 0.9), inset 0 -46px 40px -8px rgba(255, 175, 20, 0.7);
+}
+
+@keyframes fireFlicker {
+  0% { filter: brightness(0.95); }
+  100% { filter: brightness(1.16); }
 }
 
 /* Survival Vitals Bar positioned neatly above Hotbar */
@@ -1703,7 +1816,7 @@ body.webgl-crosshair #crosshair::after {
     height: 112px;
   }
   .inv-creative-catalog {
-    max-height: 112px;
+    max-height: 168px;
   }
 }
 
@@ -1746,7 +1859,7 @@ body.webgl-crosshair #crosshair::after {
     height: 94px;
   }
   .inv-creative-catalog {
-    max-height: 94px;
+    max-height: 138px;
   }
   .vm-btn {
     min-width: 60px;

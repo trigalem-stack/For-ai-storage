@@ -32,6 +32,7 @@ import {
   DEFAULT_SATURATION,
 } from '../constants.js';
 import { collidesWithWorld, moveAABB } from '../physics/AABBPhysics.js';
+import { FluidSimulator } from '../world/FluidSimulator.js';
 
 export class PlayerController {
   constructor(camera, world, playerModel, firstPersonHand, options = {}) {
@@ -75,11 +76,17 @@ export class PlayerController {
     this.inWallTimer = 0;
     this.cactusTimer = 0;
     this.voidTimer = 0;
+    this.lavaTimer = 0;
+    this.fireTimer = 0;
+    this.fireTicks = options.fireTicks ?? 0;
     this.fallDistance = 0;
     this.isDead = this.health <= 0 && !this.creativeMode;
     this.deathTilt = 0;
     this.inWallSuffocating = false;
+    this.inWater = false;
     this.headInWater = false;
+    this.inLava = false;
+    this.headInLava = false;
     this.lastDamageSource = options.lastDamageSource || null;
 
     // Eating progress state (1.6s hold)
@@ -476,8 +483,15 @@ export class PlayerController {
     this.inWallTimer = 0;
     this.cactusTimer = 0;
     this.voidTimer = 0;
+    this.lavaTimer = 0;
+    this.fireTimer = 0;
+    this.fireTicks = 0;
     this.fallDistance = 0;
     this.inWallSuffocating = false;
+    this.inWater = false;
+    this.headInWater = false;
+    this.inLava = false;
+    this.headInLava = false;
     this.lastDamageSource = null;
     this.vx = 0;
     this.vy = 0;
@@ -505,6 +519,7 @@ export class PlayerController {
       airTicks: this.airTicks,
       score: this.score,
       hungerDebuffTimer: this.hungerDebuffTimer,
+      fireTicks: this.fireTicks,
     };
   }
 
@@ -518,6 +533,7 @@ export class PlayerController {
     if (Number.isFinite(s.airTicks)) this.airTicks = Math.max(0, Math.min(MAX_AIR_TICKS, s.airTicks));
     if (Number.isFinite(s.score)) this.score = Math.max(0, s.score | 0);
     if (Number.isFinite(s.hungerDebuffTimer)) this.hungerDebuffTimer = Math.max(0, s.hungerDebuffTimer);
+    if (Number.isFinite(s.fireTicks)) this.fireTicks = Math.max(0, s.fireTicks);
     this.isDead = this.health <= 0 && !this.creativeMode;
     this.onVitalsChange?.();
   }
@@ -650,11 +666,17 @@ export class PlayerController {
       this.touchInput.sprint;
     const wantSprint = (this.creativeMode || this.foodLevel > 6) && !this.eatActive && rawSprint;
 
-    // Water & ladder submersion probe
-    const feetInWater = this.world.getBlock(this.x, this.y + 0.12, this.z) === BLOCK_IDS.WATER;
-    const waistInWater = this.world.getBlock(this.x, this.y + 0.56, this.z) === BLOCK_IDS.WATER;
-    const headInWater = this.world.getBlock(this.x, this.y + 1.38, this.z) === BLOCK_IDS.WATER;
+    // Water, Lava & Ladder submersion probe
+    const feetBlock = this.world.getBlock(this.x, this.y + 0.12, this.z);
+    const waistBlock = this.world.getBlock(this.x, this.y + 0.56, this.z);
+    const headBlock = this.world.getBlock(this.x, this.y + 1.38, this.z);
+    const feetInWater = feetBlock === BLOCK_IDS.WATER;
+    const waistInWater = waistBlock === BLOCK_IDS.WATER;
+    const headInWater = headBlock === BLOCK_IDS.WATER;
     const inWater = feetInWater || waistInWater || headInWater;
+    const inLava = feetBlock === BLOCK_IDS.LAVA || waistBlock === BLOCK_IDS.LAVA || headBlock === BLOCK_IDS.LAVA;
+    this.inWater = inWater;
+    this.inLava = inLava;
     const onLadder = BlockRegistry.isClimbable(this.world.getBlock(this.x, this.y + 0.15, this.z))
       || BlockRegistry.isClimbable(this.world.getBlock(this.x, this.y + 1.0, this.z));
 
@@ -664,7 +686,7 @@ export class PlayerController {
       : false;
 
     let nextSwim = false;
-    if (!this.flyMode && !onLadder) {
+    if (!this.flyMode && !onLadder && !inLava) {
       if (inWater && wantSprint && forward > 0.25 && (waistInWater || headInWater || this.isSwimming)) {
         nextSwim = true;
       } else if (this.isSwimming && ceilingBlocksStand) {
@@ -682,7 +704,7 @@ export class PlayerController {
     }
     this.isCrouching = nextCrouch;
 
-    if (forward <= 0.25 || this.isCrouching) {
+    if (forward <= 0.25 || this.isCrouching || inLava) {
       this.isSprinting = false;
     } else if (wantSprint) {
       this.isSprinting = true;
@@ -698,6 +720,8 @@ export class PlayerController {
     let speed = WALK_SPEED;
     if (this.flyMode) {
       speed = this.isSprinting ? FLY_SPRINT_SPEED : FLY_SPEED;
+    } else if (inLava) {
+      speed = CROUCH_SPEED * 1.15;
     } else if (this.eatActive) {
       speed = CROUCH_SPEED;
     } else if (this.isSwimming) {
@@ -718,13 +742,28 @@ export class PlayerController {
     const activeHeight = this.getCurrentHitboxHeight();
     if (this.jumpCooldown > 0) this.jumpCooldown = Math.max(0, this.jumpCooldown - dt);
 
-    // Smooth horizontal velocity (instant grip on normal ground, icy inertia on Ice, gentle drift in water)
-    const targetVx = moveDirX * speed;
-    const targetVz = moveDirZ * speed;
+    // Fluid current drift force (water pushes noticeably; lava pushes sluggishly)
+    let flowVx = 0;
+    let flowVz = 0;
+    if (!this.flyMode && (inWater || inLava)) {
+      const fId = inWater ? BLOCK_IDS.WATER : BLOCK_IDS.LAVA;
+      const flow = FluidSimulator.getFlowVector(this.world, this.x, this.y + 0.2, this.z, fId);
+      const strength = inWater ? 1.55 : 0.45;
+      flowVx = flow.x * strength;
+      flowVz = flow.z * strength;
+    }
+
+    // Smooth horizontal velocity (instant grip on normal ground, icy inertia on Ice, gentle drift in fluid)
+    const targetVx = moveDirX * speed + flowVx;
+    const targetVz = moveDirZ * speed + flowVz;
     if (isOnIce) {
       const iceGrip = Math.min(1, dt * 3.6);
       this.vx += (targetVx - this.vx) * iceGrip;
       this.vz += (targetVz - this.vz) * iceGrip;
+    } else if (inLava && !this.flyMode) {
+      const lavaGrip = Math.min(1, dt * 6.0);
+      this.vx += (targetVx - this.vx) * lavaGrip;
+      this.vz += (targetVz - this.vz) * lavaGrip;
     } else if (inWater && !this.flyMode) {
       const waterGrip = Math.min(1, dt * 9.5);
       this.vx += (targetVx - this.vx) * waterGrip;
@@ -762,15 +801,19 @@ export class PlayerController {
         this.vy = 0;
         if (res.hitWall) anyWallHit = true;
       } else {
-        const subFeetWater = this.world.getBlock(this.x, this.y + 0.1, this.z) === BLOCK_IDS.WATER;
-        const subWaistWater = this.world.getBlock(this.x, this.y + 0.56, this.z) === BLOCK_IDS.WATER;
-        const subHeadWater = this.world.getBlock(this.x, this.y + 1.25, this.z) === BLOCK_IDS.WATER;
+        const subFeet = this.world.getBlock(this.x, this.y + 0.1, this.z);
+        const subWaist = this.world.getBlock(this.x, this.y + 0.56, this.z);
+        const subHead = this.world.getBlock(this.x, this.y + 1.25, this.z);
+        const subFeetWater = subFeet === BLOCK_IDS.WATER;
+        const subWaistWater = subWaist === BLOCK_IDS.WATER;
+        const subHeadWater = subHead === BLOCK_IDS.WATER;
         const subInWater = subFeetWater || subWaistWater || subHeadWater;
+        const subInLava = subFeet === BLOCK_IDS.LAVA || subWaist === BLOCK_IDS.LAVA || subHead === BLOCK_IDS.LAVA;
         const subOnLadder = BlockRegistry.isClimbable(this.world.getBlock(this.x, this.y + 0.15, this.z))
           || BlockRegistry.isClimbable(this.world.getBlock(this.x, this.y + 1.0, this.z));
         let dy;
 
-        if (subOnLadder && !subInWater) {
+        if (subOnLadder && !subInWater && !subInLava) {
           if (wantJump || (forward > 0.25 && this.pitch > 0.25)) {
             this.vy = 3.4;
           } else if (wantCrouch) {
@@ -779,6 +822,14 @@ export class PlayerController {
             this.vy = -3.2;
           } else {
             this.vy = -2.2;
+          }
+          dy = this.vy * subDt;
+        } else if (subInLava) {
+          // Thick lava buoyancy: slow vertical motion & heavy drag
+          if (wantJump) {
+            this.vy = Math.min(1.85, Math.max(this.vy + 9.0 * subDt, 1.35));
+          } else {
+            this.vy = Math.max(-1.6, this.vy - GRAVITY * 0.12 * subDt);
           }
           dy = this.vy * subDt;
         } else if (subInWater) {
@@ -839,7 +890,7 @@ export class PlayerController {
           this.vz * subDt,
           PLAYER_HALF_WIDTH,
           activeHeight,
-          this.isCrouching && !subInWater
+          this.isCrouching && !subInWater && !subInLava
         );
 
         this.x = res.x;
@@ -857,10 +908,15 @@ export class PlayerController {
       this.sprintToggled = false;
     }
 
-    // --- Stage 6 Survival Physics, Exhaustion, Regeneration & Environmental Hazards ---
+    // --- Stage 6 & 7 Survival Physics, Exhaustion, Fluids, Fire & Hazards ---
     const eyeBlockId = this.world.getBlock(this.x, this.y + this.currentEyeHeight, this.z);
     this.headInWater = eyeBlockId === BLOCK_IDS.WATER;
+    this.headInLava = eyeBlockId === BLOCK_IDS.LAVA;
     this.inWallSuffocating = !this.creativeMode && !this.flyMode && BlockRegistry.isOpaque(eyeBlockId);
+
+    if (inWater) {
+      this.fireTicks = 0;
+    }
 
     if (!this.creativeMode) {
       // 1. Distance & jump exhaustion
@@ -874,10 +930,13 @@ export class PlayerController {
         this.addExhaustion(this.isSprinting ? 0.2 : 0.05);
       }
 
-      // 2. Fall distance tracking & landing damage (water/ladder/fly resets; bed halves + bounces; hay bale reduces 80%)
+      // 2. Fall distance tracking & landing damage (exact Minecraft floor(fallDistance - 3.0))
       if (this.flyMode || inWater || onLadder) {
         this.fallDistance = 0;
       } else {
+        if (inLava) {
+          this.fallDistance *= Math.max(0, 1 - dt * 10);
+        }
         const dyMoved = this.y - prevY;
         if (!this.onGround && dyMoved < 0) {
           this.fallDistance += -dyMoved;
@@ -888,13 +947,13 @@ export class PlayerController {
             const standDef = BlockRegistry.get(standId);
             let fallDmg = 0;
             if (standDef.isBed) {
-              fallDmg = Math.floor((this.fallDistance - 3.0) * 0.5);
+              fallDmg = Math.floor((this.fallDistance - 3.0 + 1e-4) * 0.5);
               this.vy = Math.max(this.vy, 4.2);
               this.onGround = false;
             } else if (standId === BLOCK_IDS.HAY_BALE) {
-              fallDmg = Math.max(1, Math.ceil((this.fallDistance - 3.0) * 0.2));
+              fallDmg = Math.floor((this.fallDistance - 3.0 + 1e-4) * 0.2);
             } else {
-              fallDmg = Math.ceil(this.fallDistance - 3.0);
+              fallDmg = Math.floor(this.fallDistance - 3.0 + 1e-4);
             }
             if (fallDmg > 0) this.damage(fallDmg, 'fall');
           }
@@ -917,6 +976,28 @@ export class PlayerController {
       } else {
         this.airTicks = Math.min(MAX_AIR_TICKS, this.airTicks + dt * 100);
         this.drownTimer = 0;
+      }
+
+      // 3.5 Lava contact damage (4 HP / 0.5s) & burning (160 ticks = 8s; 1 HP / 1.0s)
+      if (inLava) {
+        this.fireTicks = Math.max(this.fireTicks, 160);
+        this.lavaTimer += dt;
+        if (this.lavaTimer >= 0.5) {
+          this.lavaTimer = 0;
+          this.damage(4, 'lava');
+        }
+      } else {
+        this.lavaTimer = 0.5;
+        if (this.fireTicks > 0) {
+          this.fireTicks = Math.max(0, this.fireTicks - dt * 20);
+          this.fireTimer += dt;
+          if (this.fireTimer >= 1.0) {
+            this.fireTimer = 0;
+            this.damage(1, 'fire');
+          }
+        } else {
+          this.fireTimer = 0;
+        }
       }
 
       // 4. Cactus contact damage
@@ -1000,6 +1081,7 @@ export class PlayerController {
     } else {
       this.airTicks = MAX_AIR_TICKS;
       this.fallDistance = 0;
+      this.fireTicks = 0;
     }
 
     // Smooth camera eye-height transition
@@ -1081,7 +1163,7 @@ export class PlayerController {
       const cy = eyeY + lookY * sign * step;
       const cz = eyeZ + lookZ * sign * step;
       const b = this.world.getBlock(cx, cy, cz);
-      if (b !== 0 && b !== BLOCK_IDS.WATER) {
+      if (b !== 0 && !BlockRegistry.isFluid(b)) {
         dist = Math.max(0.5, step - 0.25);
         break;
       }

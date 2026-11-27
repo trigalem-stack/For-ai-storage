@@ -1,6 +1,6 @@
 import { BLOCK_IDS } from '../blocks/BlockRegistry.js';
 import { CHEST_SIZE, FURNACE_COOK_TICKS } from '../constants.js';
-import { ItemRegistry } from '../items/ItemRegistry.js';
+import { ITEM_IDS, ItemRegistry } from '../items/ItemRegistry.js';
 import { RecipeRegistry } from '../items/RecipeRegistry.js';
 
 export function blockCoordKey(wx, wy, wz) {
@@ -90,8 +90,13 @@ export class BlockEntityManager {
         if (fuelTicks > 0) {
           f.burnTime = fuelTicks;
           f.burnMax = fuelTicks;
+          const usedFuelId = f.fuel.id;
           f.fuel.count -= 1;
-          if (f.fuel.count <= 0) f.fuel = null;
+          if (f.fuel.count <= 0) {
+            f.fuel = usedFuelId === ITEM_IDS.LAVA_BUCKET
+              ? ItemRegistry.createStack(ITEM_IDS.BUCKET, 1)
+              : null;
+          }
           changed = true;
         }
       }

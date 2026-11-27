@@ -1,9 +1,10 @@
 import * as THREE from '../../vendor/three.module.min.js';
-import { BlockRegistry } from '../blocks/BlockRegistry.js';
+import { BLOCK_IDS, BlockRegistry } from '../blocks/BlockRegistry.js';
 import { ITEM_DROP_PLAYER_DELAY, ITEM_DROP_DEATH_LIFETIME, FACE_SHADE, MAX_STACK_DEFAULT } from '../constants.js';
 import { moveAABB } from '../physics/AABBPhysics.js';
 import { ItemRegistry } from '../items/ItemRegistry.js';
 import { getExtrudedTileGeometry } from '../textures/ExtrudedItemMesh.js';
+import { FluidSimulator } from '../world/FluidSimulator.js';
 
 const ITEM_SIZE = 0.26;
 const ITEM_HALF = ITEM_SIZE * 0.5;
@@ -183,9 +184,9 @@ export class ItemEntity {
       this.vy = options.throwDir.y * 2.5 + 2.2;
       this.vz = options.throwDir.z * 4.4 + (Math.random() - 0.5) * 0.4;
     } else {
-      this.vx = (Math.random() - 0.5) * 3.0;
-      this.vy = 2.6 + Math.random() * 1.4;
-      this.vz = (Math.random() - 0.5) * 3.0;
+      this.vx = (Math.random() - 0.5) * 1.8;
+      this.vy = 2.6 + Math.random() * 1.2;
+      this.vz = (Math.random() - 0.5) * 1.8;
     }
     this.onGround = false;
     this.age = 0;
@@ -359,7 +360,25 @@ export class ItemEntityManager {
         }
       }
 
-      item.vy = Math.max(-24, item.vy - ITEM_GRAVITY * dt);
+      const fluidHere = world.getBlock(item.x, item.y + 0.1, item.z);
+      if (fluidHere === BLOCK_IDS.LAVA) {
+        // Items tossed into lava burn away quickly
+        item.alive = false;
+        this.scene.remove(item.mesh);
+        this.entities.splice(i, 1);
+        continue;
+      }
+
+      if (fluidHere === BLOCK_IDS.WATER) {
+        const flow = FluidSimulator.getFlowVector(world, item.x, item.y + 0.1, item.z, BLOCK_IDS.WATER);
+        item.vx += (flow.x * 2.2 - item.vx) * Math.min(1, dt * 6);
+        item.vz += (flow.z * 2.2 - item.vz) * Math.min(1, dt * 6);
+        const waterAbove = world.getBlock(item.x, item.y + 0.45, item.z) === BLOCK_IDS.WATER;
+        item.vy = waterAbove ? Math.min(2.6, item.vy + 14 * dt) : Math.max(-1.2, item.vy - 3 * dt);
+      } else {
+        item.vy = Math.max(-24, item.vy - ITEM_GRAVITY * dt);
+      }
+
       const res = moveAABB(
         world,
         item,

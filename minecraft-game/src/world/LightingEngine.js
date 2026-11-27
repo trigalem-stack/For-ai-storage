@@ -65,6 +65,13 @@ export class LightingEngine {
 
     // Temporary glowing Redstone Ore coordinates ("wx,wy,wz" -> { wx, wy, wz, ttl })
     this.activeRedstone = new Map();
+
+    // 1-entry chunk cache + reusable lookup struct to avoid hot-loop GC allocations
+    this._cacheWorld = null;
+    this._cacheCx = 2147483647;
+    this._cacheCz = 2147483647;
+    this._cacheChunk = null;
+    this._ref = { chunk: null, lx: 0, lz: 0, idx: 0 };
   }
 
   clear() {
@@ -73,17 +80,36 @@ export class LightingEngine {
     this.blkAddQ.clear();
     this.blkRemQ.clear();
     this.activeRedstone.clear();
+    this._cacheWorld = null;
+    this._cacheChunk = null;
   }
 
-  _getBlockAndChunk(world, wx, wy, wz) {
+  _getBlockAndChunk(world, wx, wy, wz, alloc = false) {
     if (wy < 0 || wy >= WORLD_HEIGHT) return null;
     const cx = Math.floor(wx / CHUNK_SIZE);
     const cz = Math.floor(wz / CHUNK_SIZE);
-    const chunk = world.chunks.get(chunkKey(cx, cz));
+    let chunk;
+    if (this._cacheWorld === world && this._cacheCx === cx && this._cacheCz === cz) {
+      chunk = this._cacheChunk;
+    } else {
+      chunk = typeof world.getChunk === 'function' ? world.getChunk(cx, cz) : world.chunks.get(chunkKey(cx, cz));
+      this._cacheWorld = world;
+      this._cacheCx = cx;
+      this._cacheCz = cz;
+      this._cacheChunk = chunk || null;
+    }
     if (!chunk || !chunk.isGenerated) return null;
     const lx = wx - cx * CHUNK_SIZE;
     const lz = wz - cz * CHUNK_SIZE;
-    return { chunk, lx, lz, idx: (wy * CHUNK_SIZE + lz) * CHUNK_SIZE + lx };
+    const idx = (wy * CHUNK_SIZE + lz) * CHUNK_SIZE + lx;
+    if (alloc) {
+      return { chunk, lx, lz, idx };
+    }
+    this._ref.chunk = chunk;
+    this._ref.lx = lx;
+    this._ref.lz = lz;
+    this._ref.idx = idx;
+    return this._ref;
   }
 
   /**
@@ -235,7 +261,7 @@ export class LightingEngine {
    */
   onBlockChanged(world, wx, wy, wz, oldId, newId) {
     const touched = new Set();
-    const ref = this._getBlockAndChunk(world, wx, wy, wz);
+    const ref = this._getBlockAndChunk(world, wx, wy, wz, true);
     if (!ref) return touched;
     touched.add(ref.chunk);
 
@@ -384,7 +410,7 @@ export class LightingEngine {
     const fx = Math.floor(wx);
     const fy = Math.floor(wy);
     const fz = Math.floor(wz);
-    const ref = this._getBlockAndChunk(world, fx, fy, fz);
+    const ref = this._getBlockAndChunk(world, fx, fy, fz, true);
     if (!ref) return;
 
     const key = `${fx},${fy},${fz}`;

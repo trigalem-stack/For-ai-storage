@@ -680,25 +680,40 @@ export class InventoryPlayerPreview {
     this.lookY = 0; // -1..1
     this.targetCanvas = null;
     this.targetCtx = null;
+    this._dirty = true;
+    this._lastRenderAt = 0;
   }
 
   bindCanvas(canvasEl) {
     this.targetCanvas = canvasEl;
     this.targetCtx = canvasEl ? canvasEl.getContext('2d') : null;
+    this._dirty = true;
   }
 
   setLookTarget(normX, normY) {
-    this.lookX = Math.max(-1, Math.min(1, normX));
-    this.lookY = Math.max(-1, Math.min(1, normY));
+    const nx = Math.max(-1, Math.min(1, normX));
+    const ny = Math.max(-1, Math.min(1, normY));
+    if (Math.abs(nx - this.lookX) > 0.005 || Math.abs(ny - this.lookY) > 0.005) {
+      this.lookX = nx;
+      this.lookY = ny;
+      this._dirty = true;
+    }
   }
 
   syncEquipment(heldStack, armorSlots) {
     this.model.setHeldItem(heldStack);
     this.model.setArmor(armorSlots);
+    this._dirty = true;
   }
 
   renderToTarget(renderer, time) {
     if (!this.targetCanvas || !this.targetCtx || !renderer?.domElement) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    // Throttle Paper-Doll 3D re-renders to <=20Hz unless look/equipment just changed (zero lag!)
+    if (!this._dirty && now - this._lastRenderAt < 50) return;
+    if (this._dirty && now - this._lastRenderAt < 28) return;
+    this._dirty = false;
+    this._lastRenderAt = now;
     const pw = this.targetCanvas.width || 132;
     const ph = this.targetCanvas.height || 176;
     const dpr = renderer.getPixelRatio ? renderer.getPixelRatio() : 1;

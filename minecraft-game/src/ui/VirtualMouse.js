@@ -2,7 +2,7 @@
 // - Pixel-crisp arrow pointer (`ic_mouse_pointer` style)
 // - Auto-activates inside Inventory/Crafting/Furnace/Chest GUIs on touch devices, plus manual toggle button
 // - Touchpad drag anywhere on the overlay moves the pointer across the screen (1.45x reach)
-// - Dedicated PRI (LMB), SEC (RMB), Shift-modifier, and Drop (Q) buttons matching PojavLauncher ergonomics
+// - Dedicated PRI (LMB), SEC (RMB) with hold-drag support, Shift-modifier, and Drop (Q) buttons
 
 export class VirtualMouse {
   constructor(callbacks = {}) {
@@ -15,6 +15,7 @@ export class VirtualMouse {
     this.x = Math.round(window.innerWidth * 0.5);
     this.y = Math.round(window.innerHeight * 0.5);
     this.shiftHeld = false;
+    this.activeButton = -1; // -1 none, 0 PRI (LMB), 2 SEC (RMB)
 
     this.cursorEl = document.getElementById('virtual-cursor');
     this.barEl = document.getElementById('vm-action-bar');
@@ -30,6 +31,8 @@ export class VirtualMouse {
     this._dragLastY = 0;
     this._dragTotalDist = 0;
     this._hoveredEl = null;
+    this._downTarget = null;
+    this._downPos = { x: 0, y: 0 };
 
     this._bindEvents();
     this._syncState();
@@ -69,10 +72,22 @@ export class VirtualMouse {
     if (shouldShow) {
       this._updatePosition(this.x, this.y);
     } else {
+      this._releaseActiveButton();
       this._clearHover();
       this.shiftHeld = false;
       this.btnShift?.classList.remove('active');
     }
+  }
+
+  _releaseActiveButton() {
+    if (this.activeButton === -1) return;
+    const btn = this.activeButton;
+    this.activeButton = -1;
+    this.btnPri?.classList.remove('pressed');
+    this.btnSec?.classList.remove('pressed');
+    const curTarget = this._elementAtPointer();
+    this.callbacks.onPointerUp?.(btn, this.x, this.y, this.shiftHeld, curTarget);
+    this._downTarget = null;
   }
 
   _clearHover() {
@@ -94,32 +109,78 @@ export class VirtualMouse {
     const under = this._elementAtPointer();
     if (under !== this._hoveredEl) {
       this._clearHover();
-      const slotBtn = under?.closest?.('.inv-slot, .recipe-book-item, .inv-creative-item, .mc-menu-btn, .mc-hud-btn');
-      if (slotBtn) {
-        this._hoveredEl = slotBtn;
-        slotBtn.classList.add('vm-hover');
+      const hoverTarget = under?.closest?.(
+        '.inv-slot, .recipe-book-item, .inv-creative-item, .inv-cat-btn, .inv-creative-scrollbar, .mc-menu-btn, .mc-hud-btn'
+      );
+      if (hoverTarget) {
+        this._hoveredEl = hoverTarget;
+        hoverTarget.classList.add('vm-hover');
       }
     }
-    this.callbacks.onPointerMove?.(this.x, this.y, this._hoveredEl);
+    this.callbacks.onPointerMove?.(this.x, this.y, this._hoveredEl, this.activeButton);
   }
 
   _elementAtPointer() {
-    const el = document.elementFromPoint(this.x, this.y);
-    return el || null;
+    return document.elementFromPoint(this.x, this.y) || null;
   }
 
-  _dispatchClick(button = 0) {
+  _dispatchPointerDown(button = 0) {
     const rawTarget = this._elementAtPointer();
-    const target = rawTarget?.closest?.('.inv-slot, .recipe-book-item, .inv-creative-item, button') || rawTarget;
+    const target = rawTarget?.closest?.(
+      '.inv-slot, .recipe-book-item, .inv-creative-item, .inv-cat-btn, .inv-creative-scrollbar, .inv-creative-thumb, button'
+    ) || rawTarget;
+    this._downTarget = target;
+    this._downPos = { x: this.x, y: this.y };
+    this.activeButton = button;
+
     if (!target) return;
 
+    if (this.callbacks.onPointerDown) {
+      const handled = this.callbacks.onPointerDown(button, this.x, this.y, this.shiftHeld, target);
+      if (handled) return;
+    }
+
     if (target.classList?.contains('inv-slot')) {
-      this.callbacks.onSlotVirtualClick?.(target.dataset.zone, Number(target.dataset.index), button, this.shiftHeld, this.x, this.y);
+      this.callbacks.onSlotVirtualClick?.(
+        target.dataset.zone,
+        Number(target.dataset.index),
+        button,
+        this.shiftHeld,
+        this.x,
+        this.y
+      );
       return;
     }
 
-    // Regular UI button (Close, Recipe item, Creative item, Tabs)
-    target.click?.();
+    if (!target.closest?.('.inv-creative-scrollbar')) {
+      target.click?.();
+    }
+  }
+
+  _dispatchPointerUp(button = 0) {
+    const downTarget = this._downTarget;
+    const moved = Math.hypot(this.x - this._downPos.x, this.y - this._downPos.y);
+    const curTarget = this._elementAtPointer();
+    if (this.activeButton === button) {
+      this.activeButton = -1;
+    }
+    this._downTarget = null;
+
+    if (this.callbacks.onPointerUp) {
+      this.callbacks.onPointerUp(button, this.x, this.y, this.shiftHeld, curTarget);
+    }
+
+    if (
+      button === 0 &&
+      moved < 10 &&
+      downTarget &&
+      !downTarget.classList?.contains('inv-slot') &&
+      !downTarget.closest?.('.inv-creative-scrollbar') &&
+      this.callbacks.onPointerDown
+    ) {
+      const btnEl = downTarget.closest?.('.recipe-book-item, .inv-creative-item, .inv-cat-btn, button');
+      btnEl?.click?.();
+    }
   }
 
   _bindEvents() {
@@ -138,22 +199,47 @@ export class VirtualMouse {
       el.addEventListener('mousedown', run);
     };
 
+    const bindHoldButton = (el, button) => {
+      if (!el) return;
+      let lastDownAt = 0;
+      let holding = false;
+
+      const onDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const now = performance.now();
+        if (now - lastDownAt < 45) return;
+        lastDownAt = now;
+        holding = true;
+        el.classList.add('pressed');
+        this._dispatchPointerDown(button);
+      };
+
+      const onUp = (e) => {
+        if (!holding) return;
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        holding = false;
+        el.classList.remove('pressed');
+        this._dispatchPointerUp(button);
+      };
+
+      el.addEventListener('touchstart', onDown, { passive: false });
+      el.addEventListener('touchend', onUp, { passive: false });
+      el.addEventListener('touchcancel', onUp, { passive: false });
+      el.addEventListener('mousedown', onDown);
+      el.addEventListener('mouseup', onUp);
+      window.addEventListener('mouseup', onUp);
+      window.addEventListener('blur', onUp);
+    };
+
     bindFastTap(this.toggleBtn, () => {
       const on = this.toggleManual();
       this.callbacks.onStatusToast?.(on ? 'Виртуальная мышь: ВКЛ' : 'Виртуальная мышь: ВЫКЛ');
     });
 
-    bindFastTap(this.btnPri, () => {
-      this.btnPri?.classList.add('pressed');
-      setTimeout(() => this.btnPri?.classList.remove('pressed'), 110);
-      this._dispatchClick(0);
-    });
-
-    bindFastTap(this.btnSec, () => {
-      this.btnSec?.classList.add('pressed');
-      setTimeout(() => this.btnSec?.classList.remove('pressed'), 110);
-      this._dispatchClick(2);
-    });
+    bindHoldButton(this.btnPri, 0);
+    bindHoldButton(this.btnSec, 2);
 
     bindFastTap(this.btnShift, () => {
       this.shiftHeld = !this.shiftHeld;
@@ -172,7 +258,6 @@ export class VirtualMouse {
     window.addEventListener('touchstart', (e) => {
       if (!this.enabled) return;
       if (e.target.closest?.('#vm-action-bar, #btn-touch-mouse, #hud-top-right')) return;
-      // Only handle drag on inventory/menus or manual mouse mode (never steal game joystick/look when not enabled)
       if (!this.guiOpen && !this.manualActive) return;
       if (this._dragTouchId !== null) return;
       const t = e.changedTouches[0];
@@ -207,9 +292,9 @@ export class VirtualMouse {
         if (e.changedTouches[i].identifier === this._dragTouchId) {
           const moved = this._dragTotalDist;
           this._dragTouchId = null;
-          // If manual mouse outside GUI & tapped lightly without dragging, click at cursor
           if (this.enabled && !this.guiOpen && moved < 8 && !e.target.closest?.('#vm-action-bar, #btn-touch-mouse')) {
-            this._dispatchClick(0);
+            this._dispatchPointerDown(0);
+            this._dispatchPointerUp(0);
           }
         }
       }

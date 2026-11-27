@@ -551,6 +551,58 @@ export function registerAllItemSprites(atlas) {
     d: [118, 124, 134, 255],
   }));
 
+  atlas.addTile('item_water_bucket', makeMaskLookup([
+    '................',
+    '................',
+    '....oooooooo....',
+    '...olwwwwwwlo...',
+    '..olwwbwwbbwmo..',
+    '..omwbbbbbbwmo..',
+    '..ommbbbbddmmo..',
+    '...omdmmmmddo...',
+    '...ommmmmdddo...',
+    '....ommmdddo....',
+    '....ommmdddo....',
+    '.....ooddoo.....',
+    '......oooo......',
+    '................',
+    '................',
+    '................',
+  ], {
+    o: [68, 72, 80, 255],
+    l: [238, 242, 248, 255],
+    m: [178, 184, 194, 255],
+    d: [118, 124, 134, 255],
+    w: [116, 186, 255, 255],
+    b: [44, 114, 228, 255],
+  }));
+
+  atlas.addTile('item_lava_bucket', makeMaskLookup([
+    '................',
+    '................',
+    '....oooooooo....',
+    '...olyryyyylo...',
+    '..olyorrryyrmo..',
+    '..omrroorrrmmo..',
+    '..ommmrrrddmmo..',
+    '...omdmmmmddo...',
+    '...ommmmmdddo...',
+    '....ommmdddo....',
+    '....ommmdddo....',
+    '.....ooddoo.....',
+    '......oooo......',
+    '................',
+    '................',
+    '................',
+  ], {
+    o: [68, 72, 80, 255],
+    l: [238, 242, 248, 255],
+    m: [178, 184, 194, 255],
+    d: [118, 124, 134, 255],
+    y: [255, 224, 84, 255],
+    r: [242, 88, 24, 255],
+  }));
+
   atlas.addTile('item_flint_and_steel', makeMaskLookup([
     '................',
     '................',

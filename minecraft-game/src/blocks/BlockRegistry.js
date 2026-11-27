@@ -77,6 +77,42 @@ export const BLOCK_IDS = Object.freeze({
   BRICKS: 71,
   BOOKSHELF: 72,
   MOSSY_COBBLESTONE: 73,
+  LAVA: 74,
+  OBSIDIAN: 75,
+});
+
+const TOOL_NAME_RU = Object.freeze({
+  pickaxe: 'Кирка',
+  axe: 'Топор',
+  shovel: 'Лопата',
+  hoe: 'Мотыга',
+  sword: 'Меч',
+  shears: 'Ножницы',
+});
+
+const TIER_NAME_RU = Object.freeze({
+  0: '',
+  1: 'Деревянная+',
+  2: 'Каменная+',
+  3: 'Железная+',
+  4: 'Алмазная',
+});
+
+const ITEM_DROP_NAME_RU = Object.freeze({
+  [ITEM_IDS.STICK]: 'Палка',
+  [ITEM_IDS.COAL]: 'Уголь',
+  [ITEM_IDS.IRON_INGOT]: 'Железный слиток',
+  [ITEM_IDS.GOLD_INGOT]: 'Золотой слиток',
+  [ITEM_IDS.DIAMOND]: 'Алмаз',
+  [ITEM_IDS.EMERALD]: 'Изумруд',
+  [ITEM_IDS.LAPIS_LAZULI]: 'Лазурит',
+  [ITEM_IDS.REDSTONE]: 'Редстоун',
+  [ITEM_IDS.FLINT]: 'Кремень',
+  [ITEM_IDS.CLAY_BALL]: 'Глина (4 шт.)',
+  [ITEM_IDS.APPLE]: 'Яблоко',
+  [ITEM_IDS.WHEAT_SEEDS]: 'Семена пшеницы',
+  [ITEM_IDS.WHEAT]: 'Пшеница',
+  [ITEM_IDS.RAW_COPPER]: 'Рудная медь',
 });
 
 class BlockRegistryImpl {
@@ -208,6 +244,29 @@ class BlockRegistryImpl {
     return b ? b.isLiquid : false;
   }
 
+  isWater(id) {
+    return id === BLOCK_IDS.WATER;
+  }
+
+  isLava(id) {
+    return id === BLOCK_IDS.LAVA;
+  }
+
+  isFluid(id) {
+    return id === BLOCK_IDS.WATER || id === BLOCK_IDS.LAVA;
+  }
+
+  isWashable(id) {
+    const b = this.byId[id];
+    if (!b || b.isAir || b.isLiquid) return false;
+    return Boolean(b.isCross || b.isTorch || b.isCrop || b.isLadder || b.id === BLOCK_IDS.SNOW);
+  }
+
+  isCross(id) {
+    const b = this.byId[id];
+    return b ? b.isCross : false;
+  }
+
   occludesAO(id) {
     return this.aoTable[id] === 1;
   }
@@ -282,11 +341,11 @@ class BlockRegistryImpl {
       return [{ id: Math.random() < 0.1 ? ITEM_IDS.FLINT : BLOCK_IDS.GRAVEL, count: 1 }];
     }
 
-    // Leaves drop occasional sticks / oak apples (~5% apple on oak leaves)
+    // Leaves drop sticks (~20%) / oak apples (~10% on oak leaves) or leaf block with shears
     if (def.id === BLOCK_IDS.OAK_LEAVES || def.id === BLOCK_IDS.BIRCH_LEAVES || def.id === BLOCK_IDS.SPRUCE_LEAVES) {
       const drops = [];
-      if (Math.random() < 0.08) drops.push({ id: ITEM_IDS.STICK, count: 1 });
-      if (def.id === BLOCK_IDS.OAK_LEAVES && Math.random() < 0.05) drops.push({ id: ITEM_IDS.APPLE, count: 1 });
+      if (Math.random() < 0.20) drops.push({ id: ITEM_IDS.STICK, count: 1 });
+      if (def.id === BLOCK_IDS.OAK_LEAVES && Math.random() < 0.10) drops.push({ id: ITEM_IDS.APPLE, count: 1 });
       return drops;
     }
 
@@ -319,6 +378,94 @@ class BlockRegistryImpl {
     return this.byId.filter(
       (b) => b && !b.isAir && !b.isLiquid && !b.isCrop && b.id !== BLOCK_IDS.BEDROCK && b.id !== BLOCK_IDS.BED_HEAD && b.id !== BLOCK_IDS.FURNACE_LIT
     );
+  }
+
+  _resolveDropLabel(dropId) {
+    if (!dropId || dropId <= 0) return 'Ничего';
+    if (dropId < 256) return this.get(dropId)?.name || 'Блок';
+    return ITEM_DROP_NAME_RU[dropId] || 'Предмет';
+  }
+
+  getSurvivalInfo(blockId, heldItem = null) {
+    const def = this.get(blockId);
+    if (!def || def.isAir) return null;
+
+    if (def.isLiquid) {
+      return {
+        isLiquid: true,
+        hardnessLabel: 'Жидкость',
+        toolLabel: 'Ведро (ПКМ по источнику)',
+        dropLabel: def.id === BLOCK_IDS.WATER ? 'Ведро воды' : 'Ведро лавы (топливо 1000с)',
+        handBreakTimeSec: Infinity,
+        heldBreakTimeSec: Infinity,
+        canHarvestWithHeld: false,
+      };
+    }
+
+    if (def.hardness < 0 || !Number.isFinite(def.hardness)) {
+      return {
+        isLiquid: false,
+        unbreakable: true,
+        hardnessLabel: 'Неразрушимый (∞)',
+        toolLabel: 'Не ломается в выживании',
+        dropLabel: 'Ничего',
+        handBreakTimeSec: Infinity,
+        heldBreakTimeSec: Infinity,
+        canHarvestWithHeld: false,
+      };
+    }
+
+    const prefTool = def.preferredTool ? (TOOL_NAME_RU[def.preferredTool] || def.preferredTool) : null;
+    const minTierLabel = TIER_NAME_RU[def.minToolTier] || '';
+    let toolLabel;
+    if (def.requiresTool) {
+      toolLabel = `Нужна: ${prefTool || 'Инструмент'}${minTierLabel ? ` (${minTierLabel})` : ''}`;
+    } else if (prefTool) {
+      toolLabel = `Любой (быстрее: ${prefTool})`;
+    } else {
+      toolLabel = 'Любой инструмент / рука';
+    }
+
+    let dropLabel;
+    if (def.id === BLOCK_IDS.OAK_LEAVES || def.id === BLOCK_IDS.BIRCH_LEAVES || def.id === BLOCK_IDS.SPRUCE_LEAVES) {
+      dropLabel = def.id === BLOCK_IDS.OAK_LEAVES
+        ? 'Палка (20%), Яблоко (10%), Ножницы → Листва'
+        : 'Палка (20%), Ножницы → Листва';
+    } else if (def.id === BLOCK_IDS.GRAVEL) {
+      dropLabel = 'Гравий (90%) / Кремень (10%)';
+    } else if (def.id === BLOCK_IDS.TALL_GRASS) {
+      dropLabel = 'Семена пшеницы (16%), Ножницы → Трава';
+    } else if (def.isCrop) {
+      dropLabel = def.cropStage >= 7 ? 'Пшеница ×1 + Семена 1–3' : 'Семена пшеницы ×1';
+    } else if (def.dropId <= 0) {
+      dropLabel = 'Ничего (ломается без дропа)';
+    } else {
+      const baseName = this._resolveDropLabel(def.dropId);
+      const qtyStr = def.dropMax > def.dropMin
+        ? ` ×${def.dropMin}–${def.dropMax}`
+        : (def.dropCount > 1 ? ` ×${def.dropCount}` : '');
+      const cond = def.requiresTool ? ` (с ${prefTool || 'инстр.'})` : ' (всегда)';
+      dropLabel = `${baseName}${qtyStr}${cond}`;
+    }
+
+    const handBreakTimeSec = this.getBreakTime(blockId, null, { inWater: false, onGround: true });
+    const heldBreakTimeSec = heldItem
+      ? this.getBreakTime(blockId, heldItem, { inWater: false, onGround: true })
+      : handBreakTimeSec;
+    const canHarvestWithHeld = this.canHarvest(blockId, heldItem);
+
+    return {
+      isLiquid: false,
+      unbreakable: false,
+      hardness: def.hardness,
+      hardnessLabel: def.hardness === 0 ? '0 (мгновенно)' : `${def.hardness}`,
+      toolLabel,
+      dropLabel,
+      handBreakTimeSec,
+      heldBreakTimeSec,
+      canHarvestWithHeld,
+      requiresTool: def.requiresTool,
+    };
   }
 
   _allFaces(tileName) {
@@ -1283,6 +1430,35 @@ class BlockRegistryImpl {
       preferredTool: 'pickaxe',
       minToolTier: 1,
       faces: this._allFaces('mossy_cobblestone'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.LAVA,
+      key: 'lava',
+      name: 'Лава',
+      materialType: 'liquid',
+      hardness: -1,
+      isSolid: false,
+      isOpaque: false,
+      isTransparent: true,
+      isLiquid: true,
+      occludesAO: false,
+      lightOpacity: 3,
+      lightEmission: 15,
+      dropId: 0,
+      faces: this._allFaces('lava'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.OBSIDIAN,
+      key: 'obsidian',
+      name: 'Обсидиан',
+      materialType: 'stone',
+      hardness: 50.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 4,
+      faces: this._allFaces('obsidian'),
     });
   }
 }

@@ -479,6 +479,25 @@ export class SkyRenderer {
     }
   }
 
+  updateFluidCameraEffect(headInWater, headInLava, world) {
+    if (!world || !world.scene) return;
+    if (headInLava) {
+      if (!this._lavaFogColor) this._lavaFogColor = new THREE.Color(0x9b2200);
+      world.scene.fog = new THREE.FogExp2(0x9b2200, 0.48);
+      world.scene.background = this._lavaFogColor;
+      this._fluidCamState = 'lava';
+    } else if (headInWater) {
+      if (!this._waterFogColor) this._waterFogColor = new THREE.Color(0x134a7a);
+      world.scene.fog = new THREE.FogExp2(0x134a7a, 0.085);
+      world.scene.background = this._waterFogColor;
+      this._fluidCamState = 'water';
+    } else if (this._fluidCamState) {
+      this._fluidCamState = null;
+      world.scene.background = world.skyColor;
+      world._updateFog();
+    }
+  }
+
   dispose() {
     this.scene.remove(this.skyDome, this.starsGroup, this.sunMesh, this.moonMesh, this.cloudMesh);
     this.skyDome.geometry.dispose();

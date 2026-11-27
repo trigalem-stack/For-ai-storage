@@ -215,6 +215,7 @@ export class ChunkMesher {
       uMinLight: { value: 0.015 },
       uHeldLightPos: { value: new THREE.Vector3(0, 64, 0) },
       uHeldLightLevel: { value: 0.0 },
+      uFluidTime: { value: 0.0 },
     };
 
     // Precompute linear-space shade * AO table (6 faces * 4 AO levels = 24 floats)
@@ -241,14 +242,23 @@ export class ChunkMesher {
     });
 
     this.waterMaterial = this._createLitMaterial({
-      map: atlas.texture,
+      map: atlas.waterTileTexture || atlas.texture,
       vertexColors: true,
       fog: true,
       transparent: true,
-      opacity: 0.84,
+      opacity: 0.78,
       depthWrite: false,
       side: THREE.DoubleSide,
-    });
+    }, 'water');
+
+    this.lavaMaterial = this._createLitMaterial({
+      map: atlas.lavaTileTexture || atlas.texture,
+      vertexColors: true,
+      fog: true,
+      transparent: false,
+      depthWrite: true,
+      side: THREE.DoubleSide,
+    }, 'lava');
 
     this.iceMaterial = this._createLitMaterial({
       map: atlas.texture,
@@ -263,10 +273,11 @@ export class ChunkMesher {
     this._opaqueBuf = new ScratchMeshBuffer(4096);
     this._cutoutBuf = new ScratchMeshBuffer(1024);
     this._waterBuf = new ScratchMeshBuffer(1024);
+    this._lavaBuf = new ScratchMeshBuffer(512);
     this._iceBuf = new ScratchMeshBuffer(512);
   }
 
-  _createLitMaterial(params) {
+  _createLitMaterial(params, fluidKind = null) {
     const mat = new THREE.MeshBasicMaterial(params);
     const uniforms = this.lightUniforms;
 
@@ -277,6 +288,7 @@ export class ChunkMesher {
       shader.uniforms.uMinLight = uniforms.uMinLight;
       shader.uniforms.uHeldLightPos = uniforms.uHeldLightPos;
       shader.uniforms.uHeldLightLevel = uniforms.uHeldLightLevel;
+      shader.uniforms.uFluidTime = uniforms.uFluidTime;
 
       shader.vertexShader = shader.vertexShader
         .replace(
@@ -293,22 +305,47 @@ vVoxelLight = aLight;
 vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`
         );
 
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          '#include <common>',
-          `#include <common>
+      let frag = shader.fragmentShader.replace(
+        '#include <common>',
+        `#include <common>
 uniform float uSunIntensity;
 uniform vec3 uSkyTint;
 uniform vec3 uTorchTint;
 uniform float uMinLight;
 uniform vec3 uHeldLightPos;
 uniform float uHeldLightLevel;
+uniform float uFluidTime;
 varying vec2 vVoxelLight;
 varying vec3 vWorldPos;`
-        )
-        .replace(
-          '#include <color_fragment>',
-          `#include <color_fragment>
+      );
+
+      if (fluidKind === 'water') {
+        frag = frag.replace(
+          '#include <map_fragment>',
+          `#ifdef USE_MAP
+vec2 fUv = vMapUv + vec2(sin(uFluidTime * 1.45 + vWorldPos.z * 0.65) * 0.06, -uFluidTime * 0.42);
+vec4 sampledDiffuseColor = texture2D( map, fUv );
+diffuseColor *= sampledDiffuseColor;
+#endif`
+        );
+      } else if (fluidKind === 'lava') {
+        frag = frag.replace(
+          '#include <map_fragment>',
+          `#ifdef USE_MAP
+vec2 fUv1 = vMapUv + vec2(sin(uFluidTime * 0.7 + vWorldPos.x * 0.4) * 0.12, -uFluidTime * 0.18);
+vec2 fUv2 = vMapUv * 1.15 - vec2(uFluidTime * 0.10, cos(uFluidTime * 0.55 + vWorldPos.z * 0.35) * 0.09);
+vec4 lCol1 = texture2D( map, fUv1 );
+vec4 lCol2 = texture2D( map, fUv2 );
+diffuseColor *= mix(lCol1, lCol2, 0.42);
+#endif`
+        );
+      }
+
+      const colorReplace = fluidKind === 'lava'
+        ? `#include <color_fragment>
+float lavaPulse = 0.92 + 0.08 * sin(uFluidTime * 2.4 + vWorldPos.x * 0.9 + vWorldPos.z * 0.9);
+diffuseColor.rgb *= vec3(1.12, 0.98, 0.90) * lavaPulse;`
+        : `#include <color_fragment>
 float skyVoxel = clamp(vVoxelLight.x, 0.0, 1.0);
 float skyCurve = pow(0.82, (1.0 - skyVoxel) * 15.0);
 float sunCurve = pow(max(uSunIntensity, 0.001), 0.92);
@@ -322,10 +359,11 @@ if (uHeldLightLevel > 0.01) {
 float blkEff = max(clamp(vVoxelLight.y, 0.0, 1.0), heldBlk);
 float blkCurve = pow(0.87, (1.0 - blkEff) * 15.0);
 vec3 blkTerm = pow(max(blkCurve, 0.001), 1.32) * uTorchTint;
-diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
-        );
+diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
+
+      shader.fragmentShader = frag.replace('#include <color_fragment>', colorReplace);
     };
-    mat.customProgramCacheKey = () => 'mc-dual-light-v3';
+    mat.customProgramCacheKey = () => (fluidKind ? `mc-fluid-${fluidKind}-v1` : 'mc-dual-light-v3');
     return mat;
   }
 
@@ -340,6 +378,10 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
     this.lightUniforms.uHeldLightLevel.value = level;
   }
 
+  setFluidTime(timeSec) {
+    this.lightUniforms.uFluidTime.value = timeSec;
+  }
+
   /**
    * Builds chunk geometries using direct local+neighbor chunk references (no per-voxel Map lookups).
    * `neighbors` can be either an array of 8 chunk refs [W, E, N, S, NW, NE, SW, SE]
@@ -349,10 +391,12 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
     const opaqueBuf = this._opaqueBuf;
     const cutoutBuf = this._cutoutBuf;
     const waterBuf = this._waterBuf;
+    const lavaBuf = this._lavaBuf;
     const iceBuf = this._iceBuf;
     opaqueBuf.reset();
     cutoutBuf.reset();
     waterBuf.reset();
+    lavaBuf.reset();
     iceBuf.reset();
 
     const baseX = chunk.cx * CHUNK_SIZE;
@@ -383,6 +427,21 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
       const nlx = lx - dcx * CHUNK_SIZE;
       const nlz = lz - dcz * CHUNK_SIZE;
       return nc.blocks[y * slice + nlz * CHUNK_SIZE + nlx];
+    };
+
+    const sampleMeta = (lx, y, lz) => {
+      if (y < 0 || y >= WORLD_HEIGHT) return 0;
+      if (lx >= 0 && lx < CHUNK_SIZE && lz >= 0 && lz < CHUNK_SIZE) {
+        return chunk.meta ? chunk.meta[y * slice + lz * CHUNK_SIZE + lx] : 0;
+      }
+      if (isFnFallback) return 0;
+      const dcx = lx < 0 ? -1 : lx >= CHUNK_SIZE ? 1 : 0;
+      const dcz = lz < 0 ? -1 : lz >= CHUNK_SIZE ? 1 : 0;
+      const nc = nbChunks ? nbChunks[(dcz + 1) * 3 + (dcx + 1)] : null;
+      if (!nc || !nc.isGenerated || !nc.meta) return 0;
+      const nlx = lx - dcx * CHUNK_SIZE;
+      const nlz = lz - dcz * CHUNK_SIZE;
+      return nc.meta[y * slice + nlz * CHUNK_SIZE + nlx];
     };
 
     const sampleLightByte = (lx, y, lz) => {
@@ -554,11 +613,17 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
             continue;
           }
 
+          // 3.5. Dynamic sloped fluid meshing (Water & Lava)
+          if (def.isLiquid) {
+            const fluidBuf = id === BLOCK_IDS.LAVA ? lavaBuf : waterBuf;
+            this._emitFluidBlock(fluidBuf, x, y, z, id, sampleBlock, sampleMeta, sampleLightByte, opaqueTable);
+            continue;
+          }
+
           // 4. Standard cubic blocks (and slightly inset Cactus / 15px Farmland)
           const isIce = id === BLOCK_IDS.ICE;
-          const isTranslucent = def.isLiquid || def.isTransparent;
+          const isTranslucent = def.isTransparent;
           const buf = isIce ? iceBuf : (isTranslucent ? waterBuf : (def.isCutout ? cutoutBuf : opaqueBuf));
-          const waterTopDrop = def.isLiquid && sampleBlock(x, y + 1, z) !== BLOCK_IDS.WATER ? 0.12 : 0;
           const farmlandDrop = def.isFarmland ? 0.0625 : 0;
           const farmlandWet = def.isFarmland && (chunk.getMeta(x, y, z) > 0);
           const inset = def.inset || 0;
@@ -578,8 +643,6 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
               if (opaqueTable[neighborId] === 1) continue;
             } else if (inset > 0 || farmlandDrop > 0) {
               if (face.ny !== 0 && (neighborId === id || opaqueTable[neighborId] === 1)) continue;
-            } else if (def.isLiquid) {
-              if (neighborId === id || neighborId === BLOCK_IDS.ICE || opaqueTable[neighborId] === 1) continue;
             } else if (isIce) {
               if (neighborId === id || opaqueTable[neighborId] === 1) continue;
             } else {
@@ -620,7 +683,6 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
               let dy = corner[1];
               let dz = corner[2];
 
-              if (waterTopDrop > 0 && dy === 1) dy -= waterTopDrop;
               if (farmlandDrop > 0 && dy === 1) dy -= farmlandDrop;
               if (inset > 0) {
                 dx = face.nx === 0 ? (dx === 0 ? inset : 1 - inset) : (face.nx > 0 ? 1 - inset : inset);
@@ -734,8 +796,158 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
       opaqueGeometry: opaqueBuf.toGeometry(),
       cutoutGeometry: cutoutBuf.toGeometry(),
       waterGeometry: waterBuf.toGeometry(),
+      lavaGeometry: lavaBuf.toGeometry(),
       iceGeometry: iceBuf.toGeometry(),
     };
+  }
+
+  /**
+   * Computes seamless vertex-corner fluid height (0..1) shared identically across all 4 adjacent blocks
+   * so flowing slopes have zero cracks and still sources keep exact 0.88 surface height.
+   */
+  _fluidCornerHeight(vx, y, vz, fluidId, sampleBlock, sampleMeta, opaqueTable) {
+    let sum = 0;
+    let count = 0;
+
+    for (let dz = -1; dz <= 0; dz++) {
+      for (let dx = -1; dx <= 0; dx++) {
+        const bx = vx + dx;
+        const bz = vz + dz;
+        const aboveId = sampleBlock(bx, y + 1, bz);
+        if (aboveId === fluidId) return 1.0;
+
+        const bId = sampleBlock(bx, y, bz);
+        if (bId === fluidId) {
+          const meta = sampleMeta(bx, y, bz);
+          const lvl = meta & 0x07;
+          const falling = (meta & 8) !== 0;
+          if (lvl === 0 || falling) return 0.88;
+          sum += 0.88 * ((8 - lvl) / 8);
+          count++;
+        } else if (opaqueTable[bId] === 0 && bId !== BLOCK_IDS.ICE) {
+          // Non-solid / air neighbor slopes flowing liquid gently downward
+          count++;
+        }
+      }
+    }
+
+    if (count === 0) return 0.88;
+    const avg = sum / count;
+    return avg < 0.06 ? 0.06 : avg;
+  }
+
+  _emitFluidBlock(buf, x, y, z, fluidId, sampleBlock, sampleMeta, sampleLightByte, opaqueTable) {
+    const isLava = fluidId === BLOCK_IDS.LAVA;
+    const aboveSame = sampleBlock(x, y + 1, z) === fluidId;
+    const belowId = sampleBlock(x, y - 1, z);
+    const nPosX = sampleBlock(x + 1, y, z);
+    const nNegX = sampleBlock(x - 1, y, z);
+    const nPosZ = sampleBlock(x, y, z + 1);
+    const nNegZ = sampleBlock(x, y, z - 1);
+
+    const blocksFace = (nid) => nid === fluidId || opaqueTable[nid] === 1 || (!isLava && nid === BLOCK_IDS.ICE);
+
+    const drawTop = !aboveSame;
+    const drawBottom = y > 0 && !blocksFace(belowId);
+    const drawPosX = !blocksFace(nPosX);
+    const drawNegX = !blocksFace(nNegX);
+    const drawPosZ = !blocksFace(nPosZ);
+    const drawNegZ = !blocksFace(nNegZ);
+
+    if (!drawTop && !drawBottom && !drawPosX && !drawNegX && !drawPosZ && !drawNegZ) return;
+
+    const h00 = aboveSame ? 1.0 : this._fluidCornerHeight(x, y, z, fluidId, sampleBlock, sampleMeta, opaqueTable);
+    const h10 = aboveSame ? 1.0 : this._fluidCornerHeight(x + 1, y, z, fluidId, sampleBlock, sampleMeta, opaqueTable);
+    const h01 = aboveSame ? 1.0 : this._fluidCornerHeight(x, y, z + 1, fluidId, sampleBlock, sampleMeta, opaqueTable);
+    const h11 = aboveSame ? 1.0 : this._fluidCornerHeight(x + 1, y, z + 1, fluidId, sampleBlock, sampleMeta, opaqueTable);
+
+    const lb = sampleLightByte(x, y, z);
+    const skyL = ((lb >> 4) & 0x0f) / 15;
+    const blkL = isLava ? 1.0 : (lb & 0x0f) / 15;
+
+    const topCol = isLava ? [1.0, 1.0, 1.0] : [Math.pow(1.0, 2.2), Math.pow(1.0, 2.2), Math.pow(1.0, 2.2)];
+    const sideColNS = isLava ? [0.92, 0.92, 0.92] : [Math.pow(0.84, 2.2), Math.pow(0.84, 2.2), Math.pow(0.84, 2.2)];
+    const sideColEW = isLava ? [0.84, 0.84, 0.84] : [Math.pow(0.68, 2.2), Math.pow(0.68, 2.2), Math.pow(0.68, 2.2)];
+    const botCol = isLava ? [0.78, 0.78, 0.78] : [Math.pow(0.55, 2.2), Math.pow(0.55, 2.2), Math.pow(0.55, 2.2)];
+
+    if (drawTop) {
+      // Orient flow texture along downhill slope when fluid slopes
+      const slopeX = (h00 + h01) - (h10 + h11);
+      const slopeZ = (h00 + h10) - (h01 + h11);
+      let topUvs;
+      if (Math.abs(slopeX) > 0.02 || Math.abs(slopeZ) > 0.02) {
+        const ang = Math.atan2(slopeX, slopeZ);
+        const ca = Math.cos(ang);
+        const sa = Math.sin(ang);
+        const rotUv = (u, v) => [0.5 + (u - 0.5) * ca - (v - 0.5) * sa, 0.5 + (u - 0.5) * sa + (v - 0.5) * ca];
+        topUvs = [rotUv(0, 0), rotUv(1, 0), rotUv(1, 1), rotUv(0, 1)];
+      } else {
+        topUvs = [[0, 0], [1, 0], [1, 1], [0, 1]];
+      }
+      buf.pushQuad(
+        [[x, y + h01, z + 1], [x + 1, y + h11, z + 1], [x + 1, y + h10, z], [x, y + h00, z]],
+        [0, 1, 0],
+        topUvs,
+        topCol,
+        skyL,
+        blkL
+      );
+    }
+
+    if (drawBottom) {
+      buf.pushQuad(
+        [[x, y, z], [x + 1, y, z], [x + 1, y, z + 1], [x, y, z + 1]],
+        [0, -1, 0],
+        [[0, 0], [1, 0], [1, 1], [0, 1]],
+        botCol,
+        skyL,
+        blkL
+      );
+    }
+
+    if (drawPosZ) {
+      buf.pushQuad(
+        [[x, y, z + 1], [x + 1, y, z + 1], [x + 1, y + h11, z + 1], [x, y + h01, z + 1]],
+        [0, 0, 1],
+        [[0, 0], [1, 0], [1, h11], [0, h01]],
+        sideColNS,
+        skyL,
+        blkL
+      );
+    }
+
+    if (drawNegZ) {
+      buf.pushQuad(
+        [[x + 1, y, z], [x, y, z], [x, y + h00, z], [x + 1, y + h10, z]],
+        [0, 0, -1],
+        [[0, 0], [1, 0], [1, h00], [0, h10]],
+        sideColNS,
+        skyL,
+        blkL
+      );
+    }
+
+    if (drawPosX) {
+      buf.pushQuad(
+        [[x + 1, y, z + 1], [x + 1, y, z], [x + 1, y + h10, z], [x + 1, y + h11, z + 1]],
+        [1, 0, 0],
+        [[0, 0], [1, 0], [1, h10], [0, h11]],
+        sideColEW,
+        skyL,
+        blkL
+      );
+    }
+
+    if (drawNegX) {
+      buf.pushQuad(
+        [[x, y, z], [x, y, z + 1], [x, y + h01, z + 1], [x, y + h00, z]],
+        [-1, 0, 0],
+        [[0, 0], [1, 0], [1, h01], [0, h00]],
+        sideColEW,
+        skyL,
+        blkL
+      );
+    }
   }
 
   /**

@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node scripts/build-offline.mjs",
     "check": "node scripts/check-syntax.mjs",
-    "test": "node scripts/test-stage1.mjs && node scripts/test-stage2.mjs && node scripts/test-stage3.mjs && node scripts/test-stage4.mjs && node scripts/test-stage5.mjs && node scripts/test-stage6.mjs",
+    "test": "node scripts/test-stage1.mjs && node scripts/test-stage2.mjs && node scripts/test-stage3.mjs && node scripts/test-stage4.mjs && node scripts/test-stage5.mjs && node scripts/test-stage6.mjs && node scripts/test-stage7.mjs",
     "preview": "node scripts/serve.mjs"
   },
   "dependencies": {

@@ -92,4 +92,8 @@ export const ITEM_IDS = Object.freeze({
   ROTTEN_FLESH: 337,
   RAW_COPPER: 338,
   COPPER_INGOT: 339,
+
+  // Stage 7 Fluid Buckets
+  WATER_BUCKET: 340,
+  LAVA_BUCKET: 341,
 });

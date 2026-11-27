@@ -9,6 +9,7 @@ import {
   DEFAULT_WORLD_TIME,
   EAT_DURATION_SEC,
   PLAYER_HALF_WIDTH,
+  REACH_DISTANCE,
   SLEEP_END_TICK,
   SLEEP_START_TICK,
   TICK_MS,
@@ -227,7 +228,12 @@ class MinecraftGame {
 
     this.virtualMouse = new VirtualMouse({
       isTouchDevice: this.settings.touchMode,
-      onPointerMove: (x, y, hoveredEl) => this.inventoryUI?.updateVirtualPointer(x, y, hoveredEl),
+      onPointerDown: (button, x, y, shiftKey, target) =>
+        this.inventoryUI?.handleVirtualPointerDown(button, x, y, shiftKey, target),
+      onPointerMove: (x, y, hoveredEl, activeButton) =>
+        this.inventoryUI?.handleVirtualPointerMove(x, y, hoveredEl, activeButton),
+      onPointerUp: (button, x, y, shiftKey, target) =>
+        this.inventoryUI?.handleVirtualPointerUp(button, x, y, shiftKey, target),
       onSlotVirtualClick: (zone, index, button, shiftKey, x, y) =>
         this.inventoryUI?.handleVirtualSlotClick(zone, index, button, shiftKey, x, y),
       onVirtualDrop: (zone, index) => this.inventoryUI?.handleVirtualDrop(zone, index),
@@ -438,12 +444,8 @@ class MinecraftGame {
   _handleBlockSideEffects(wx, wy, wz, newId, oldId, oldMeta) {
     if (!this.world) return;
 
-    // 1. Falling sand/gravel stability cascade
-    if (BlockRegistry.fallsWithGravity(newId)) {
-      this.fallingManager.scheduleStabilityCheck(wx, wy, wz);
-    } else {
-      this.fallingManager.scheduleStabilityCheck(wx, wy + 1, wz);
-    }
+    // 1. Falling sand/gravel 6-neighbor stability cascade
+    this.fallingManager.scheduleAround(wx, wy, wz);
 
     // 2. If block was removed, detach any torches/ladders/crops/plants supported by this block (drops in BOTH modes)
     if (newId === 0 && oldId !== 0) {
@@ -601,6 +603,12 @@ class MinecraftGame {
       fogEnabled: this.settings.fogEnabled,
       onBlockChanged: (wx, wy, wz, id, oldId, oldMeta) => {
         this._handleBlockSideEffects(wx, wy, wz, id, oldId, oldMeta);
+      },
+      onWashBlock: (wx, wy, wz, washedId) => {
+        const drops = BlockRegistry.getHarvestDrops(washedId, null);
+        for (const d of drops) {
+          this.itemManager.spawnDrop(d.id, wx + 0.5, wy + 0.3, wz + 0.5, d.count);
+        }
       },
     });
 
@@ -849,6 +857,75 @@ class MinecraftGame {
           return false;
         }
       }
+    }
+
+    // 2c. Empty Bucket: scoop Water or Lava source block (meta === 0)
+    if (slot && slot.id === ITEM_IDS.BUCKET) {
+      const fluidHit = raycastVoxel(
+        this.world,
+        this.player.getEyeOrigin(),
+        this.player.getLookDirection(),
+        REACH_DISTANCE,
+        { includeFluids: true }
+      );
+      if (
+        fluidHit &&
+        (fluidHit.blockId === BLOCK_IDS.WATER || fluidHit.blockId === BLOCK_IDS.LAVA) &&
+        this.world.getBlockMeta(fluidHit.x, fluidHit.y, fluidHit.z) === 0
+      ) {
+        const filledId = fluidHit.blockId === BLOCK_IDS.LAVA ? ITEM_IDS.LAVA_BUCKET : ITEM_IDS.WATER_BUCKET;
+        this.world.setBlock(fluidHit.x, fluidHit.y, fluidHit.z, 0, true, true, 0);
+        if (this.gameMode !== 'creative') {
+          if (slot.count <= 1) {
+            this.inventory.setSlot(this.inventory.selectedSlot, ItemRegistry.createStack(filledId, 1));
+          } else {
+            this.hotbar.consumeSelected(1);
+            const rem = this.inventory.addItem(filledId, 1);
+            if (rem > 0) this._dropStackFromPlayer(ItemRegistry.createStack(filledId, rem));
+          }
+          this.hotbar.render();
+          this._syncHeldAndArmorVisuals();
+        }
+        this.firstPersonHand.triggerSwing();
+        this._scheduleSave();
+        return true;
+      }
+      return false;
+    }
+
+    // 2d. Filled Water/Lava Bucket: place fluid source block (meta === 0)
+    if (slot && (slot.id === ITEM_IDS.WATER_BUCKET || slot.id === ITEM_IDS.LAVA_BUCKET)) {
+      if (!hit || !hit.normal || (hit.normal.x === 0 && hit.normal.y === 0 && hit.normal.z === 0)) {
+        return false;
+      }
+      const targetDef = BlockRegistry.get(hit.blockId);
+      const px = targetDef.isCross ? hit.x : hit.x + hit.normal.x;
+      const py = targetDef.isCross ? hit.y : hit.y + hit.normal.y;
+      const pz = targetDef.isCross ? hit.z : hit.z + hit.normal.z;
+      if (py < 0 || py >= WORLD_HEIGHT) return false;
+
+      const existing = this.world.getBlock(px, py, pz);
+      const existingDef = BlockRegistry.get(existing);
+      if (existing !== 0 && !existingDef.isLiquid && !existingDef.isWashable) return false;
+
+      if (existing !== 0 && existingDef.isWashable) {
+        const drops = BlockRegistry.getHarvestDrops(existing, null);
+        for (const d of drops) {
+          this.itemManager.spawnDrop(d.id, px + 0.5, py + 0.3, pz + 0.5, d.count);
+        }
+      }
+
+      const fluidId = ItemRegistry.get(slot.id)?.fluidId || BLOCK_IDS.WATER;
+      if (!this.world.setBlock(px, py, pz, fluidId, true, true, 0)) return false;
+
+      if (this.gameMode !== 'creative') {
+        this.inventory.setSlot(this.inventory.selectedSlot, ItemRegistry.createStack(ITEM_IDS.BUCKET, 1));
+        this.hotbar.render();
+        this._syncHeldAndArmorVisuals();
+      }
+      this.firstPersonHand.triggerSwing();
+      this._scheduleSave();
+      return true;
     }
 
     if (!slot || slot.id <= 0) return false;
@@ -1244,6 +1321,7 @@ class MinecraftGame {
     if (!this.hud.inMainMenu && !this.hud.isPaused && !this.isSleeping) {
       this.skyRenderer.advanceTicks(1);
       if (this.world) {
+        this.world.stepFluids();
         const changed = this.blockEntities.tick(1, this.world);
         if (changed && this.inventoryUI?.isOpen && this.inventoryUI.mode === 'furnace') {
           this.inventoryUI.updateFurnaceProgress();
@@ -1289,6 +1367,7 @@ class MinecraftGame {
       this.itemManager.update(dt, this.world, this.player, this.inventory);
       this.world.update(this.player.x, this.player.z, dt);
       this.skyRenderer.update(dt, this.player.x, this.player.y, this.player.z, this.world);
+      this.skyRenderer.updateFluidCameraEffect(this.player.headInWater, this.player.headInLava, this.world);
 
       const heldStack = this.inventory.getHeldStack();
       const heldLight = ItemRegistry.getHeldLightEmission(heldStack);

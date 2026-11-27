@@ -365,6 +365,7 @@ async function runStage5Tests() {
   iceRes.iceGeometry.dispose();
 
   // Thin torch raycast misses edge and hits stone wall behind it
+  world.setBlock(3, 66, 7, 0, false, false);
   world.setBlock(3, 66, 5, BLOCK_IDS.STONE, true, false);
   world.setBlock(3, 66, 6, BLOCK_IDS.TORCH, true, false, 0); // floor torch at (3,66,6)
   const missEdgeHit = raycastVoxel(world, { x: 3.10, y: 66.5, z: 7.5 }, { x: 0, y: 0, z: -1 });

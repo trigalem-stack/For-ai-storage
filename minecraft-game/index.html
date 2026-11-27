@@ -9,16 +9,17 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#2d63b8">
-  <title>Minecraft Web Edition — Stage 6</title>
+  <title>Minecraft Web Edition — Stage 7</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <canvas id="game-canvas" aria-label="Minecraft 3D World"></canvas>
 
-  <!-- Vignettes for Damage & Wall/Sand Suffocation -->
+  <!-- Vignettes for Damage, Wall/Sand Suffocation, Water, Lava & Burning -->
   <div id="damage-vignette" aria-hidden="true"></div>
   <div id="suffocation-vignette" class="hidden" aria-hidden="true"></div>
+  <div id="fluid-overlay" aria-hidden="true"></div>
 
   <!-- Crisp White Crosshair (hidden in F5 3rd-person camera modes) -->
   <div id="crosshair" aria-hidden="true"></div>
@@ -105,7 +106,6 @@
           <div class="inv-toolbar">
             <button id="btn-inv-recipes" class="mc-hud-btn inv-tool-btn" type="button" title="Книга рецептов">📖</button>
             <button id="btn-inv-creative" class="mc-hud-btn inv-tool-btn hidden" type="button" title="Творческий каталог">✨ Блоки</button>
-            <button id="btn-inv-split" class="mc-hud-btn inv-tool-btn" type="button" title="Разделить стак пополам">½</button>
             <button id="btn-inv-drop" class="mc-hud-btn inv-tool-btn" type="button" title="Выбросить (Q)">Брос.</button>
             <button id="btn-inv-close" class="mc-hud-btn" type="button" title="Закрыть (E / Esc)">✕</button>
           </div>
@@ -196,7 +196,7 @@
       <div class="mc-logo-badge">
         <div class="mc-cube-badge"></div>
         <h1 id="main-title">MINECRAFT WEB</h1>
-        <p class="mc-modal-sub">Этап 6 · Здоровье · Броня · Голод · Фермерство · Урон · Возрождение</p>
+        <p class="mc-modal-sub">Этап 7 · Вода и Лава · Пещеры и Озёра · Вёдра · Инвентарь</p>
       </div>
       <div class="mc-modal-actions">
         <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">▶ Играть (Миры)</button>

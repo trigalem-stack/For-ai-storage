@@ -44,8 +44,15 @@ export const MAX_LIGHT_LEVEL = 15;
 export const TORCH_LIGHT_LEVEL = 14;
 export const GLOWSTONE_LIGHT_LEVEL = 15;
 export const JACK_O_LANTERN_LIGHT_LEVEL = 15;
+export const LAVA_LIGHT_LEVEL = 15;
 export const FURNACE_LIGHT_LEVEL = 13;
 export const REDSTONE_GLOW_LEVEL = 9;
+
+// Fluid simulation constants (Stage 7: 20 TPS ticks)
+export const WATER_TICK_DELAY = 5;
+export const LAVA_TICK_DELAY = 30;
+export const MAX_FLUID_UPDATES_PER_TICK = 256;
+export const FLUID_FALLING_BIT = 8;
 
 // Player AABB hitbox & eye dimensions (authentic Minecraft Java proportions)
 export const PLAYER_WIDTH = 0.6;
@@ -93,7 +100,7 @@ export const MIN_RENDER_DISTANCE = 2;
 export const MAX_RENDER_DISTANCE = 16;
 
 // Chunk meshing frame budget (ms)
-export const CHUNK_FRAME_BUDGET_MS = 1.8;
+export const CHUNK_FRAME_BUDGET_MS = 4.0;
 
 // Texture atlas layout: 16x16 grid of 32x32 padded cells (inner 16x16 + 8px edge padding)
 export const ATLAS_GRID_SIZE = 16;

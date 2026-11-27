@@ -12,6 +12,8 @@ const DEATH_REASON_TEXT = {
   drown: 'Захлебнулся под водой',
   inWall: 'Задохнулся в блоках',
   cactus: 'Укололся насмерть о кактус',
+  lava: 'Попытался поплавать в лаве',
+  fire: 'Сгорел в пламени',
   starve: 'Умер от голода',
   void: 'Провалился в бездну',
   generic: 'Погиб в мире',
@@ -105,6 +107,7 @@ export class Hud {
     this.hungerRowEl = document.getElementById('hud-hunger-row');
     this.damageVignetteEl = document.getElementById('damage-vignette');
     this.suffocationVignetteEl = document.getElementById('suffocation-vignette');
+    this.fluidOverlayEl = document.getElementById('fluid-overlay');
 
     this.deathOverlayEl = document.getElementById('death-overlay');
     this.deathReasonEl = document.getElementById('death-reason');
@@ -388,7 +391,19 @@ export class Hud {
     this.deathOverlayEl?.classList.add('hidden');
   }
 
+  updateFluidOverlay(player) {
+    if (!this.fluidOverlayEl) return;
+    if (!player || this.inMainMenu || player.isDead) {
+      this.fluidOverlayEl.classList.remove('water', 'lava', 'burning');
+      return;
+    }
+    this.fluidOverlayEl.classList.toggle('lava', Boolean(player.headInLava));
+    this.fluidOverlayEl.classList.toggle('water', Boolean(player.headInWater && !player.headInLava));
+    this.fluidOverlayEl.classList.toggle('burning', Boolean(!player.creativeMode && player.fireTicks > 0));
+  }
+
   updateSurvivalVitals(player, armorPoints = 0) {
+    this.updateFluidOverlay(player);
     if (!this.survivalHudEl) return;
     const hide = !player || this.inMainMenu || player.creativeMode;
     this.survivalHudEl.classList.toggle('hidden', hide);

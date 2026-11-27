@@ -75,6 +75,7 @@ class ItemRegistryImpl {
       armorPoints: def.armorPoints ?? 0,
       attackDamage: def.attackDamage ?? 1,
       lightEmission: def.lightEmission ?? 0,
+      fluidId: def.fluidId ?? 0,
       isFood: Boolean(def.foodStats),
       foodStats: def.foodStats || null,
     };
@@ -249,6 +250,26 @@ class ItemRegistryImpl {
       maxStack: 16,
       sprite: 'item_bucket',
       toolType: 'bucket',
+    });
+    this._register({
+      id: ITEM_IDS.WATER_BUCKET,
+      key: 'water_bucket',
+      name: 'Ведро воды',
+      category: 'utility',
+      maxStack: 1,
+      sprite: 'item_water_bucket',
+      toolType: 'bucket',
+      fluidId: BLOCK_IDS.WATER,
+    });
+    this._register({
+      id: ITEM_IDS.LAVA_BUCKET,
+      key: 'lava_bucket',
+      name: 'Ведро лавы',
+      category: 'utility',
+      maxStack: 1,
+      sprite: 'item_lava_bucket',
+      toolType: 'bucket',
+      fluidId: BLOCK_IDS.LAVA,
     });
     this._register({
       id: ITEM_IDS.FLINT_AND_STEEL,

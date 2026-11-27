@@ -215,6 +215,7 @@ class RecipeRegistryImpl {
 
   _registerFuels() {
     this.fuels.set(BLOCK_IDS.COAL_BLOCK, 16000); // 800s
+    this.fuels.set(ITEM_IDS.LAVA_BUCKET, 20000); // 1000s (100 items, returns Bucket)
     this.fuels.set(ITEM_IDS.COAL, 1600); // 80s
     this.fuels.set(ITEM_IDS.CHARCOAL, 1600); // 80s
     this.fuels.set(BLOCK_IDS.OAK_PLANKS, 300); // 15s

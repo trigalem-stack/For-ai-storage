@@ -76,7 +76,8 @@ function getBlockHitBox(def, meta) {
  * Skips Air and Water, and tests tight sub-voxel bounds for Torches/Ladders/Beds
  * so aiming past a torch hits the block behind it naturally.
  */
-export function raycastVoxel(world, origin, direction, maxDistance = REACH_DISTANCE) {
+export function raycastVoxel(world, origin, direction, maxDistance = REACH_DISTANCE, options = {}) {
+  const includeFluids = Boolean(options.includeFluids);
   const dx = direction.x;
   const dy = direction.y;
   const dz = direction.z;
@@ -112,7 +113,8 @@ export function raycastVoxel(world, origin, direction, maxDistance = REACH_DISTA
   for (let iter = 0; iter < 128 && t <= maxDistance; iter++) {
     if (vy >= 0 && vy < WORLD_HEIGHT) {
       const id = world.getBlock(vx, vy, vz);
-      if (BlockRegistry.isTargetable(id)) {
+      const isFluidMatch = includeFluids && BlockRegistry.isFluid(id);
+      if (isFluidMatch || BlockRegistry.isTargetable(id)) {
         const def = BlockRegistry.get(id);
         const meta = world?.getBlockMeta ? world.getBlockMeta(vx, vy, vz) : 0;
         const box = getBlockHitBox(def, meta);

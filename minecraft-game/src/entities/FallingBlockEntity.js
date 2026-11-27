@@ -44,7 +44,25 @@ export class FallingBlockManager {
     const fy = Math.floor(wy);
     const fz = Math.floor(wz);
     if (fy < 0 || fy >= WORLD_HEIGHT) return;
-    this.pendingColumns.push({ x: fx, y: fy, z: fz });
+    if (this.pendingColumns.length < 512) {
+      this.pendingColumns.push({ x: fx, y: fy, z: fz });
+    }
+  }
+
+  /**
+   * Schedules stability checks on (wx, wy, wz) and all 6 orthogonal neighbors for authentic cascade collapses.
+   */
+  scheduleAround(wx, wy, wz) {
+    const fx = Math.floor(wx);
+    const fy = Math.floor(wy);
+    const fz = Math.floor(wz);
+    this.scheduleStabilityCheck(fx, fy, fz);
+    this.scheduleStabilityCheck(fx, fy + 1, fz);
+    if (fy > 1) this.scheduleStabilityCheck(fx, fy - 1, fz);
+    this.scheduleStabilityCheck(fx + 1, fy, fz);
+    this.scheduleStabilityCheck(fx - 1, fy, fz);
+    this.scheduleStabilityCheck(fx, fy, fz + 1);
+    this.scheduleStabilityCheck(fx, fy, fz - 1);
   }
 
   _canFallInto(blockId) {
@@ -62,8 +80,10 @@ export class FallingBlockManager {
     const geom = this._getGeometry(blockId);
     if (!geom) return false;
 
-    // Clear voxel block without triggering another cascade loop
+    // Clear voxel block without re-entering main onBlockChanged, then wake fluids + 6 neighbors
     if (!world.setBlock(bx, by, bz, 0, true, false)) return false;
+    world.fluids?.scheduleAround(bx, by, bz, world);
+    this.scheduleAround(bx, by, bz);
 
     const mesh = new THREE.Mesh(geom, this.material);
     mesh.position.set(bx + 0.5, by + 0.5, bz + 0.5);
@@ -158,6 +178,8 @@ export class FallingBlockManager {
           }
         } else if (landY >= 0 && landY < WORLD_HEIGHT) {
           world.setBlock(ent.x, landY, ent.z, ent.blockId, true, false);
+          world.fluids?.scheduleAround(ent.x, landY, ent.z, world);
+          this.scheduleAround(ent.x, landY, ent.z);
         }
         continue;
       }

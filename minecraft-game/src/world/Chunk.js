@@ -27,11 +27,13 @@ export class Chunk {
     this.lightCalculated = false;
     this.dirty = true;
     this.hasMeshed = false;
+    this.fluidSprings = null;
 
     // Three.js mesh references managed by World
     this.opaqueMesh = null;
     this.cutoutMesh = null;
     this.waterMesh = null;
+    this.lavaMesh = null;
     this.iceMesh = null;
   }
 
@@ -138,7 +140,7 @@ export class Chunk {
   }
 
   disposeMeshes(scene) {
-    const meshes = [this.opaqueMesh, this.cutoutMesh, this.waterMesh, this.iceMesh];
+    const meshes = [this.opaqueMesh, this.cutoutMesh, this.waterMesh, this.lavaMesh, this.iceMesh];
     for (const mesh of meshes) {
       if (mesh) {
         scene.remove(mesh);
@@ -148,6 +150,7 @@ export class Chunk {
     this.opaqueMesh = null;
     this.cutoutMesh = null;
     this.waterMesh = null;
+    this.lavaMesh = null;
     this.iceMesh = null;
   }
 }

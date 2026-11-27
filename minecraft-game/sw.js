@@ -1,4 +1,4 @@
-const CACHE_NAME = 'minecraft-web-stage6-v2';
+const CACHE_NAME = 'minecraft-web-stage7-v3';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -21,6 +21,7 @@ const CORE_ASSETS = [
   './src/world/BiomeManager.js',
   './src/world/WorldGen.js',
   './src/world/Chunk.js',
+  './src/world/FluidSimulator.js',
   './src/world/LightingEngine.js',
   './src/world/ChunkMesher.js',
   './src/world/Raycast.js',

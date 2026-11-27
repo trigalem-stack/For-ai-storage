@@ -223,7 +223,7 @@ export class SaveManager {
       : (existing?.gameMode || 'survival');
 
     const payload = {
-      version: 6,
+      version: 7,
       id: worldId,
       name,
       worldSeed: state.worldSeed,

@@ -22,6 +22,7 @@ export class WorldGen {
     const result = this.kernel.generateChunkData(this.seed, chunk.cx, chunk.cz);
     chunk.blocks.set(result.blocks);
     chunk.biomes.set(result.biomes);
+    chunk.fluidSprings = result.fluidSprings && result.fluidSprings.length > 0 ? result.fluidSprings : null;
     chunk.minY = result.minY;
     chunk.maxY = result.maxY;
     chunk.isGenerated = true;
@@ -46,10 +47,11 @@ export class WorldGen {
             cz: msg.cz,
             blocks: res.blocks.buffer,
             biomes: res.biomes.buffer,
+            fluidSprings: res.fluidSprings.buffer,
             minY: res.minY,
             maxY: res.maxY,
           },
-          [res.blocks.buffer, res.biomes.buffer]
+          [res.blocks.buffer, res.biomes.buffer, res.fluidSprings.buffer]
         );
       };
     `;

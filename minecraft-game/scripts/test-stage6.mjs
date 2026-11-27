@@ -550,7 +550,7 @@ async function runStage6Tests() {
     modifiedBlocks: [],
   });
   const loadedSurv = await saveMgr.loadWorld(survMeta.id);
-  assert.equal(loadedSurv.version, 6);
+  assert.ok(loadedSurv.version >= 6);
   assert.equal(loadedSurv.gameMode, 'survival');
   assert.equal(loadedSurv.survival.health, 12);
   assert.equal(loadedSurv.survival.foodLevel, 14);
