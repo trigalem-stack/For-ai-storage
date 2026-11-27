@@ -32,6 +32,7 @@ export class Chunk {
     this.opaqueMesh = null;
     this.cutoutMesh = null;
     this.waterMesh = null;
+    this.iceMesh = null;
   }
 
   getBlock(x, y, z) {
@@ -137,7 +138,7 @@ export class Chunk {
   }
 
   disposeMeshes(scene) {
-    const meshes = [this.opaqueMesh, this.cutoutMesh, this.waterMesh];
+    const meshes = [this.opaqueMesh, this.cutoutMesh, this.waterMesh, this.iceMesh];
     for (const mesh of meshes) {
       if (mesh) {
         scene.remove(mesh);
@@ -147,5 +148,6 @@ export class Chunk {
     this.opaqueMesh = null;
     this.cutoutMesh = null;
     this.waterMesh = null;
+    this.iceMesh = null;
   }
 }

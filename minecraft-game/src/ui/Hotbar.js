@@ -1,13 +1,59 @@
 import { BLOCK_IDS, BlockRegistry } from '../blocks/BlockRegistry.js';
-import { HOTBAR_SIZE, MAX_STACK_SIZE } from '../constants.js';
+import { HOTBAR_SIZE, MAX_STACK_DEFAULT } from '../constants.js';
+import { Inventory } from '../items/Inventory.js';
+import { ItemRegistry } from '../items/ItemRegistry.js';
+
+export function getDurabilityColor(ratio) {
+  if (ratio > 0.6) return '#42e042';
+  if (ratio > 0.25) return '#f2d438';
+  return '#e83838';
+}
 
 export class Hotbar {
   constructor(atlas, options = {}) {
     this.atlas = atlas;
     this.onChange = options.onChange || null;
-    this.creativeMode = options.creativeMode !== undefined ? Boolean(options.creativeMode) : true;
-    this.slots = new Array(HOTBAR_SIZE).fill(null);
-    this.selectedIndex = 0;
+    this.onInventoryToggle = options.onInventoryToggle || null;
+    this.onPaletteToggle = options.onPaletteToggle || null;
+    this.disableHotbarKeyE = Boolean(options.disableHotbarKeyE);
+
+    const defaultCreative = options.creativeMode !== undefined ? Boolean(options.creativeMode) : true;
+    this.inventory = options.inventory || new Inventory({ creativeMode: defaultCreative });
+    this.inventory.onChange = () => {
+      this.render();
+      this.onChange?.(this.getSelectedSlot(), true);
+    };
+    this._slotsProxy = new Proxy(this.inventory.slots, {
+      get: (target, prop) => {
+        if (prop === 'length') return HOTBAR_SIZE;
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const i = Number(prop);
+          return i < HOTBAR_SIZE ? target[i] : undefined;
+        }
+        if (
+          prop === 'slice' || prop === 'map' || prop === 'findIndex' || prop === 'find' ||
+          prop === 'forEach' || prop === 'some' || prop === 'every' || prop === 'filter' ||
+          prop === Symbol.iterator
+        ) {
+          const sub = target.slice(0, HOTBAR_SIZE);
+          const val = sub[prop];
+          return typeof val === 'function' ? val.bind(sub) : val;
+        }
+        const val = target[prop];
+        return typeof val === 'function' ? val.bind(target) : val;
+      },
+      set: (target, prop, value) => {
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const i = Number(prop);
+          if (i < HOTBAR_SIZE) {
+            target[i] = value;
+          }
+          return true;
+        }
+        target[prop] = value;
+        return true;
+      },
+    });
 
     this.container = document.getElementById('hotbar');
     this.itemLabelEl = document.getElementById('hotbar-item-name');
@@ -19,28 +65,52 @@ export class Hotbar {
     this.slotEls = [];
     this.labelTimer = null;
     this.paletteOpen = false;
-    this.onPaletteToggle = options.onPaletteToggle || null;
 
-    this._initStarterKit();
+    if (options.initStarter !== false && !options.inventory) {
+      this._initStarterKit();
+    }
     this._buildDom();
     this._buildCreativePalette();
     this._bindInput();
     this.render();
   }
 
+  get slots() {
+    return this._slotsProxy;
+  }
+
+  get selectedIndex() {
+    return this.inventory.selectedSlot;
+  }
+
+  set selectedIndex(val) {
+    this.inventory.selectedSlot = ((val % HOTBAR_SIZE) + HOTBAR_SIZE) % HOTBAR_SIZE;
+  }
+
+  get creativeMode() {
+    return this.inventory.creativeMode;
+  }
+
+  set creativeMode(val) {
+    this.inventory.creativeMode = Boolean(val);
+  }
+
   _initStarterKit() {
-    this.slots = [
-      { id: BLOCK_IDS.COBBLESTONE, count: 64 },
-      { id: BLOCK_IDS.OAK_PLANKS, count: 64 },
-      { id: BLOCK_IDS.TORCH, count: 64 },
-      { id: BLOCK_IDS.GLOWSTONE, count: 64 },
-      { id: BLOCK_IDS.JACK_O_LANTERN, count: 64 },
-      { id: BLOCK_IDS.BED_FOOT, count: 64 },
-      { id: BLOCK_IDS.SAND, count: 64 },
-      { id: BLOCK_IDS.DANDELION, count: 64 },
-      { id: BLOCK_IDS.REDSTONE_ORE, count: 64 },
+    const starterIds = [
+      BLOCK_IDS.COBBLESTONE,
+      BLOCK_IDS.OAK_PLANKS,
+      BLOCK_IDS.TORCH,
+      BLOCK_IDS.GLOWSTONE,
+      BLOCK_IDS.JACK_O_LANTERN,
+      BLOCK_IDS.BED_FOOT,
+      BLOCK_IDS.SAND,
+      BLOCK_IDS.DANDELION,
+      BLOCK_IDS.REDSTONE_ORE,
     ];
-    this.selectedIndex = 0;
+    for (let i = 0; i < HOTBAR_SIZE; i++) {
+      this.inventory.slots[i] = ItemRegistry.createStack(starterIds[i], MAX_STACK_DEFAULT);
+    }
+    this.inventory.selectedSlot = 0;
   }
 
   resetStarterKit() {
@@ -50,7 +120,7 @@ export class Hotbar {
   }
 
   setCreativeMode(enabled) {
-    this.creativeMode = Boolean(enabled);
+    this.inventory.creativeMode = Boolean(enabled);
     this.render();
   }
 
@@ -59,13 +129,18 @@ export class Hotbar {
     for (let i = 0; i < HOTBAR_SIZE; i++) {
       const s = savedHotbar.slots[i];
       if (s && s.id > 0 && s.count > 0) {
-        this.slots[i] = { id: s.id, count: Math.min(MAX_STACK_SIZE, s.count) };
+        this.inventory.slots[i] = ItemRegistry.createStack(
+          s.id,
+          s.count,
+          s.maxDurability > 0 ? s.durability : null,
+          s.meta || 0
+        );
       } else {
-        this.slots[i] = null;
+        this.inventory.slots[i] = null;
       }
     }
     if (Number.isFinite(savedHotbar.selectedIndex)) {
-      this.selectedIndex = Math.max(0, Math.min(HOTBAR_SIZE - 1, savedHotbar.selectedIndex | 0));
+      this.inventory.selectedSlot = Math.max(0, Math.min(HOTBAR_SIZE - 1, savedHotbar.selectedIndex | 0));
     }
     this.render();
     this.onChange?.(this.getSelectedSlot(), false);
@@ -73,31 +148,32 @@ export class Hotbar {
 
   exportState() {
     return {
-      selectedIndex: this.selectedIndex,
-      slots: this.slots.map((s) => (s ? { id: s.id, count: s.count } : null)),
+      selectedIndex: this.inventory.selectedSlot,
+      slots: this.slots.map((s) => (s ? { id: s.id, count: s.count, durability: s.durability || 0, maxDurability: s.maxDurability || 0 } : null)),
     };
   }
 
   getSelectedSlot() {
-    return this.slots[this.selectedIndex] || null;
+    return this.inventory.getHeldStack();
   }
 
   selectSlot(index) {
     const next = ((index % HOTBAR_SIZE) + HOTBAR_SIZE) % HOTBAR_SIZE;
-    this.selectedIndex = next;
+    this.inventory.selectedSlot = next;
     this.render();
     this._showSelectedName();
     this.onChange?.(this.getSelectedSlot(), true);
   }
 
-  setSlotBlock(blockId, index = this.selectedIndex) {
+  setSlotBlock(itemId, index = this.inventory.selectedSlot) {
     const slotIdx = Math.max(0, Math.min(HOTBAR_SIZE - 1, index));
-    if (!blockId || blockId <= 0) {
-      this.slots[slotIdx] = null;
+    if (!itemId || itemId <= 0) {
+      this.inventory.slots[slotIdx] = null;
     } else {
-      this.slots[slotIdx] = { id: blockId, count: MAX_STACK_SIZE };
+      const maxS = ItemRegistry.getMaxStack(itemId);
+      this.inventory.slots[slotIdx] = ItemRegistry.createStack(itemId, maxS);
     }
-    this.selectedIndex = slotIdx;
+    this.inventory.selectedSlot = slotIdx;
     this.render();
     this._showSelectedName();
     this.onChange?.(this.getSelectedSlot(), true);
@@ -105,63 +181,48 @@ export class Hotbar {
 
   pickBlock(blockId) {
     if (!blockId || blockId <= 0) return;
-    const existingIdx = this.slots.findIndex((s) => s && s.id === blockId);
+    const existingIdx = this.inventory.slots.slice(0, HOTBAR_SIZE).findIndex((s) => s && s.id === blockId);
     if (existingIdx >= 0) {
       this.selectSlot(existingIdx);
       return;
     }
-    this.setSlotBlock(blockId, this.selectedIndex);
+    // In Survival, look inside full inventory and swap into active slot
+    if (!this.inventory.creativeMode) {
+      const invIdx = this.inventory.slots.findIndex((s) => s && s.id === blockId);
+      if (invIdx >= HOTBAR_SIZE) {
+        const tmp = this.inventory.slots[this.inventory.selectedSlot];
+        this.inventory.slots[this.inventory.selectedSlot] = this.inventory.slots[invIdx];
+        this.inventory.slots[invIdx] = tmp;
+        this.render();
+        this._showSelectedName();
+        this.onChange?.(this.getSelectedSlot(), true);
+      }
+      return;
+    }
+    this.setSlotBlock(blockId, this.inventory.selectedSlot);
   }
 
-  canAccept(blockId) {
-    if (!blockId) return false;
-    for (let i = 0; i < HOTBAR_SIZE; i++) {
-      const s = this.slots[i];
-      if (!s) return true;
-      if (s.id === blockId && s.count < MAX_STACK_SIZE) return true;
-    }
-    return false;
+  canAccept(itemId, count = 1, durability = 0) {
+    return this.inventory.canAccept(itemId, count, durability);
   }
 
-  addItem(blockId, amount = 1) {
-    if (!blockId || amount <= 0) return amount;
-    let remaining = amount;
-
-    for (let i = 0; i < HOTBAR_SIZE && remaining > 0; i++) {
-      const s = this.slots[i];
-      if (s && s.id === blockId && s.count < MAX_STACK_SIZE) {
-        const add = Math.min(MAX_STACK_SIZE - s.count, remaining);
-        s.count += add;
-        remaining -= add;
-      }
-    }
-
-    for (let i = 0; i < HOTBAR_SIZE && remaining > 0; i++) {
-      if (!this.slots[i]) {
-        const add = Math.min(MAX_STACK_SIZE, remaining);
-        this.slots[i] = { id: blockId, count: add };
-        remaining -= add;
-      }
-    }
-
-    if (remaining !== amount) {
+  addItem(itemId, amount = 1, durability = null, meta = 0) {
+    const rem = this.inventory.addItem(itemId, amount, durability, meta);
+    if (rem !== amount) {
       this.render();
       this.onChange?.(this.getSelectedSlot(), true);
     }
-    return remaining;
+    return rem;
   }
 
-  /**
-   * Consumes item from selected slot. In Creative mode blocks are infinite unless force=true.
-   */
   consumeSelected(amount = 1, force = false) {
-    const slot = this.slots[this.selectedIndex];
+    const slot = this.inventory.slots[this.inventory.selectedSlot];
     if (!slot || slot.count <= 0) return false;
-    if (this.creativeMode && !force) return true;
+    if (this.inventory.creativeMode && !force) return true;
     if (slot.count < amount) return false;
     slot.count -= amount;
     if (slot.count <= 0) {
-      this.slots[this.selectedIndex] = null;
+      this.inventory.slots[this.inventory.selectedSlot] = null;
     }
     this.render();
     this.onChange?.(this.getSelectedSlot(), true);
@@ -181,24 +242,29 @@ export class Hotbar {
     if (!this.paletteGrid) return;
     this.paletteGrid.innerHTML = '';
     const blocks = BlockRegistry.getPlaceableBlocks();
-    for (const def of blocks) {
+    const allItems = ItemRegistry.getAllItems();
+    const combined = [
+      ...blocks.map((b) => ({ id: b.id, name: b.name })),
+      ...allItems.map((it) => ({ id: it.id, name: it.name })),
+    ];
+    for (const entry of combined) {
       const itemBtn = document.createElement('button');
       itemBtn.type = 'button';
       itemBtn.className = 'palette-block-btn';
-      itemBtn.title = def.name;
+      itemBtn.title = entry.name;
 
       const img = document.createElement('img');
-      img.src = this.atlas.getBlockIconDataURL(def);
-      img.alt = def.name;
+      img.src = this.atlas.getItemIconDataURL(entry.id);
+      img.alt = entry.name;
       img.draggable = false;
 
       const label = document.createElement('span');
-      label.textContent = def.name;
+      label.textContent = entry.name;
 
       itemBtn.append(img, label);
       itemBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.setSlotBlock(def.id, this.selectedIndex);
+        this.setSlotBlock(entry.id, this.inventory.selectedSlot);
         this.togglePalette(false);
       });
       this.paletteGrid.appendChild(itemBtn);
@@ -210,7 +276,11 @@ export class Hotbar {
     });
     this.paletteBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.togglePalette();
+      if (this.onInventoryToggle) {
+        this.onInventoryToggle();
+      } else {
+        this.togglePalette();
+      }
     });
   }
 
@@ -221,8 +291,7 @@ export class Hotbar {
       this.itemLabelEl.classList.add('hidden');
       return;
     }
-    const def = BlockRegistry.get(slot.id);
-    this.itemLabelEl.textContent = def.name;
+    this.itemLabelEl.textContent = ItemRegistry.getName(slot.id);
     this.itemLabelEl.classList.remove('hidden');
     clearTimeout(this.labelTimer);
     this.labelTimer = setTimeout(() => {
@@ -250,9 +319,15 @@ export class Hotbar {
       const count = document.createElement('span');
       count.className = 'hotbar-count hidden';
 
-      btn.append(icon, count);
+      const durBar = document.createElement('div');
+      durBar.className = 'slot-durability hidden';
+      const durFill = document.createElement('div');
+      durFill.className = 'slot-durability-fill';
+      durBar.appendChild(durFill);
+
+      btn.append(icon, count, durBar);
       this.container.appendChild(btn);
-      this.slotEls.push({ btn, icon, count });
+      this.slotEls.push({ btn, icon, count, durBar, durFill });
 
       const pickSlot = (e) => {
         e.preventDefault();
@@ -271,15 +346,19 @@ export class Hotbar {
         if (n >= 1 && n <= HOTBAR_SIZE) {
           this.selectSlot(n - 1);
         }
-      } else if (e.code === 'KeyE' && !e.repeat) {
-        this.togglePalette();
+      } else if (e.code === 'KeyE' && !e.repeat && !this.disableHotbarKeyE) {
+        if (this.onInventoryToggle) {
+          this.onInventoryToggle();
+        } else {
+          this.togglePalette();
+        }
       }
     };
 
     this._onWheel = (e) => {
       if (document.pointerLockElement && Math.abs(e.deltaY) > 0) {
         const dir = e.deltaY > 0 ? 1 : -1;
-        this.selectSlot(this.selectedIndex + dir);
+        this.selectSlot(this.inventory.selectedSlot + dir);
       }
     };
 
@@ -291,19 +370,28 @@ export class Hotbar {
     for (let i = 0; i < HOTBAR_SIZE; i++) {
       const ui = this.slotEls[i];
       if (!ui) continue;
-      ui.btn.classList.toggle('selected', i === this.selectedIndex);
+      ui.btn.classList.toggle('selected', i === this.inventory.selectedSlot);
 
-      const slot = this.slots[i];
+      const slot = this.inventory.slots[i];
       if (slot && slot.id > 0 && slot.count > 0) {
-        const def = BlockRegistry.get(slot.id);
-        ui.icon.src = this.atlas.getBlockIconDataURL(def);
+        ui.icon.src = this.atlas.getItemIconDataURL(slot.id);
         ui.icon.classList.remove('hidden');
-        const showCount = !this.creativeMode && slot.count > 1;
+        const showCount = !this.inventory.creativeMode && slot.count > 1;
         ui.count.textContent = showCount ? String(slot.count) : '';
         ui.count.classList.toggle('hidden', !showCount);
+
+        const maxDur = slot.maxDurability || 0;
+        const showDur = maxDur > 0 && slot.durability < maxDur;
+        ui.durBar.classList.toggle('hidden', !showDur);
+        if (showDur) {
+          const ratio = Math.max(0, Math.min(1, slot.durability / maxDur));
+          ui.durFill.style.width = `${Math.round(ratio * 100)}%`;
+          ui.durFill.style.background = getDurabilityColor(ratio);
+        }
       } else {
         ui.icon.classList.add('hidden');
         ui.count.classList.add('hidden');
+        ui.durBar.classList.add('hidden');
       }
     }
   }

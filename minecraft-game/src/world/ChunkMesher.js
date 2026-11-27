@@ -207,12 +207,14 @@ export class ChunkMesher {
   constructor(atlas) {
     this.atlas = atlas;
 
-    // Shared lighting uniforms across ALL terrain materials -> 0 ms CPU for full Day/Night cycle!
+    // Shared lighting uniforms across ALL terrain materials -> 0 ms CPU for full Day/Night & Held Torch cycle!
     this.lightUniforms = {
       uSunIntensity: { value: 1.0 },
       uSkyTint: { value: new THREE.Color('#ffffff') },
       uTorchTint: { value: new THREE.Color('#ffc478') },
-      uMinLight: { value: 0.006 },
+      uMinLight: { value: 0.015 },
+      uHeldLightPos: { value: new THREE.Vector3(0, 64, 0) },
+      uHeldLightLevel: { value: 0.0 },
     };
 
     // Precompute linear-space shade * AO table (6 faces * 4 AO levels = 24 floats)
@@ -243,14 +245,25 @@ export class ChunkMesher {
       vertexColors: true,
       fog: true,
       transparent: true,
-      opacity: 0.88,
+      opacity: 0.84,
       depthWrite: false,
       side: THREE.DoubleSide,
+    });
+
+    this.iceMaterial = this._createLitMaterial({
+      map: atlas.texture,
+      vertexColors: true,
+      fog: true,
+      transparent: true,
+      opacity: 0.88,
+      depthWrite: true,
+      side: THREE.FrontSide,
     });
 
     this._opaqueBuf = new ScratchMeshBuffer(4096);
     this._cutoutBuf = new ScratchMeshBuffer(1024);
     this._waterBuf = new ScratchMeshBuffer(1024);
+    this._iceBuf = new ScratchMeshBuffer(512);
   }
 
   _createLitMaterial(params) {
@@ -262,18 +275,22 @@ export class ChunkMesher {
       shader.uniforms.uSkyTint = uniforms.uSkyTint;
       shader.uniforms.uTorchTint = uniforms.uTorchTint;
       shader.uniforms.uMinLight = uniforms.uMinLight;
+      shader.uniforms.uHeldLightPos = uniforms.uHeldLightPos;
+      shader.uniforms.uHeldLightLevel = uniforms.uHeldLightLevel;
 
       shader.vertexShader = shader.vertexShader
         .replace(
           '#include <common>',
           `#include <common>
 attribute vec2 aLight;
-varying vec2 vVoxelLight;`
+varying vec2 vVoxelLight;
+varying vec3 vWorldPos;`
         )
         .replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
-vVoxelLight = aLight;`
+vVoxelLight = aLight;
+vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`
         );
 
       shader.fragmentShader = shader.fragmentShader
@@ -284,21 +301,31 @@ uniform float uSunIntensity;
 uniform vec3 uSkyTint;
 uniform vec3 uTorchTint;
 uniform float uMinLight;
-varying vec2 vVoxelLight;`
+uniform vec3 uHeldLightPos;
+uniform float uHeldLightLevel;
+varying vec2 vVoxelLight;
+varying vec3 vWorldPos;`
         )
         .replace(
           '#include <color_fragment>',
           `#include <color_fragment>
-float skyEff = clamp(vVoxelLight.x * uSunIntensity, 0.0, 1.0);
-float blkEff = clamp(vVoxelLight.y, 0.0, 1.0);
-float skyCurve = pow(0.8, (1.0 - skyEff) * 15.0);
+float skyVoxel = clamp(vVoxelLight.x, 0.0, 1.0);
+float skyCurve = pow(0.82, (1.0 - skyVoxel) * 15.0);
+float sunCurve = pow(max(uSunIntensity, 0.001), 0.92);
+vec3 skyTerm = pow(max(skyCurve, 0.001), 1.8) * sunCurve * uSkyTint;
+
+float heldBlk = 0.0;
+if (uHeldLightLevel > 0.01) {
+  float hDist = distance(vWorldPos, uHeldLightPos);
+  heldBlk = clamp((uHeldLightLevel - hDist) / 15.0, 0.0, 1.0);
+}
+float blkEff = max(clamp(vVoxelLight.y, 0.0, 1.0), heldBlk);
 float blkCurve = pow(0.8, (1.0 - blkEff) * 15.0);
-vec3 skyTerm = pow(max(skyCurve, 0.001), 2.2) * uSkyTint;
-vec3 blkTerm = pow(max(blkCurve, 0.001), 2.2) * uTorchTint;
+vec3 blkTerm = pow(max(blkCurve, 0.001), 2.0) * uTorchTint;
 diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
         );
     };
-    mat.customProgramCacheKey = () => 'mc-dual-light-v1';
+    mat.customProgramCacheKey = () => 'mc-dual-light-v2';
     return mat;
   }
 
@@ -306,6 +333,11 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
     this.lightUniforms.uSunIntensity.value = sunIntensity;
     if (skyTintColor) this.lightUniforms.uSkyTint.value.copy(skyTintColor);
     if (torchTintColor) this.lightUniforms.uTorchTint.value.copy(torchTintColor);
+  }
+
+  setHeldLight(x, y, z, level = 0) {
+    this.lightUniforms.uHeldLightPos.value.set(x, y, z);
+    this.lightUniforms.uHeldLightLevel.value = level;
   }
 
   /**
@@ -317,9 +349,11 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
     const opaqueBuf = this._opaqueBuf;
     const cutoutBuf = this._cutoutBuf;
     const waterBuf = this._waterBuf;
+    const iceBuf = this._iceBuf;
     opaqueBuf.reset();
     cutoutBuf.reset();
     waterBuf.reset();
+    iceBuf.reset();
 
     const baseX = chunk.cx * CHUNK_SIZE;
     const baseZ = chunk.cz * CHUNK_SIZE;
@@ -357,11 +391,19 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
       if (lx >= 0 && lx < CHUNK_SIZE && lz >= 0 && lz < CHUNK_SIZE) {
         return light[y * slice + lz * CHUNK_SIZE + lx];
       }
-      if (isFnFallback) return 0xf0;
+      if (isFnFallback) {
+        const cx = lx < 0 ? 0 : lx >= CHUNK_SIZE ? CHUNK_SIZE - 1 : lx;
+        const cz = lz < 0 ? 0 : lz >= CHUNK_SIZE ? CHUNK_SIZE - 1 : lz;
+        return light[y * slice + cz * CHUNK_SIZE + cx];
+      }
       const dcx = lx < 0 ? -1 : lx >= CHUNK_SIZE ? 1 : 0;
       const dcz = lz < 0 ? -1 : lz >= CHUNK_SIZE ? 1 : 0;
       const nc = nbChunks ? nbChunks[(dcz + 1) * 3 + (dcx + 1)] : null;
-      if (!nc || !nc.isGenerated) return 0xf0;
+      if (!nc || !nc.isGenerated) {
+        const cx = lx < 0 ? 0 : lx >= CHUNK_SIZE ? CHUNK_SIZE - 1 : lx;
+        const cz = lz < 0 ? 0 : lz >= CHUNK_SIZE ? CHUNK_SIZE - 1 : lz;
+        return light[y * slice + cz * CHUNK_SIZE + cx];
+      }
       const nlx = lx - dcx * CHUNK_SIZE;
       const nlz = lz - dcz * CHUNK_SIZE;
       return nc.light[y * slice + nlz * CHUNK_SIZE + nlx];
@@ -394,6 +436,14 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
             const meta = chunk.getMeta(x, y, z);
             const lb = sampleLightByte(x, y, z);
             this._emitBedGeometry(cutoutBuf, x, y, z, id === BLOCK_IDS.BED_HEAD, meta & 3, (lb >> 4) / 15, (lb & 15) / 15);
+            continue;
+          }
+
+          // 2.5. 3D Ladder attached to wall
+          if (def.isLadder) {
+            const meta = chunk.getMeta(x, y, z);
+            const lb = sampleLightByte(x, y, z);
+            this._emitLadderGeometry(cutoutBuf, x, y, z, meta, (lb >> 4) / 15, (lb & 15) / 15);
             continue;
           }
 
@@ -455,8 +505,9 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
           }
 
           // 4. Standard cubic blocks (and slightly inset Cactus)
+          const isIce = id === BLOCK_IDS.ICE;
           const isTranslucent = def.isLiquid || def.isTransparent;
-          const buf = isTranslucent ? waterBuf : (def.isCutout ? cutoutBuf : opaqueBuf);
+          const buf = isIce ? iceBuf : (isTranslucent ? waterBuf : (def.isCutout ? cutoutBuf : opaqueBuf));
           const waterTopDrop = def.isLiquid && sampleBlock(x, y + 1, z) !== BLOCK_IDS.WATER ? 0.12 : 0;
           const inset = def.inset || 0;
           const selfEmitNorm = def.lightEmission > 0 ? def.lightEmission / 15 : 0;
@@ -477,6 +528,8 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
               if (face.ny !== 0 && (neighborId === id || opaqueTable[neighborId] === 1)) continue;
             } else if (def.isLiquid) {
               if (neighborId === id || neighborId === BLOCK_IDS.ICE || opaqueTable[neighborId] === 1) continue;
+            } else if (isIce) {
+              if (neighborId === id || opaqueTable[neighborId] === 1) continue;
             } else {
               if (neighborId === id || opaqueTable[neighborId] === 1) continue;
             }
@@ -627,6 +680,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
       opaqueGeometry: opaqueBuf.toGeometry(),
       cutoutGeometry: cutoutBuf.toGeometry(),
       waterGeometry: waterBuf.toGeometry(),
+      iceGeometry: iceBuf.toGeometry(),
     };
   }
 
@@ -688,7 +742,30 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
   }
 
   /**
-   * Emits a 3D bed half (mattress from Y=3/16..9/16 + wooden legs at outer corners),
+   * Emits a 3D wall-mounted ladder (meta=1:-X wall, 2:+X wall, 3:-Z wall, 4:+Z wall).
+   */
+  _emitLadderGeometry(buf, x, y, z, meta, skyL, blkL) {
+    const uv = this.atlas.getUV('ladder');
+    const uvs = [[uv.u0, uv.vBottom], [uv.u1, uv.vBottom], [uv.u1, uv.vTop], [uv.u0, uv.vTop]];
+    const col = [0.95, 0.94, 0.92];
+    const t = 0.05;
+    if (meta === 1) {
+      const px = x + t;
+      buf.pushQuad([[px, y, z + 1], [px, y, z], [px, y + 1, z], [px, y + 1, z + 1]], [1, 0, 0], uvs, col, skyL, blkL);
+    } else if (meta === 2) {
+      const px = x + 1 - t;
+      buf.pushQuad([[px, y, z], [px, y, z + 1], [px, y + 1, z + 1], [px, y + 1, z]], [-1, 0, 0], uvs, col, skyL, blkL);
+    } else if (meta === 4) {
+      const pz = z + 1 - t;
+      buf.pushQuad([[x + 1, y, pz], [x, y, pz], [x, y + 1, pz], [x + 1, y + 1, pz]], [0, 0, -1], uvs, col, skyL, blkL);
+    } else {
+      const pz = z + t;
+      buf.pushQuad([[x, y, pz], [x + 1, y, pz], [x + 1, y + 1, pz], [x, y + 1, pz]], [0, 0, 1], uvs, col, skyL, blkL);
+    }
+  }
+
+  /**
+   * Emits a watertight 3D bed half (mattress from Y=3/16..9/16 + raised pillow + closed wooden legs),
    * rotated cleanly according to `facing` (0:N, 1:E, 2:S, 3:W).
    */
   _emitBedGeometry(buf, x, y, z, isHead, facing, skyL, blkL) {
@@ -696,14 +773,14 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
     const woodUv = this.atlas.getUV('oak_planks');
 
     const yBot = y + 3 / 16;
+    const yMid = y + 5 / 16;
     const yTop = y + 9 / 16;
 
-    // Rotate local (lx, lz) in [0..1] around block center by facing * 90 deg clockwise
     const rot = (lx, lz) => {
-      if (facing === 0) return [x + lx, z + lz];           // head toward -Z
-      if (facing === 1) return [x + (1 - lz), z + lx];     // head toward +X
-      if (facing === 2) return [x + (1 - lx), z + (1 - lz)]; // head toward +Z
-      return [x + lz, z + (1 - lx)];                       // head toward -X
+      if (facing === 0) return [x + lx, z + lz];
+      if (facing === 1) return [x + (1 - lz), z + lx];
+      if (facing === 2) return [x + (1 - lx), z + (1 - lz)];
+      return [x + lz, z + (1 - lx)];
     };
 
     const p = (lx, py, lz) => {
@@ -711,11 +788,12 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
       return [wx, py, wz];
     };
 
-    // Mattress top face (white pillow on head half, red blanket on foot half)
     const topCol = [1.0, 1.0, 1.0];
-    const sideCol = [0.68, 0.68, 0.68];
-    const darkCol = [0.42, 0.42, 0.42];
+    const sideCol = [0.80, 0.80, 0.80];
+    const woodCol = [0.68, 0.64, 0.60];
+    const darkCol = [0.46, 0.44, 0.42];
 
+    // Mattress top face
     buf.pushQuad(
       [p(0, yTop, 1), p(1, yTop, 1), p(1, yTop, 0), p(0, yTop, 0)],
       [0, 1, 0],
@@ -725,49 +803,89 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
       blkL
     );
 
-    // Underside wood plank
+    // Underside closed wood plank frame
+    const wUvs = [[woodUv.u0, woodUv.vBottom], [woodUv.u1, woodUv.vBottom], [woodUv.u1, woodUv.vTop], [woodUv.u0, woodUv.vTop]];
     buf.pushQuad(
       [p(0, yBot, 0), p(1, yBot, 0), p(1, yBot, 1), p(0, yBot, 1)],
       [0, -1, 0],
-      [[woodUv.u0, woodUv.vBottom], [woodUv.u1, woodUv.vBottom], [woodUv.u1, woodUv.vTop], [woodUv.u0, woodUv.vTop]],
+      wUvs,
       darkCol,
       skyL,
       blkL
     );
 
-    // Side & End mattress bands mapped cleanly
+    // Side & End mattress bands (100% solid pixels y=0..13 in TextureAtlas -> zero holes!)
     const sideUv = this.atlas.getUV(isHead ? 'bed_side_head' : 'bed_side_foot');
     const sDv = sideUv.vTop - sideUv.vBottom;
-    const sV0 = sideUv.vBottom + sDv * (5 / 16);
-    const sV1 = sideUv.vBottom + sDv * (10 / 16);
-    const sideBandUvs = [[sideUv.u0, sV0], [sideUv.u1, sV0], [sideUv.u1, sV1], [sideUv.u0, sV1]];
+    // Upper blanket/pillow layer (yMid..yTop) maps to v=6/16..15/16 (solid red/white)
+    const matUvs = [
+      [sideUv.u0, sideUv.vBottom + sDv * (6 / 16)],
+      [sideUv.u1, sideUv.vBottom + sDv * (6 / 16)],
+      [sideUv.u1, sideUv.vTop],
+      [sideUv.u0, sideUv.vTop],
+    ];
+    // Lower wooden rail layer (yBot..yMid) maps to wood planks
+    const railUvs = [
+      [woodUv.u0, woodUv.vBottom],
+      [woodUv.u1, woodUv.vBottom],
+      [woodUv.u1, woodUv.vBottom + (woodUv.vTop - woodUv.vBottom) * 0.25],
+      [woodUv.u0, woodUv.vBottom + (woodUv.vTop - woodUv.vBottom) * 0.25],
+    ];
 
-    // Right & Left sides
-    buf.pushQuad([p(1, yBot, 1), p(1, yBot, 0), p(1, yTop, 0), p(1, yTop, 1)], [1, 0, 0], sideBandUvs, sideCol, skyL, blkL);
-    buf.pushQuad([p(0, yBot, 0), p(0, yBot, 1), p(0, yTop, 1), p(0, yTop, 0)], [-1, 0, 0], sideBandUvs, sideCol, skyL, blkL);
+    // Right & Left mattress + wooden rail
+    buf.pushQuad([p(1, yMid, 1), p(1, yMid, 0), p(1, yTop, 0), p(1, yTop, 1)], [1, 0, 0], matUvs, sideCol, skyL, blkL);
+    buf.pushQuad([p(0, yMid, 0), p(0, yMid, 1), p(0, yTop, 1), p(0, yTop, 0)], [-1, 0, 0], matUvs, sideCol, skyL, blkL);
+    buf.pushQuad([p(1, yBot, 1), p(1, yBot, 0), p(1, yMid, 0), p(1, yMid, 1)], [1, 0, 0], railUvs, woodCol, skyL, blkL);
+    buf.pushQuad([p(0, yBot, 0), p(0, yBot, 1), p(0, yMid, 1), p(0, yMid, 0)], [-1, 0, 0], railUvs, woodCol, skyL, blkL);
 
-    // Outer end (headboard on head half at lz=0, footboard on foot half at lz=1)
+    // Outer end & inner seam cap (even if neighbor half breaks or isn't adjacent, no open back hole!)
     const endUv = this.atlas.getUV(isHead ? 'bed_end_head' : 'bed_end_foot');
     const eDv = endUv.vTop - endUv.vBottom;
-    const eV0 = endUv.vBottom + eDv * (5 / 16);
-    const eV1 = endUv.vBottom + eDv * (10 / 16);
-    const endBandUvs = [[endUv.u0, eV0], [endUv.u1, eV0], [endUv.u1, eV1], [endUv.u0, eV1]];
+    const endMatUvs = [
+      [endUv.u0, endUv.vBottom + eDv * (6 / 16)],
+      [endUv.u1, endUv.vBottom + eDv * (6 / 16)],
+      [endUv.u1, endUv.vTop],
+      [endUv.u0, endUv.vTop],
+    ];
 
     if (isHead) {
-      buf.pushQuad([p(1, yBot, 0), p(0, yBot, 0), p(0, yTop, 0), p(1, yTop, 0)], [0, 0, -1], endBandUvs, sideCol, skyL, blkL);
+      buf.pushQuad([p(1, yMid, 0), p(0, yMid, 0), p(0, yTop, 0), p(1, yTop, 0)], [0, 0, -1], endMatUvs, sideCol, skyL, blkL);
+      buf.pushQuad([p(1, yBot, 0), p(0, yBot, 0), p(0, yMid, 0), p(1, yMid, 0)], [0, 0, -1], railUvs, woodCol, skyL, blkL);
+      buf.pushQuad([p(0, yBot, 1), p(1, yBot, 1), p(1, yTop, 1), p(0, yTop, 1)], [0, 0, 1], wUvs, darkCol, skyL, blkL);
+      // Raised 3D pillow cap on top of head half
+      const pTop = yTop + 1 / 16;
+      const pZ0 = 1 / 16;
+      const pZ1 = 7 / 16;
+      const pX0 = 1 / 16;
+      const pX1 = 15 / 16;
+      const pCol = [0.96, 0.97, 0.99];
+      const pSide = [0.82, 0.84, 0.88];
+      const pilUvs = [
+        [topUv.u0, topUv.vBottom + (topUv.vTop - topUv.vBottom) * 0.55],
+        [topUv.u1, topUv.vBottom + (topUv.vTop - topUv.vBottom) * 0.55],
+        [topUv.u1, topUv.vTop],
+        [topUv.u0, topUv.vTop],
+      ];
+      buf.pushQuad([p(pX0, pTop, pZ1), p(pX1, pTop, pZ1), p(pX1, pTop, pZ0), p(pX0, pTop, pZ0)], [0, 1, 0], pilUvs, pCol, skyL, blkL);
+      buf.pushQuad([p(pX0, yTop, pZ1), p(pX1, yTop, pZ1), p(pX1, pTop, pZ1), p(pX0, pTop, pZ1)], [0, 0, 1], pilUvs, pSide, skyL, blkL);
+      buf.pushQuad([p(pX1, yTop, pZ0), p(pX0, yTop, pZ0), p(pX0, pTop, pZ0), p(pX1, pTop, pZ0)], [0, 0, -1], pilUvs, pSide, skyL, blkL);
+      buf.pushQuad([p(pX1, yTop, pZ1), p(pX1, yTop, pZ0), p(pX1, pTop, pZ0), p(pX1, pTop, pZ1)], [1, 0, 0], pilUvs, pSide, skyL, blkL);
+      buf.pushQuad([p(pX0, yTop, pZ0), p(pX0, yTop, pZ1), p(pX0, pTop, pZ1), p(pX0, pTop, pZ0)], [-1, 0, 0], pilUvs, pSide, skyL, blkL);
     } else {
-      buf.pushQuad([p(0, yBot, 1), p(1, yBot, 1), p(1, yTop, 1), p(0, yTop, 1)], [0, 0, 1], endBandUvs, sideCol, skyL, blkL);
+      buf.pushQuad([p(0, yMid, 1), p(1, yMid, 1), p(1, yTop, 1), p(0, yTop, 1)], [0, 0, 1], endMatUvs, sideCol, skyL, blkL);
+      buf.pushQuad([p(0, yBot, 1), p(1, yBot, 1), p(1, yMid, 1), p(0, yMid, 1)], [0, 0, 1], railUvs, woodCol, skyL, blkL);
+      buf.pushQuad([p(1, yBot, 0), p(0, yBot, 0), p(0, yTop, 0), p(1, yTop, 0)], [0, 0, -1], wUvs, darkCol, skyL, blkL);
     }
 
-    // Two outer wooden legs (3/16 x 3/16 x 3/16) at outer corners of this half
+    // Two outer wooden legs (3/16 x 3/16 x 3/16) completely closed on all 6 faces
     const legMinZ = isHead ? 0 : 13 / 16;
     const legMaxZ = isHead ? 3 / 16 : 1;
-    const wUvs = [[woodUv.u0, woodUv.vBottom], [woodUv.u1, woodUv.vBottom], [woodUv.u1, woodUv.vTop], [woodUv.u0, woodUv.vTop]];
     const emitLeg = (x0, x1) => {
       buf.pushQuad([p(x0, y, legMaxZ), p(x1, y, legMaxZ), p(x1, yBot, legMaxZ), p(x0, yBot, legMaxZ)], [0, 0, 1], wUvs, darkCol, skyL, blkL);
       buf.pushQuad([p(x1, y, legMinZ), p(x0, y, legMinZ), p(x0, yBot, legMinZ), p(x1, yBot, legMinZ)], [0, 0, -1], wUvs, darkCol, skyL, blkL);
       buf.pushQuad([p(x1, y, legMaxZ), p(x1, y, legMinZ), p(x1, yBot, legMinZ), p(x1, yBot, legMaxZ)], [1, 0, 0], wUvs, darkCol, skyL, blkL);
       buf.pushQuad([p(x0, y, legMinZ), p(x0, y, legMaxZ), p(x0, yBot, legMaxZ), p(x0, yBot, legMinZ)], [-1, 0, 0], wUvs, darkCol, skyL, blkL);
+      buf.pushQuad([p(x0, y, legMinZ), p(x1, y, legMinZ), p(x1, y, legMaxZ), p(x0, y, legMaxZ)], [0, -1, 0], wUvs, darkCol, skyL, blkL);
     };
     emitLeg(0, 3 / 16);
     emitLeg(13 / 16, 1);

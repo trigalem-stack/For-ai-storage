@@ -1,5 +1,6 @@
 // Extensible Block Registry for Stages 1-12.
 // Compact numeric IDs (0..255) stored in Chunk Uint8Array.
+import { ITEM_IDS } from '../items/ItemIds.js';
 
 export const BLOCK_IDS = Object.freeze({
   AIR: 0,
@@ -47,6 +48,18 @@ export const BLOCK_IDS = Object.freeze({
   JACK_O_LANTERN: 42,
   BED_FOOT: 43,
   BED_HEAD: 44,
+  CRAFTING_TABLE: 45,
+  FURNACE: 46,
+  FURNACE_LIT: 47,
+  CHEST: 48,
+  GLASS: 49,
+  STONE_BRICKS: 50,
+  LADDER: 51,
+  COAL_BLOCK: 52,
+  IRON_BLOCK: 53,
+  GOLD_BLOCK: 54,
+  DIAMOND_BLOCK: 55,
+  WOOL_WHITE: 56,
 });
 
 class BlockRegistryImpl {
@@ -64,9 +77,10 @@ class BlockRegistryImpl {
     const isCross = Boolean(def.isCross);
     const isTorch = Boolean(def.isTorch);
     const isBed = Boolean(def.isBed);
+    const isLadder = Boolean(def.isLadder);
     const isOpaque = def.isOpaque !== undefined
       ? def.isOpaque
-      : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !(def.inset > 0));
+      : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !isLadder && !(def.inset > 0));
     const lightOpacity = def.lightOpacity !== undefined
       ? def.lightOpacity
       : (isOpaque ? 15 : 0);
@@ -79,15 +93,18 @@ class BlockRegistryImpl {
       isCross,
       isTorch,
       isBed,
+      isLadder,
+      isClimbable: Boolean(def.isClimbable || isLadder),
       directional: Boolean(def.directional),
-      isSolid: def.isSolid !== undefined ? def.isSolid : (!def.isAir && !def.isLiquid && !isCross && !isTorch),
+      interactiveType: def.interactiveType || null, // 'crafting' | 'furnace' | 'chest' | 'bed'
+      isSolid: def.isSolid !== undefined ? def.isSolid : (!def.isAir && !def.isLiquid && !isCross && !isTorch && !isLadder),
       isOpaque,
       isTransparent: Boolean(def.isTransparent || def.isLiquid),
-      isCutout: Boolean(def.isCutout || isCross || isTorch || isBed),
+      isCutout: Boolean(def.isCutout || isCross || isTorch || isBed || isLadder),
       isLiquid: Boolean(def.isLiquid),
       occludesAO: def.occludesAO !== undefined
         ? def.occludesAO
-        : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !(def.inset > 0)),
+        : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !isLadder && !(def.inset > 0)),
       fallsWithGravity: Boolean(def.fallsWithGravity),
       slipperiness: def.slipperiness ?? 0.0,
       inset: def.inset ?? 0,
@@ -96,7 +113,11 @@ class BlockRegistryImpl {
       hardness: def.hardness ?? 1.0,
       requiresTool: Boolean(def.requiresTool),
       preferredTool: def.preferredTool || null,
+      minToolTier: def.minToolTier ?? (def.requiresTool ? 1 : 0),
       dropId: def.dropId !== undefined ? def.dropId : def.id,
+      dropCount: def.dropCount ?? 1,
+      dropMin: def.dropMin ?? (def.dropCount ?? 1),
+      dropMax: def.dropMax ?? (def.dropCount ?? 1),
       dropChance: def.dropChance ?? 1.0,
       lightEmission: def.lightEmission ?? 0,
       touchLightEmission: def.touchLightEmission ?? 0,
@@ -132,7 +153,7 @@ class BlockRegistryImpl {
 
   isTargetable(id) {
     const b = this.byId[id];
-    return b ? (b.isSolid || b.isCross || b.isTorch || b.isBed) : false;
+    return b ? (b.isSolid || b.isCross || b.isTorch || b.isBed || b.isLadder) : false;
   }
 
   isTorch(id) {
@@ -141,6 +162,11 @@ class BlockRegistryImpl {
 
   isBed(id) {
     return id === BLOCK_IDS.BED_FOOT || id === BLOCK_IDS.BED_HEAD;
+  }
+
+  isClimbable(id) {
+    const b = this.byId[id];
+    return b ? b.isClimbable : false;
   }
 
   getLightOpacity(id) {
@@ -165,6 +191,21 @@ class BlockRegistryImpl {
     return b ? b.fallsWithGravity : false;
   }
 
+  getAllBlocks() {
+    return this.byId.filter((b) => b && !b.isAir);
+  }
+
+  canHarvest(blockId, heldItem = null) {
+    const def = this.get(blockId);
+    if (!def || def.isAir || def.isLiquid || def.hardness < 0 || !Number.isFinite(def.hardness)) {
+      return false;
+    }
+    if (!def.requiresTool) return true;
+    if (!heldItem || !heldItem.toolType) return false;
+    if (heldItem.toolType !== def.preferredTool) return false;
+    return (heldItem.toolTier || 0) >= def.minToolTier;
+  }
+
   getBreakTime(blockId, heldItem = null, modifiers = {}) {
     const def = this.get(blockId);
     if (!def || def.isAir || def.isLiquid || def.hardness < 0 || !Number.isFinite(def.hardness)) {
@@ -174,10 +215,14 @@ class BlockRegistryImpl {
 
     let speedMultiplier = 1.0;
     const isBestTool = Boolean(heldItem && heldItem.toolType && heldItem.toolType === def.preferredTool);
-    const canHarvest = !def.requiresTool || isBestTool;
+    const isSwordBoost = Boolean(heldItem && heldItem.toolType === 'sword' && (def.materialType === 'grass' || def.materialType === 'plant' || def.id === BLOCK_IDS.WOOL_WHITE));
+    const isShearsBoost = Boolean(heldItem && heldItem.toolType === 'shears' && (def.id === BLOCK_IDS.WOOL_WHITE || def.materialType === 'grass'));
+    const canHarvest = this.canHarvest(blockId, heldItem);
 
-    if (isBestTool && heldItem.toolSpeed) {
+    if ((isBestTool || isShearsBoost) && heldItem.toolSpeed) {
       speedMultiplier = heldItem.toolSpeed;
+    } else if (isSwordBoost) {
+      speedMultiplier = 1.5;
     }
     if (modifiers.inWater) speedMultiplier /= 5;
     if (modifiers.onGround === false) speedMultiplier /= 5;
@@ -193,13 +238,44 @@ class BlockRegistryImpl {
     return def.dropId;
   }
 
-  getAllBlocks() {
-    return this.byId.filter((b) => b && !b.isAir);
+  getHarvestDrops(blockId, heldItem = null) {
+    const def = this.get(blockId);
+    if (!def || def.isAir || def.isLiquid) return [];
+
+    // Shears harvest leaves & wool directly
+    if (heldItem?.toolType === 'shears' && (def.id === BLOCK_IDS.OAK_LEAVES || def.id === BLOCK_IDS.BIRCH_LEAVES || def.id === BLOCK_IDS.SPRUCE_LEAVES || def.id === BLOCK_IDS.TALL_GRASS || def.id === BLOCK_IDS.VINE)) {
+      return [{ id: def.id, count: 1 }];
+    }
+
+    if (!this.canHarvest(blockId, heldItem)) {
+      return [];
+    }
+
+    // Gravel 10% flint chance
+    if (def.id === BLOCK_IDS.GRAVEL) {
+      return [{ id: Math.random() < 0.1 ? ITEM_IDS.FLINT : BLOCK_IDS.GRAVEL, count: 1 }];
+    }
+
+    // Leaves drop occasional sticks / oak apples
+    if (def.id === BLOCK_IDS.OAK_LEAVES || def.id === BLOCK_IDS.BIRCH_LEAVES || def.id === BLOCK_IDS.SPRUCE_LEAVES) {
+      const drops = [];
+      if (Math.random() < 0.08) drops.push({ id: ITEM_IDS.STICK, count: 1 });
+      if (def.id === BLOCK_IDS.OAK_LEAVES && Math.random() < 0.025) drops.push({ id: ITEM_IDS.APPLE, count: 1 });
+      return drops;
+    }
+
+    if (def.dropId <= 0) return [];
+    if (def.dropChance < 1.0 && Math.random() > def.dropChance) return [];
+
+    const count = def.dropMax > def.dropMin
+      ? def.dropMin + Math.floor(Math.random() * (def.dropMax - def.dropMin + 1))
+      : def.dropCount;
+    return count > 0 ? [{ id: def.dropId, count }] : [];
   }
 
   getPlaceableBlocks() {
     return this.byId.filter(
-      (b) => b && !b.isAir && !b.isLiquid && b.id !== BLOCK_IDS.BEDROCK && b.id !== BLOCK_IDS.BED_HEAD
+      (b) => b && !b.isAir && !b.isLiquid && b.id !== BLOCK_IDS.BEDROCK && b.id !== BLOCK_IDS.BED_HEAD && b.id !== BLOCK_IDS.FURNACE_LIT
     );
   }
 
@@ -421,6 +497,8 @@ class BlockRegistryImpl {
       materialType: 'dirt',
       hardness: 0.6,
       preferredTool: 'shovel',
+      dropId: ITEM_IDS.CLAY_BALL,
+      dropCount: 4,
       faces: this._allFaces('clay'),
     });
 
@@ -434,7 +512,7 @@ class BlockRegistryImpl {
       isOpaque: false,
       isTransparent: true,
       occludesAO: false,
-      lightOpacity: 2,
+      lightOpacity: 1,
       preferredTool: 'pickaxe',
       dropId: 0,
       faces: this._allFaces('ice'),
@@ -564,6 +642,8 @@ class BlockRegistryImpl {
       hardness: 3.0,
       requiresTool: true,
       preferredTool: 'pickaxe',
+      minToolTier: 1,
+      dropId: ITEM_IDS.COAL,
       faces: this._allFaces('coal_ore'),
     });
 
@@ -575,6 +655,7 @@ class BlockRegistryImpl {
       hardness: 3.0,
       requiresTool: true,
       preferredTool: 'pickaxe',
+      minToolTier: 2,
       faces: this._allFaces('iron_ore'),
     });
 
@@ -586,6 +667,7 @@ class BlockRegistryImpl {
       hardness: 3.0,
       requiresTool: true,
       preferredTool: 'pickaxe',
+      minToolTier: 3,
       faces: this._allFaces('gold_ore'),
     });
 
@@ -597,6 +679,10 @@ class BlockRegistryImpl {
       hardness: 3.0,
       requiresTool: true,
       preferredTool: 'pickaxe',
+      minToolTier: 2,
+      dropId: ITEM_IDS.LAPIS_LAZULI,
+      dropMin: 4,
+      dropMax: 8,
       faces: this._allFaces('lapis_ore'),
     });
 
@@ -608,6 +694,10 @@ class BlockRegistryImpl {
       hardness: 3.0,
       requiresTool: true,
       preferredTool: 'pickaxe',
+      minToolTier: 3,
+      dropId: ITEM_IDS.REDSTONE,
+      dropMin: 4,
+      dropMax: 5,
       lightEmission: 0,
       touchLightEmission: 9,
       redstoneGlow: true,
@@ -622,6 +712,8 @@ class BlockRegistryImpl {
       hardness: 3.0,
       requiresTool: true,
       preferredTool: 'pickaxe',
+      minToolTier: 3,
+      dropId: ITEM_IDS.DIAMOND,
       faces: this._allFaces('diamond_ore'),
     });
 
@@ -633,6 +725,8 @@ class BlockRegistryImpl {
       hardness: 3.0,
       requiresTool: true,
       preferredTool: 'pickaxe',
+      minToolTier: 3,
+      dropId: ITEM_IDS.EMERALD,
       faces: this._allFaces('emerald_ore'),
     });
 
@@ -773,6 +867,7 @@ class BlockRegistryImpl {
       name: 'Кровать',
       materialType: 'wood',
       isBed: true,
+      interactiveType: 'bed',
       isSolid: true,
       isOpaque: false,
       isCutout: true,
@@ -796,6 +891,7 @@ class BlockRegistryImpl {
       name: 'Кровать (изголовье)',
       materialType: 'wood',
       isBed: true,
+      interactiveType: 'bed',
       isSolid: true,
       isOpaque: false,
       isCutout: true,
@@ -811,6 +907,189 @@ class BlockRegistryImpl {
         east: 'bed_side_head',
         west: 'bed_side_head',
       },
+    });
+
+    // Stage 5 Interactive & Crafted Blocks
+    this.register({
+      id: BLOCK_IDS.CRAFTING_TABLE,
+      key: 'crafting_table',
+      name: 'Верстак',
+      materialType: 'wood',
+      interactiveType: 'crafting',
+      hardness: 2.5,
+      preferredTool: 'axe',
+      faces: {
+        top: 'crafting_table_top',
+        bottom: 'oak_planks',
+        north: 'crafting_table_front',
+        south: 'crafting_table_side',
+        east: 'crafting_table_side',
+        west: 'crafting_table_front',
+      },
+    });
+
+    this.register({
+      id: BLOCK_IDS.FURNACE,
+      key: 'furnace',
+      name: 'Печь',
+      materialType: 'stone',
+      interactiveType: 'furnace',
+      directional: true,
+      hardness: 3.5,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 1,
+      faces: {
+        top: 'furnace_top',
+        bottom: 'furnace_top',
+        south: 'furnace_front',
+        north: 'furnace_side',
+        east: 'furnace_side',
+        west: 'furnace_side',
+      },
+    });
+
+    this.register({
+      id: BLOCK_IDS.FURNACE_LIT,
+      key: 'furnace_lit',
+      name: 'Горящая печь',
+      materialType: 'stone',
+      interactiveType: 'furnace',
+      directional: true,
+      lightEmission: 13,
+      hardness: 3.5,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 1,
+      dropId: BLOCK_IDS.FURNACE,
+      faces: {
+        top: 'furnace_top',
+        bottom: 'furnace_top',
+        south: 'furnace_front_on',
+        north: 'furnace_side',
+        east: 'furnace_side',
+        west: 'furnace_side',
+      },
+    });
+
+    this.register({
+      id: BLOCK_IDS.CHEST,
+      key: 'chest',
+      name: 'Сундук',
+      materialType: 'wood',
+      interactiveType: 'chest',
+      directional: true,
+      hardness: 2.5,
+      preferredTool: 'axe',
+      faces: {
+        top: 'chest_top',
+        bottom: 'chest_top',
+        south: 'chest_front',
+        north: 'chest_side',
+        east: 'chest_side',
+        west: 'chest_side',
+      },
+    });
+
+    this.register({
+      id: BLOCK_IDS.GLASS,
+      key: 'glass',
+      name: 'Стекло',
+      materialType: 'glass',
+      hardness: 0.3,
+      isOpaque: false,
+      isCutout: true,
+      occludesAO: false,
+      lightOpacity: 0,
+      dropId: 0,
+      faces: this._allFaces('glass'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.STONE_BRICKS,
+      key: 'stone_bricks',
+      name: 'Каменные кирпичи',
+      materialType: 'stone',
+      hardness: 1.5,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 1,
+      faces: this._allFaces('stone_bricks'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.LADDER,
+      key: 'ladder',
+      name: 'Лестница',
+      materialType: 'wood',
+      isLadder: true,
+      isClimbable: true,
+      isSolid: false,
+      isOpaque: false,
+      isCutout: true,
+      occludesAO: false,
+      lightOpacity: 0,
+      hardness: 0.4,
+      preferredTool: 'axe',
+      faces: this._allFaces('ladder'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.COAL_BLOCK,
+      key: 'coal_block',
+      name: 'Угольный блок',
+      materialType: 'stone',
+      hardness: 5.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 1,
+      faces: this._allFaces('coal_block'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.IRON_BLOCK,
+      key: 'iron_block',
+      name: 'Железный блок',
+      materialType: 'stone',
+      hardness: 5.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 2,
+      faces: this._allFaces('iron_block'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.GOLD_BLOCK,
+      key: 'gold_block',
+      name: 'Золотой блок',
+      materialType: 'stone',
+      hardness: 3.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 3,
+      faces: this._allFaces('gold_block'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.DIAMOND_BLOCK,
+      key: 'diamond_block',
+      name: 'Алмазный блок',
+      materialType: 'stone',
+      hardness: 5.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 3,
+      faces: this._allFaces('diamond_block'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.WOOL_WHITE,
+      key: 'wool_white',
+      name: 'Белая шерсть',
+      materialType: 'wool',
+      hardness: 0.8,
+      preferredTool: 'shears',
+      faces: this._allFaces('wool_white'),
     });
   }
 }

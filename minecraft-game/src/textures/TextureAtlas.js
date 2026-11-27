@@ -6,6 +6,9 @@ import {
   ATLAS_TILE_INNER,
   ATLAS_TILE_PAD,
 } from '../constants.js';
+import { registerAllItemSprites } from './ItemSprites.js';
+import { ItemRegistry } from '../items/ItemRegistry.js';
+import { BlockRegistry } from '../blocks/BlockRegistry.js';
 
 // Deterministic integer hash for crisp procedural 16x16 pixel art
 function pxHash(seed, x, y) {
@@ -40,6 +43,7 @@ export class TextureAtlas {
     this.ctx.imageSmoothingEnabled = false;
 
     this.tiles = new Map(); // tileName -> { cx, cy, uv: { u0, u1, vBottom, vTop } }
+    this.tilePixels = new Map(); // tileName -> Uint8ClampedArray(16*16*4)
     this.nextIndex = 0;
     this.previewCache = new Map();
     this.crackTextures = null;
@@ -111,7 +115,12 @@ export class TextureAtlas {
 
     const record = { cx, cy, u0, u1, vBottom, vTop };
     this.tiles.set(name, record);
+    this.tilePixels.set(name, tilePixels);
     return record;
+  }
+
+  getTilePixels16(name) {
+    return this.tilePixels.get(name) || null;
   }
 
   getUV(name) {
@@ -168,7 +177,7 @@ export class TextureAtlas {
     const sideLeftRec = this.getUV(blockDef.faces.west);
     const sideRightRec = this.getUV(blockDef.faces.south);
 
-    if (blockDef.isCross || blockDef.isTorch) {
+    if (blockDef.isCross || blockDef.isTorch || blockDef.isLadder) {
       g.drawImage(
         this.canvas,
         topRec.cx * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
@@ -229,6 +238,44 @@ export class TextureAtlas {
     drawIsoFace(sideLeftRec, 0.85, 0.42, 0, 0.92, 2.4, 8.7, 0.82);
     drawIsoFace(sideRightRec, 0.85, -0.42, 0, 0.92, 16, 15.4, 0.64);
 
+    const url = c.toDataURL();
+    this.previewCache.set(cacheKey, url);
+    return url;
+  }
+
+  getItemIconDataURL(itemOrId) {
+    if (!itemOrId) return '';
+    const id = typeof itemOrId === 'number' ? itemOrId : itemOrId.id;
+    if (!id || id <= 0) return '';
+    if (id < 256) {
+      const bDef = BlockRegistry.get(id);
+      return bDef && !bDef.isAir ? this.getBlockIconDataURL(bDef) : '';
+    }
+    const cacheKey = `item:${id}`;
+    if (this.previewCache.has(cacheKey)) {
+      return this.previewCache.get(cacheKey);
+    }
+    const itemDef = ItemRegistry.get(id);
+    if (!itemDef || !itemDef.sprite) return '';
+    const rec = this.getUV(itemDef.sprite);
+    if (!rec) return '';
+    const size = 32;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(
+      this.canvas,
+      rec.cx * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
+      rec.cy * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
+      ATLAS_TILE_INNER,
+      ATLAS_TILE_INNER,
+      2,
+      2,
+      28,
+      28
+    );
     const url = c.toDataURL();
     this.previewCache.set(cacheKey, url);
     return url;
@@ -592,18 +639,18 @@ export class TextureAtlas {
       return shadeRgb(clayBase, (clump - 0.5) * 18 + (n - 0.5) * 10);
     });
 
-    // 20. Ice (semi-transparent pale blue with diagonal shine streaks)
-    const iceBase = hexToRgb('#8cb8ff');
+    // 20. Ice (reworked crystalline glacier ice — smooth blue-cyan gradients & crisp frost veins, NO glass border)
+    const iceBase = [124, 174, 246];
     this.addTile('ice', (x, y) => {
-      const diag = (x + y) % 16;
-      const border = x === 0 || x === 15 || y === 0 || y === 15;
-      if (diag === 4 || diag === 5 || (diag === 11 && x > 4 && x < 12)) {
-        return [228, 245, 255, 205];
-      }
-      if (border) return [185, 222, 255, 200];
       const n = pxHash(1701, x, y);
-      const rgb = shadeRgb(iceBase, (n - 0.5) * 18);
-      return [rgb[0], rgb[1], rgb[2], 180];
+      const streakA = (x + y === 6 || x + y === 17) && x >= 2 && x <= 13;
+      const streakB = (x * 2 + y === 13 || x + y * 2 === 22) && y >= 3 && y <= 12;
+      const wave = Math.sin((x * 0.45) + (y * 0.3)) * 10;
+      if (streakA) return [214, 238, 255, 235];
+      if (streakB) return [188, 224, 255, 228];
+      const cell = pxHash(1703, x >> 2, y >> 2);
+      const rgb = shadeRgb(iceBase, wave + (cell - 0.5) * 24 + (n - 0.5) * 14);
+      return [rgb[0], rgb[1], rgb[2], 222];
     });
 
     // 21-23. Birch Log & Leaves
@@ -1031,7 +1078,7 @@ export class TextureAtlas {
       return shadeRgb(pumpDark, rib + (pxHash(2403, x, y) - 0.5) * 14);
     });
 
-    // 53-58. Red Bed textures (top pillow/blanket, sides, ends)
+    // 53-58. Red Bed textures (solid full-coverage mattress/frame strips so 3D geometry never shows gaps)
     const bedRed = [188, 34, 34];
     const bedRedDark = [148, 22, 22];
     const bedWhite = [238, 240, 244];
@@ -1050,32 +1097,175 @@ export class TextureAtlas {
       return shadeRgb(bedRed, (pxHash(2503, x, y) - 0.5) * 14);
     });
     this.addTile('bed_side_foot', (x, y) => {
-      if (y <= 6) return [0, 0, 0, 0];
       if (y <= 10) return shadeRgb(bedRed, (pxHash(2504, x, y) - 0.5) * 14);
-      if (y <= 12) return shadeRgb(bedWood, (pxHash(2505, x, y) - 0.5) * 14);
-      if (x <= 2) return shadeRgb(bedWood, -18);
-      return [0, 0, 0, 0];
+      if (y <= 13) return shadeRgb(bedWood, (pxHash(2505, x, y) - 0.5) * 14);
+      return shadeRgb(bedWood, -22);
     });
     this.addTile('bed_side_head', (x, y) => {
-      if (y <= 6) return [0, 0, 0, 0];
       if (y <= 10) return x <= 7 ? shadeRgb(bedWhite, -8) : shadeRgb(bedRed, (pxHash(2506, x, y) - 0.5) * 14);
-      if (y <= 12) return shadeRgb(bedWood, (pxHash(2507, x, y) - 0.5) * 14);
-      if (x >= 13) return shadeRgb(bedWood, -18);
-      return [0, 0, 0, 0];
+      if (y <= 13) return shadeRgb(bedWood, (pxHash(2507, x, y) - 0.5) * 14);
+      return shadeRgb(bedWood, -22);
     });
     this.addTile('bed_end_foot', (x, y) => {
-      if (y <= 6) return [0, 0, 0, 0];
       if (y <= 10) return shadeRgb(bedRedDark, (pxHash(2508, x, y) - 0.5) * 12);
-      if (y <= 12) return shadeRgb(bedWood, (pxHash(2509, x, y) - 0.5) * 14);
-      if (x <= 2 || x >= 13) return shadeRgb(bedWood, -18);
-      return [0, 0, 0, 0];
+      if (y <= 13) return shadeRgb(bedWood, (pxHash(2509, x, y) - 0.5) * 14);
+      return shadeRgb(bedWood, -22);
     });
     this.addTile('bed_end_head', (x, y) => {
-      if (y <= 6) return [0, 0, 0, 0];
       if (y <= 10) return shadeRgb(bedWhite, -12);
-      if (y <= 12) return shadeRgb(bedWood, (pxHash(2510, x, y) - 0.5) * 14);
-      if (x <= 2 || x >= 13) return shadeRgb(bedWood, -18);
+      if (y <= 13) return shadeRgb(bedWood, (pxHash(2510, x, y) - 0.5) * 14);
+      return shadeRgb(bedWood, -22);
+    });
+
+    // 59-77. Stage 5 Crafted & Functional Block Tiles
+    const craftTopDark = [118, 76, 38];
+    const craftTopPlank = [174, 134, 80];
+    this.addTile('crafting_table_top', (x, y) => {
+      if (x === 0 || x === 15 || y === 0 || y === 15) return shadeRgb(craftTopDark, -14);
+      if (x === 5 || x === 10 || y === 5 || y === 10) return craftTopDark;
+      return shadeRgb(craftTopPlank, (pxHash(2601, x, y) - 0.5) * 18);
+    });
+    const craftWood = [156, 114, 62];
+    this.addTile('crafting_table_front', (x, y) => {
+      if (y <= 2) return shadeRgb(craftTopDark, (pxHash(2602, x, y) - 0.5) * 12);
+      // Saw + Hammer tools hanging on front
+      if ((x >= 3 && x <= 5 && y >= 5 && y <= 11) || (x === 4 && y === 4)) {
+        return y <= 6 ? [188, 194, 204] : [108, 74, 38];
+      }
+      if ((x >= 10 && x <= 12 && y >= 6 && y <= 12)) {
+        return (y === 6 || y === 7) ? [178, 184, 194] : (x === 11 ? [108, 74, 38] : shadeRgb(craftWood, (pxHash(2603, x, y) - 0.5) * 14));
+      }
+      if (y === 3 || y === 15 || x === 0 || x === 15) return shadeRgb(craftTopDark, -8);
+      return shadeRgb(craftWood, (pxHash(2604, x, y) - 0.5) * 16);
+    });
+    this.addTile('crafting_table_side', (x, y) => {
+      if (y <= 2) return shadeRgb(craftTopDark, (pxHash(2605, x, y) - 0.5) * 12);
+      if (x >= 3 && x <= 12 && y >= 5 && y <= 11 && (x === 7 || x === 8 || y === 5 || y === 11)) {
+        return [96, 66, 36];
+      }
+      if (y === 3 || y === 15 || x === 0 || x === 15) return shadeRgb(craftTopDark, -8);
+      return shadeRgb(craftWood, (pxHash(2606, x, y) - 0.5) * 16);
+    });
+
+    // Furnace
+    const furnStone = [126, 126, 130];
+    this.addTile('furnace_top', (x, y) => {
+      const border = x === 0 || x === 15 || y === 0 || y === 15;
+      const n = pxHash(2701, x, y);
+      if (border) return shadeRgb(furnStone, -28 + n * 10);
+      return shadeRgb(furnStone, (n - 0.5) * 28);
+    });
+    this.addTile('furnace_side', (x, y) => {
+      const n = pxHash(2702, x, y);
+      if (y === 0 || y === 15 || y === 7 || (y < 7 && x % 8 === 0) || (y > 7 && (x + 4) % 8 === 0)) {
+        return shadeRgb(furnStone, -32 + n * 8);
+      }
+      return shadeRgb(furnStone, (n - 0.5) * 26);
+    });
+    const renderFurnaceFront = (lit) => (x, y) => {
+      const n = pxHash(2703, x, y);
+      // Top smelter mouth
+      if (x >= 3 && x <= 12 && y >= 2 && y <= 6) {
+        if (y === 2 || y === 6 || x === 3 || x === 12) return [64, 64, 68];
+        return [28, 28, 32];
+      }
+      // Bottom firebox
+      if (x >= 4 && x <= 11 && y >= 10 && y <= 14) {
+        if (y === 10 || x === 4 || x === 11) return [58, 58, 62];
+        if (!lit) return [24, 24, 28];
+        const flicker = pxHash(2709, x, y);
+        if (y >= 13) return flicker > 0.45 ? [255, 224, 72] : [248, 128, 24];
+        return flicker > 0.35 ? [255, 168, 36] : [214, 74, 18];
+      }
+      if (x === 0 || x === 15 || y === 0 || y === 15) return shadeRgb(furnStone, -30);
+      return shadeRgb(furnStone, (n - 0.5) * 26);
+    };
+    this.addTile('furnace_front', renderFurnaceFront(false));
+    this.addTile('furnace_front_on', renderFurnaceFront(true));
+
+    // Chest
+    const chestWood = [166, 114, 48];
+    const chestRim = [78, 52, 22];
+    this.addTile('chest_top', (x, y) => {
+      if (x <= 1 || x >= 14 || y <= 1 || y >= 14) return shadeRgb(chestRim, (pxHash(2801, x, y) - 0.5) * 12);
+      return shadeRgb(chestWood, (pxHash(2802, x, y) - 0.5) * 20);
+    });
+    this.addTile('chest_side', (x, y) => {
+      if (x === 0 || x === 15 || y === 0 || y === 15 || y === 5) return shadeRgb(chestRim, (pxHash(2803, x, y) - 0.5) * 12);
+      return shadeRgb(chestWood, (pxHash(2804, x, y) - 0.5) * 22);
+    });
+    this.addTile('chest_front', (x, y) => {
+      if (x >= 6 && x <= 9 && y >= 4 && y <= 7) {
+        return (x === 7 || x === 8) && y >= 5 && y <= 6 ? [216, 220, 228] : [132, 136, 146];
+      }
+      if (x === 0 || x === 15 || y === 0 || y === 15 || y === 5) return shadeRgb(chestRim, (pxHash(2805, x, y) - 0.5) * 12);
+      return shadeRgb(chestWood, (pxHash(2806, x, y) - 0.5) * 22);
+    });
+
+    // Glass (cutout frame + clean diagonal glint streaks)
+    this.addTile('glass', (x, y) => {
+      if (x === 0 || x === 15 || y === 0 || y === 15) return [188, 226, 238, 255];
+      if ((x === 3 && y === 2) || (x === 2 && y === 3) || (x === 4 && y === 2) || (x === 3 && y === 3)) {
+        return [232, 248, 255, 255];
+      }
+      if ((x === 12 && y === 11) || (x === 11 && y === 12)) {
+        return [216, 240, 250, 255];
+      }
       return [0, 0, 0, 0];
     });
+
+    // Stone Bricks
+    const sbBase = [122, 124, 128];
+    this.addTile('stone_bricks', (x, y) => {
+      const n = pxHash(2901, x, y);
+      const mortar = y === 0 || y === 8 || (y < 8 && x === 7) || (y >= 8 && x === 15);
+      if (mortar) return shadeRgb(sbBase, -36 + n * 8);
+      if (y === 1 || y === 9) return shadeRgb(sbBase, 14 + n * 8);
+      if (y === 7 || y === 15) return shadeRgb(sbBase, -18 + n * 8);
+      return shadeRgb(sbBase, (n - 0.5) * 22);
+    });
+
+    // Ladder
+    this.addTile('ladder', (x, y) => {
+      const rail = x === 2 || x === 3 || x === 12 || x === 13;
+      const rung = y === 1 || y === 2 || y === 5 || y === 6 || y === 9 || y === 10 || y === 13 || y === 14;
+      if (!rail && !rung) return [0, 0, 0, 0];
+      const n = pxHash(2950, x, y);
+      if (rail && !rung) return [...shadeRgb([144, 102, 54], (n - 0.5) * 18), 255];
+      return [...shadeRgb([166, 122, 68], (n - 0.5) * 18), 255];
+    });
+
+    // Resource Blocks (Coal, Iron, Gold, Diamond, Wool)
+    this.addTile('coal_block', (x, y) => {
+      const n = pxHash(3001, x, y);
+      const border = x === 0 || x === 15 || y === 0 || y === 15;
+      return shadeRgb([34, 34, 38], (border ? -12 : 0) + (n - 0.5) * 22);
+    });
+    this.addTile('iron_block', (x, y) => {
+      if (x === 0 || y === 0) return [242, 246, 250];
+      if (x === 15 || y === 15) return [142, 148, 158];
+      if (x === 1 || y === 1 || x === 14 || y === 14) return [218, 224, 232];
+      return shadeRgb([204, 210, 220], (pxHash(3002, x, y) - 0.5) * 14);
+    });
+    this.addTile('gold_block', (x, y) => {
+      if (x === 0 || y === 0) return [255, 246, 142];
+      if (x === 15 || y === 15) return [184, 124, 18];
+      if (x === 1 || y === 1 || x === 14 || y === 14) return [252, 222, 68];
+      return shadeRgb([244, 198, 42], (pxHash(3003, x, y) - 0.5) * 18);
+    });
+    this.addTile('diamond_block', (x, y) => {
+      if (x === 0 || y === 0) return [168, 254, 248];
+      if (x === 15 || y === 15) return [26, 142, 140];
+      if (x === 1 || y === 1 || x === 14 || y === 14) return [110, 240, 232];
+      return shadeRgb([68, 218, 208], (pxHash(3004, x, y) - 0.5) * 20);
+    });
+    this.addTile('wool_white', (x, y) => {
+      const n = pxHash(3005, x, y);
+      const weave = ((x + y) % 2 === 0 ? 6 : -6);
+      return shadeRgb([238, 238, 240], weave + (n - 0.5) * 14);
+    });
+
+    // Stage 5 All 16x16 Item Pixel Sprites
+    registerAllItemSprites(this);
   }
 }

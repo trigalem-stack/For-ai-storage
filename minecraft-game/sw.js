@@ -1,4 +1,4 @@
-const CACHE_NAME = 'minecraft-web-stage4-v1';
+const CACHE_NAME = 'minecraft-web-stage5-v1';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,12 @@ const CORE_ASSETS = [
   './src/main.js',
   './src/constants.js',
   './src/blocks/BlockRegistry.js',
+  './src/items/ItemIds.js',
+  './src/items/ItemRegistry.js',
+  './src/items/RecipeRegistry.js',
+  './src/items/Inventory.js',
+  './src/textures/ItemSprites.js',
+  './src/textures/ExtrudedItemMesh.js',
   './src/textures/TextureAtlas.js',
   './src/physics/AABBPhysics.js',
   './src/world/Noise.js',
@@ -18,6 +24,7 @@ const CORE_ASSETS = [
   './src/world/LightingEngine.js',
   './src/world/ChunkMesher.js',
   './src/world/Raycast.js',
+  './src/world/BlockEntityManager.js',
   './src/world/SkyRenderer.js',
   './src/world/MenuPanorama.js',
   './src/world/SkyEnvironment.js',
@@ -28,6 +35,7 @@ const CORE_ASSETS = [
   './src/player/FirstPersonHand.js',
   './src/player/PlayerController.js',
   './src/ui/Hotbar.js',
+  './src/ui/InventoryUI.js',
   './src/ui/MobileControls.js',
   './src/ui/Hud.js',
   './src/storage/SaveManager.js',

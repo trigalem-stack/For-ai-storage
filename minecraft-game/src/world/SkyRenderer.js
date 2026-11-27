@@ -38,13 +38,13 @@ export class SkyRenderer {
     this._sunDir = new THREE.Vector3(0, 1, 0);
     this._cDayTop = new THREE.Color('#4488eb');
     this._cDayHor = new THREE.Color('#a4d4ff');
-    this._cSunsetTop = new THREE.Color('#354078');
-    this._cSunsetHor = new THREE.Color('#f47c44');
-    this._cNightTop = new THREE.Color('#040814');
-    this._cNightHor = new THREE.Color('#0c152b');
+    this._cSunsetTop = new THREE.Color('#3f4c8c');
+    this._cSunsetHor = new THREE.Color('#f4844a');
+    this._cNightTop = new THREE.Color('#091124');
+    this._cNightHor = new THREE.Color('#162646');
     this._cSunTintDay = new THREE.Color('#ffffff');
-    this._cSunTintSunset = new THREE.Color('#ffd0b2');
-    this._cSunTintNight = new THREE.Color('#6f88c2');
+    this._cSunTintSunset = new THREE.Color('#ffd3a8');
+    this._cSunTintNight = new THREE.Color('#92ade8');
     this._cCloudColor = new THREE.Color('#ffffff');
 
     // 1. Sky Gradient Dome
@@ -425,9 +425,9 @@ export class SkyRenderer {
 
     this.fogColor.copy(horCol);
 
-    // Chunk shader sun intensity (1.0 day -> 0.17 deep night) & ambient tint
-    this.sunIntensity = lerp(0.17, 1.0, dayFactor);
-    this.skyTint.copy(this._cSunTintNight).lerp(this._cSunTintDay, dayFactor).lerp(this._cSunTintSunset, twilightFactor * 0.42);
+    // Chunk shader sun intensity (1.0 day -> 0.24 moonlight night) & ambient tint
+    this.sunIntensity = lerp(0.24, 1.0, dayFactor);
+    this.skyTint.copy(this._cSunTintNight).lerp(this._cSunTintDay, dayFactor).lerp(this._cSunTintSunset, twilightFactor * 0.45);
 
     // Stars fade in gently at dusk
     this.starMat.opacity = clamp01((nightFactor - 0.28) * 1.45);
@@ -435,9 +435,9 @@ export class SkyRenderer {
 
     // Clouds tint & slow drift
     this._cCloudColor.setRGB(
-      lerp(0.16, 1.0, dayFactor) + twilightFactor * 0.16,
-      lerp(0.20, 1.0, dayFactor) + twilightFactor * 0.04,
-      lerp(0.32, 1.0, dayFactor)
+      lerp(0.28, 1.0, dayFactor) + twilightFactor * 0.16,
+      lerp(0.32, 1.0, dayFactor) + twilightFactor * 0.05,
+      lerp(0.45, 1.0, dayFactor)
     );
     this.cloudMat.color.copy(this._cCloudColor);
     this.cloudMat.opacity = lerp(0.45, 0.84, dayFactor);

@@ -330,29 +330,25 @@ export class PlayerController {
       this.sprintToggled ||
       this.touchInput.sprint;
 
-    // Water submersion probe
+    // Water & ladder submersion probe
     const feetInWater = this.world.getBlock(this.x, this.y + 0.12, this.z) === BLOCK_IDS.WATER;
-    const waistInWater = this.world.getBlock(this.x, this.y + 0.72, this.z) === BLOCK_IDS.WATER;
-    const headInWater = this.world.getBlock(this.x, this.y + 1.48, this.z) === BLOCK_IDS.WATER;
-    const inWater = feetInWater || waistInWater;
+    const waistInWater = this.world.getBlock(this.x, this.y + 0.56, this.z) === BLOCK_IDS.WATER;
+    const headInWater = this.world.getBlock(this.x, this.y + 1.38, this.z) === BLOCK_IDS.WATER;
+    const inWater = feetInWater || waistInWater || headInWater;
+    const onLadder = BlockRegistry.isClimbable(this.world.getBlock(this.x, this.y + 0.15, this.z))
+      || BlockRegistry.isClimbable(this.world.getBlock(this.x, this.y + 1.0, this.z));
 
-    // 1-block-tall swim mode activates ONLY when fully submerged in water & sprinting!
-    // Exits immediately back to upright posture when surfacing (!headInWater) or exiting water,
-    // UNLESS a solid 1-block ceiling prevents standing up.
+    // 1-block-tall swim mode activates when sprinting forward in water or crawling under a 1-block overhang in water!
     const ceilingBlocksStand = !this.flyMode && this.isSwimming
       ? collidesWithWorld(this.world, this.x, this.y, this.z, PLAYER_HALF_WIDTH, PLAYER_HEIGHT)
       : false;
 
     let nextSwim = false;
-    if (!this.flyMode) {
-      if (headInWater && wantSprint && forward > 0.25 && !wantJump) {
+    if (!this.flyMode && !onLadder) {
+      if (inWater && wantSprint && forward > 0.25 && (waistInWater || headInWater || this.isSwimming)) {
         nextSwim = true;
-      } else if (this.isSwimming) {
-        if (ceilingBlocksStand) {
-          nextSwim = true;
-        } else if (headInWater && wantSprint && forward > 0.25 && !wantJump) {
-          nextSwim = true;
-        }
+      } else if (this.isSwimming && ceilingBlocksStand) {
+        nextSwim = true;
       }
     }
     this.isSwimming = nextSwim;
@@ -444,40 +440,60 @@ export class PlayerController {
         if (res.hitWall) anyWallHit = true;
       } else {
         const subFeetWater = this.world.getBlock(this.x, this.y + 0.1, this.z) === BLOCK_IDS.WATER;
-        const subWaistWater = this.world.getBlock(this.x, this.y + 0.65, this.z) === BLOCK_IDS.WATER;
-        const subHeadWater = this.world.getBlock(this.x, this.y + 1.35, this.z) === BLOCK_IDS.WATER;
-        const subInWater = subFeetWater || subWaistWater;
+        const subWaistWater = this.world.getBlock(this.x, this.y + 0.56, this.z) === BLOCK_IDS.WATER;
+        const subHeadWater = this.world.getBlock(this.x, this.y + 1.25, this.z) === BLOCK_IDS.WATER;
+        const subInWater = subFeetWater || subWaistWater || subHeadWater;
+        const subOnLadder = BlockRegistry.isClimbable(this.world.getBlock(this.x, this.y + 0.15, this.z))
+          || BlockRegistry.isClimbable(this.world.getBlock(this.x, this.y + 1.0, this.z));
         let dy;
 
-        if (subInWater) {
-          // 3D pitch swim + reliable upward surfacing + clean shore hop onto 1-block bank!
+        if (subOnLadder && !subInWater) {
+          if (wantJump || (forward > 0.25 && this.pitch > 0.25)) {
+            this.vy = 3.4;
+          } else if (wantCrouch) {
+            this.vy = 0;
+          } else if (forward > 0.25 && this.pitch < -0.35) {
+            this.vy = -3.2;
+          } else {
+            this.vy = -2.2;
+          }
+          dy = this.vy * subDt;
+        } else if (subInWater) {
+          // Smooth, natural Minecraft-style swimming & gentle buoyancy (no sky-rocketing!)
           if (wantJump) {
             const nearShoreWall = len > 0.05 && collidesWithWorld(
               this.world,
               this.x + moveDirX * 0.42,
-              this.y + 0.35,
+              this.y + 0.22,
               this.z + moveDirZ * 0.42,
               PLAYER_HALF_WIDTH,
               0.85
             );
-            if (!subHeadWater && (nearShoreWall || !subWaistWater)) {
-              // Strong hop onto dry shore block from water!
-              this.vy = Math.max(this.vy, 7.25);
+            if (!subHeadWater && nearShoreWall) {
+              // Controlled hop onto 1-block bank when pushing against shore
+              this.vy = Math.max(this.vy, 6.8);
             } else if (!subHeadWater && subWaistWater) {
-              // Buoyant bob at surface so holding Jump stays afloat smoothly
-              this.vy = Math.max(this.vy, 3.6);
+              // Gentle surface float bob without flying above water
+              this.vy = Math.min(1.45, Math.max(this.vy + 10.0 * subDt, 0.35));
+            } else if (!subHeadWater && !subWaistWater) {
+              // Shallow ankle-deep puddle: normal modest water hop
+              this.vy = Math.max(this.vy, 5.8);
             } else {
-              // Deep underwater: swim briskly upward toward surface
-              this.vy = Math.min(5.2, Math.max(this.vy + 28.0 * subDt, 3.8));
+              // Submerged: smooth steady upward swim toward surface
+              this.vy = Math.min(2.6, Math.max(this.vy + 14.0 * subDt, 1.9));
             }
           } else if (wantCrouch) {
-            this.vy = Math.max(-5.2, this.vy - 24.0 * subDt);
+            this.vy = Math.max(-3.0, this.vy - 15.0 * subDt);
           } else if (this.isSwimming && forward > 0.25) {
-            const swimVertTarget = Math.sin(this.pitch) * speed;
-            this.vy += (swimVertTarget - this.vy) * Math.min(1, subDt * 8);
+            const aboveEyeWater = this.world.getBlock(this.x, this.y + 0.85, this.z) === BLOCK_IDS.WATER;
+            let swimVertTarget = Math.sin(this.pitch) * speed * 0.72;
+            if (!aboveEyeWater && swimVertTarget > 0) {
+              swimVertTarget = Math.min(swimVertTarget, 0.4);
+            }
+            this.vy += (swimVertTarget - this.vy) * Math.min(1, subDt * 7.5);
           } else {
-            // Gentle sinking in deep water when idle
-            this.vy = Math.max(-2.1, this.vy - GRAVITY * 0.16 * subDt);
+            // Very gentle sinking when idle in deep water
+            this.vy = Math.max(-1.35, this.vy - GRAVITY * 0.08 * subDt);
           }
           dy = this.vy * subDt;
         } else {
@@ -556,7 +572,8 @@ export class PlayerController {
       walkPhase: this.walkPhase,
       moveBlend: this.moveBlend,
       swingProgress: this.firstPersonHand.getSwingProgress(),
-      isCrouching: this.isCrouching || this.isSwimming,
+      isCrouching: this.isCrouching,
+      isSwimming: this.isSwimming,
       time: this.time,
     });
 

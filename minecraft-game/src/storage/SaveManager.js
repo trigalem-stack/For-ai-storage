@@ -159,7 +159,7 @@ export class SaveManager {
       : ((Math.floor(Math.random() * 0x7fffffff) + 1) | 0);
 
     const worldData = {
-      version: 4,
+      version: 5,
       id,
       name: cleanName,
       worldSeed: cleanSeed,
@@ -168,6 +168,8 @@ export class SaveManager {
       spawnPoint: null,
       player: null,
       hotbar: null,
+      inventory: null,
+      blockEntities: null,
       modifiedBlocks: [],
       createdAt: now,
       updatedAt: now,
@@ -204,7 +206,7 @@ export class SaveManager {
     const mods = Array.isArray(state.modifiedBlocks) ? state.modifiedBlocks : [];
 
     const payload = {
-      version: 4,
+      version: 5,
       id: worldId,
       name,
       worldSeed: state.worldSeed,
@@ -213,6 +215,8 @@ export class SaveManager {
       spawnPoint: state.spawnPoint ?? existing?.spawnPoint ?? null,
       player: state.player,
       hotbar: state.hotbar || null,
+      inventory: state.inventory ?? existing?.inventory ?? null,
+      blockEntities: state.blockEntities ?? existing?.blockEntities ?? null,
       modifiedBlocks: mods,
       createdAt,
       updatedAt: now,

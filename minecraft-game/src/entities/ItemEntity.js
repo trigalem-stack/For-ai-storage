@@ -1,14 +1,16 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { BlockRegistry } from '../blocks/BlockRegistry.js';
-import { FACE_SHADE, MAX_STACK_SIZE } from '../constants.js';
+import { ITEM_DROP_PLAYER_DELAY, FACE_SHADE, MAX_STACK_DEFAULT } from '../constants.js';
 import { moveAABB } from '../physics/AABBPhysics.js';
+import { ItemRegistry } from '../items/ItemRegistry.js';
+import { getExtrudedTileGeometry } from '../textures/ExtrudedItemMesh.js';
 
 const ITEM_SIZE = 0.26;
 const ITEM_HALF = ITEM_SIZE * 0.5;
 const ITEM_GRAVITY = 24.0;
-const PICKUP_DELAY = 0.22;
-const MAGNET_RADIUS = 1.8;
-const PICKUP_RADIUS = 0.52;
+const PICKUP_DELAY_DEFAULT = 0.22;
+const MAGNET_RADIUS = 1.85;
+const PICKUP_RADIUS = 0.54;
 const MERGE_RADIUS = 1.1;
 const MAX_DROPPED_ITEMS = 120;
 
@@ -22,15 +24,19 @@ const CUBE_FACES = [
 ];
 
 /**
- * Builds and caches a crisp 3D textured BufferGeometry for dropped ItemEntities
- * and the 1st-person held item:
- * - Cross plants (dandelion, poppy, tall grass, etc.) render as flat upright sprites (NOT cubes!)
- * - Torches render as 2x10x2 3D voxel torches
- * - Beds render as miniature 3D beds with pillow, blanket & legs
- * - Standard blocks render as cubes (respecting inset for Cactus)
+ * Builds crisp 3D BufferGeometry for blocks (with cross-plant flats, 3D torches,
+ * 3D beds, and 3D ladders) OR delegates non-block items (>=256) to 1-px extruded 3D geometry.
  */
-export function buildBlockItemGeometry(atlas, blockId, scale = 1.0) {
-  const def = BlockRegistry.get(blockId);
+export function buildBlockItemGeometry(atlas, itemId, scale = 1.0) {
+  if (!itemId || itemId <= 0) return null;
+
+  if (itemId >= 256) {
+    const itemDef = ItemRegistry.get(itemId);
+    if (!itemDef || !itemDef.sprite) return null;
+    return getExtrudedTileGeometry(atlas, itemDef.sprite, { scale: scale * 1.35 });
+  }
+
+  const def = BlockRegistry.get(itemId);
   if (!def || !def.faces) return null;
 
   const positions = [];
@@ -51,8 +57,8 @@ export function buildBlockItemGeometry(atlas, blockId, scale = 1.0) {
     indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   };
 
-  // 1. Flat sprite item for Cross Plants (flowers, tall grass, mushrooms, dead bush, vines)
-  if (def.isCross) {
+  // 1. Flat sprite item for Cross Plants & Ladders
+  if (def.isCross || def.isLadder) {
     const uv = atlas.getUV(def.faces.top);
     const h = 0.54 * scale;
     const zOff = 0.015 * scale;
@@ -68,7 +74,7 @@ export function buildBlockItemGeometry(atlas, blockId, scale = 1.0) {
     return geom;
   }
 
-  // 2. 3D Torch model (2x10x2 pixels)
+  // 2. 3D Torch model (2x10x2 pixels = 5 faces = 20 verts)
   if (def.isTorch) {
     const uv = atlas.getUV('torch');
     const du = uv.u1 - uv.u0;
@@ -108,15 +114,13 @@ export function buildBlockItemGeometry(atlas, blockId, scale = 1.0) {
     const yBot = -0.14 * scale;
     const yTop = 0.16 * scale;
 
-    // Top pillow + blanket halves
     addQuad([-hw, yTop, 0], [hw, yTop, 0], [hw, yTop, -hl], [-hw, yTop, -hl], 0, 1, 0, headUv.u0, headUv.u1, headUv.vBottom, headUv.vTop, 1.0);
     addQuad([-hw, yTop, hl], [hw, yTop, hl], [hw, yTop, 0], [-hw, yTop, 0], 0, 1, 0, footUv.u0, footUv.u1, footUv.vBottom, footUv.vTop, 1.0);
-    // Underside & sides
     addQuad([-hw, yBot, -hl], [hw, yBot, -hl], [hw, yBot, hl], [-hw, yBot, hl], 0, -1, 0, woodUv.u0, woodUv.u1, woodUv.vBottom, woodUv.vTop, 0.6);
-    addQuad([-hw, yBot, hl], [hw, yBot, hl], [hw, yTop, hl], [-hw, yTop, hl], 0, 0, 1, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.35, sideUv.vTop, 0.85);
+    addQuad([-hw, yBot, hl], [hw, yBot, hl], [hw, yTop, hl], [-hw, yTop, hl], 0, 0, 1, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.4, sideUv.vTop, 0.85);
     addQuad([hw, yBot, -hl], [-hw, yBot, -hl], [-hw, yTop, -hl], [hw, yTop, -hl], 0, 0, -1, woodUv.u0, woodUv.u1, woodUv.vBottom, woodUv.vTop, 0.8);
-    addQuad([hw, yBot, hl], [hw, yBot, -hl], [hw, yTop, -hl], [hw, yTop, hl], 1, 0, 0, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.35, sideUv.vTop, 0.72);
-    addQuad([-hw, yBot, -hl], [-hw, yBot, hl], [-hw, yTop, hl], [-hw, yTop, -hl], -1, 0, 0, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.35, sideUv.vTop, 0.70);
+    addQuad([hw, yBot, hl], [hw, yBot, -hl], [hw, yTop, -hl], [hw, yTop, hl], 1, 0, 0, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.4, sideUv.vTop, 0.72);
+    addQuad([-hw, yBot, -hl], [-hw, yBot, hl], [-hw, yTop, hl], [-hw, yTop, -hl], -1, 0, 0, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.4, sideUv.vTop, 0.70);
 
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -158,15 +162,27 @@ export function buildBlockItemGeometry(atlas, blockId, scale = 1.0) {
 }
 
 export class ItemEntity {
-  constructor(blockId, count, x, y, z, geometry, material) {
-    this.blockId = blockId;
+  constructor(id, count, x, y, z, geometry, material, options = {}) {
+    this.id = id;
+    this.blockId = id; // Backwards-compatibility alias
     this.count = count;
+    this.durability = options.durability ?? 0;
+    this.maxDurability = options.maxDurability ?? ItemRegistry.getMaxDurability(id);
+    this.meta = options.meta ?? 0;
+    this.pickupDelay = options.pickupDelay ?? PICKUP_DELAY_DEFAULT;
+
     this.x = x;
     this.y = y;
     this.z = z;
-    this.vx = (Math.random() - 0.5) * 3.0;
-    this.vy = 2.6 + Math.random() * 1.4;
-    this.vz = (Math.random() - 0.5) * 3.0;
+    if (options.throwDir) {
+      this.vx = options.throwDir.x * 4.4 + (Math.random() - 0.5) * 0.4;
+      this.vy = options.throwDir.y * 2.5 + 2.2;
+      this.vz = options.throwDir.z * 4.4 + (Math.random() - 0.5) * 0.4;
+    } else {
+      this.vx = (Math.random() - 0.5) * 3.0;
+      this.vy = 2.6 + Math.random() * 1.4;
+      this.vz = (Math.random() - 0.5) * 3.0;
+    }
     this.onGround = false;
     this.age = 0;
     this.phase = Math.random() * Math.PI * 2;
@@ -190,48 +206,82 @@ export class ItemEntityManager {
       alphaTest: 0.5,
       side: THREE.DoubleSide,
     });
+    this.extrudedMaterial = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      fog: true,
+      side: THREE.FrontSide,
+    });
   }
 
-  _getGeometry(blockId) {
-    let geom = this.geometryCache.get(blockId);
+  _getGeometry(itemId) {
+    let geom = this.geometryCache.get(itemId);
     if (!geom) {
-      geom = buildBlockItemGeometry(this.atlas, blockId, ITEM_SIZE);
-      if (geom) this.geometryCache.set(blockId, geom);
+      geom = buildBlockItemGeometry(this.atlas, itemId, ITEM_SIZE);
+      if (geom && itemId < 256) {
+        this.geometryCache.set(itemId, geom);
+      }
     }
     return geom;
   }
 
-  spawnDrop(blockId, x, y, z, count = 1) {
-    if (!blockId || count <= 0) return null;
+  spawnDrop(itemOrId, x, y, z, count = 1, options = {}) {
+    const isObj = typeof itemOrId === 'object' && itemOrId !== null;
+    const id = isObj ? itemOrId.id : itemOrId;
+    let qty = isObj ? (itemOrId.count ?? count) : count;
+    const durability = isObj ? (itemOrId.durability ?? 0) : (options.durability ?? 0);
+    const maxDurability = isObj ? (itemOrId.maxDurability ?? ItemRegistry.getMaxDurability(id)) : ItemRegistry.getMaxDurability(id);
+    const meta = isObj ? (itemOrId.meta ?? 0) : (options.meta ?? 0);
 
-    // Try merging immediately into a close identical entity
-    for (const other of this.entities) {
-      if (!other.alive || other.blockId !== blockId || other.count >= MAX_STACK_SIZE) continue;
-      const d = Math.hypot(other.x - x, other.y - y, other.z - z);
-      if (d < MERGE_RADIUS) {
-        const space = MAX_STACK_SIZE - other.count;
-        const add = Math.min(space, count);
-        other.count += add;
-        count -= add;
-        if (count <= 0) return other;
+    if (!id || qty <= 0) return null;
+    const maxStack = ItemRegistry.getMaxStack(id);
+
+    // Merge identical stackable drops nearby
+    if (maxStack > 1 && maxDurability === 0) {
+      for (const other of this.entities) {
+        if (!other.alive || other.id !== id || other.meta !== meta || other.count >= maxStack) continue;
+        const d = Math.hypot(other.x - x, other.y - y, other.z - z);
+        if (d < MERGE_RADIUS) {
+          const space = maxStack - other.count;
+          const add = Math.min(space, qty);
+          other.count += add;
+          qty -= add;
+          if (qty <= 0) return other;
+        }
       }
     }
 
-    // Cap maximum dropped entities cleanly by removing oldest
     if (this.entities.length >= MAX_DROPPED_ITEMS) {
       const oldest = this.entities.shift();
       this.scene.remove(oldest.mesh);
     }
 
-    const geom = this._getGeometry(blockId);
+    const geom = this._getGeometry(id);
     if (!geom) return null;
-    const entity = new ItemEntity(blockId, count, x, y, z, geom, this.material);
+    const mat = id >= 256 ? this.extrudedMaterial : this.material;
+    const entity = new ItemEntity(id, qty, x, y, z, geom, mat, {
+      durability,
+      maxDurability,
+      meta,
+      pickupDelay: options.pickupDelay ?? PICKUP_DELAY_DEFAULT,
+      throwDir: options.throwDir || null,
+    });
     this.entities.push(entity);
     this.scene.add(entity.mesh);
     return entity;
   }
 
-  update(dt, world, player, hotbar) {
+  spawnPlayerDrop(stack, player, lookDir) {
+    if (!stack || !stack.id || stack.count <= 0) return null;
+    const sx = player.x + lookDir.x * 0.6;
+    const sy = player.y + 1.25;
+    const sz = player.z + lookDir.z * 0.6;
+    return this.spawnDrop(stack, sx, sy, sz, stack.count, {
+      pickupDelay: ITEM_DROP_PLAYER_DELAY,
+      throwDir: lookDir,
+    });
+  }
+
+  update(dt, world, player, receiver) {
     const targetX = player.x;
     const targetY = player.y + 0.85;
     const targetZ = player.z;
@@ -245,22 +295,20 @@ export class ItemEntityManager {
       }
 
       item.age += dt;
-
-      // Despawn after 5 minutes
       if (item.age > 300) {
         item.alive = false;
         continue;
       }
 
-      // Magnetic pickup toward player
       const dxp = targetX - item.x;
       const dyp = targetY - item.y;
       const dzp = targetZ - item.z;
       const dist = Math.hypot(dxp, dyp, dzp);
 
-      if (item.age >= PICKUP_DELAY && dist < MAGNET_RADIUS && hotbar.canAccept(item.blockId)) {
+      const canPick = receiver && (typeof receiver.canAccept === 'function' ? receiver.canAccept(item.id, item.count, item.durability) : true);
+      if (item.age >= item.pickupDelay && dist < MAGNET_RADIUS && canPick) {
         if (dist < PICKUP_RADIUS) {
-          const leftover = hotbar.addItem(item.blockId, item.count);
+          const leftover = receiver.addItem(item.id, item.count, item.durability, item.meta);
           if (leftover <= 0) {
             item.alive = false;
             this.scene.remove(item.mesh);
@@ -279,7 +327,6 @@ export class ItemEntityManager {
         }
       }
 
-      // Standard physics with block collisions & friction
       item.vy = Math.max(-24, item.vy - ITEM_GRAVITY * dt);
       const res = moveAABB(
         world,
@@ -307,14 +354,14 @@ export class ItemEntityManager {
       }
       if (res.hitCeiling) item.vy = 0;
 
-      // Periodically merge resting nearby stacks
-      if (item.onGround && Math.floor(item.age * 4) !== Math.floor((item.age - dt) * 4)) {
+      const maxStack = ItemRegistry.getMaxStack(item.id) || MAX_STACK_DEFAULT;
+      if (maxStack > 1 && item.maxDurability === 0 && item.onGround && Math.floor(item.age * 4) !== Math.floor((item.age - dt) * 4)) {
         for (let j = i - 1; j >= 0; j--) {
           const other = this.entities[j];
-          if (!other.alive || other.blockId !== item.blockId || other.count >= MAX_STACK_SIZE) continue;
+          if (!other.alive || other.id !== item.id || other.meta !== item.meta || other.count >= maxStack) continue;
           const d = Math.hypot(other.x - item.x, other.y - item.y, other.z - item.z);
           if (d < MERGE_RADIUS) {
-            const add = Math.min(MAX_STACK_SIZE - other.count, item.count);
+            const add = Math.min(maxStack - other.count, item.count);
             other.count += add;
             item.count -= add;
             if (item.count <= 0) {
@@ -345,5 +392,6 @@ export class ItemEntityManager {
     }
     this.geometryCache.clear();
     this.material.dispose();
+    this.extrudedMaterial.dispose();
   }
 }

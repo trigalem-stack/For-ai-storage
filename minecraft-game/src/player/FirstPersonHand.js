@@ -1,11 +1,13 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { BlockRegistry } from '../blocks/BlockRegistry.js';
 import { buildBlockItemGeometry } from '../entities/ItemEntity.js';
+import { ItemRegistry } from '../items/ItemRegistry.js';
+import { getExtrudedTileGeometry } from '../textures/ExtrudedItemMesh.js';
 import { createRightArmGeometry } from './PlayerSkin.js';
 
 /**
- * Dedicated first-person right-arm / held-block overlay rendered in a depth-cleared pass
- * so the player's arm or held block never clips into nearby terrain.
+ * Dedicated first-person right-arm / held-item overlay rendered in a depth-cleared pass
+ * so the player's arm or held 3D tool/block never clips into nearby terrain.
  */
 export class FirstPersonHand {
   constructor(skinTexture, atlas) {
@@ -13,7 +15,7 @@ export class FirstPersonHand {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / Math.max(1, window.innerHeight), 0.05, 10);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.78);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.82);
     const dir = new THREE.DirectionalLight(0xfff8eb, 0.72);
     dir.position.set(1.2, 2.0, 1.4);
     this.scene.add(ambient, dir);
@@ -30,6 +32,11 @@ export class FirstPersonHand {
       side: THREE.DoubleSide,
     });
 
+    this.extrudedMaterial = new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      side: THREE.FrontSide,
+    });
+
     this.pivot = new THREE.Group();
     this.scene.add(this.pivot);
 
@@ -43,13 +50,14 @@ export class FirstPersonHand {
     this.armHolder.add(this.armMesh);
     this.pivot.add(this.armHolder);
 
-    // Held 3D block mount (shown instead of bare arm when a block is selected in hotbar)
+    // Held 3D block or 1-px extruded tool mount
     this.heldItemMount = new THREE.Group();
     this.heldItemMount.visible = false;
     this.pivot.add(this.heldItemMount);
 
-    this.heldBlockCache = new Map();
-    this.currentHeldBlockId = 0;
+    this.heldCache = new Map();
+    this.currentHeldId = 0;
+    this.currentHeldIsTool = false;
 
     // Animation & inertia state
     this.swayX = 0;
@@ -60,46 +68,76 @@ export class FirstPersonHand {
     this.isMining = false;
   }
 
+  // Alias preserved for Stage 2/4 tests
+  get currentHeldBlockId() {
+    return this.currentHeldId;
+  }
+
   resize(width, height) {
     this.camera.aspect = width / Math.max(1, height);
     this.camera.updateProjectionMatrix();
   }
 
-  setHeldBlock(blockId) {
-    const id = blockId || 0;
-    if (id === this.currentHeldBlockId) return;
-    this.currentHeldBlockId = id;
+  setHeldBlock(itemOrId) {
+    this.setHeldItem(itemOrId);
+  }
+
+  setHeldItem(itemOrId) {
+    const id = typeof itemOrId === 'object' && itemOrId !== null ? (itemOrId.id || 0) : (itemOrId || 0);
+    if (id === this.currentHeldId) return;
+    this.currentHeldId = id;
 
     while (this.heldItemMount.children.length > 0) {
       this.heldItemMount.remove(this.heldItemMount.children[0]);
     }
 
     if (id <= 0) {
+      this.currentHeldIsTool = false;
       this.armHolder.visible = true;
       this.heldItemMount.visible = false;
       return;
     }
 
-    let mesh = this.heldBlockCache.get(id);
+    const itemDef = ItemRegistry.get(id);
+    const isExtrudedItem = id >= 256;
+    this.currentHeldIsTool = isExtrudedItem && Boolean(itemDef?.toolType);
+
+    let mesh = this.heldCache.get(id);
     if (!mesh) {
-      const geom = buildBlockItemGeometry(this.atlas, id, 0.36);
-      if (!geom) {
-        this.armHolder.visible = true;
-        this.heldItemMount.visible = false;
-        return;
-      }
-      mesh = new THREE.Mesh(geom, this.blockMaterial);
-      const def = BlockRegistry.get(id);
-      if (def.isCross) {
-        mesh.rotation.set(0.06, -0.22, -0.06);
-      } else if (def.isTorch) {
-        mesh.rotation.set(-0.22, 0.12, -0.14);
-      } else if (def.isBed) {
-        mesh.rotation.set(0.28, Math.PI * 0.35, 0.08);
+      if (isExtrudedItem) {
+        if (!itemDef || !itemDef.sprite) {
+          this.armHolder.visible = true;
+          this.heldItemMount.visible = false;
+          return;
+        }
+        const geom = getExtrudedTileGeometry(this.atlas, itemDef.sprite, { scale: 0.54 });
+        mesh = new THREE.Mesh(geom, this.extrudedMaterial);
+        if (itemDef.toolType && itemDef.toolType !== 'bucket') {
+          // Authentic diagonal grip pointing forward-upward into the view
+          mesh.rotation.set(-0.22, -Math.PI * 0.42, 0.26);
+        } else {
+          mesh.rotation.set(0.12, -0.32, -0.08);
+        }
       } else {
-        mesh.rotation.set(0.18, Math.PI * 0.25, 0.08);
+        const geom = buildBlockItemGeometry(this.atlas, id, 0.36);
+        if (!geom) {
+          this.armHolder.visible = true;
+          this.heldItemMount.visible = false;
+          return;
+        }
+        mesh = new THREE.Mesh(geom, this.blockMaterial);
+        const def = BlockRegistry.get(id);
+        if (def.isCross || def.isLadder) {
+          mesh.rotation.set(0.06, -0.22, -0.06);
+        } else if (def.isTorch) {
+          mesh.rotation.set(-0.22, 0.12, -0.14);
+        } else if (def.isBed) {
+          mesh.rotation.set(0.28, Math.PI * 0.35, 0.08);
+        } else {
+          mesh.rotation.set(0.18, Math.PI * 0.25, 0.08);
+        }
       }
-      this.heldBlockCache.set(id, mesh);
+      this.heldCache.set(id, mesh);
     }
 
     this.heldItemMount.add(mesh);
@@ -109,26 +147,26 @@ export class FirstPersonHand {
 
   /**
    * Dynamically tints the 1st-person arm & held item from surrounding voxel sky/block light.
-   * Emissive held items (torch, glowstone, jack o'lantern) stay bright even inside dark caves.
+   * Emissive held items stay warmly bright even inside dark caves.
    */
   setEnvironmentLight(skyLevel, blockLevel, sunIntensity, skyTint, torchTint) {
-    const def = BlockRegistry.get(this.currentHeldBlockId);
+    const def = ItemRegistry.get(this.currentHeldId);
     const heldEmit = def?.lightEmission || 0;
 
-    const skyEff = Math.min(1, Math.max(0, (skyLevel / 15) * sunIntensity));
+    const skyCurve = Math.pow(0.82, (1 - Math.min(1, Math.max(0, skyLevel / 15))) * 15);
+    const sunCurve = Math.pow(Math.max(0.001, sunIntensity), 0.92);
     const blkEff = Math.min(1, Math.max(0, Math.max(blockLevel, heldEmit * 0.6) / 15));
-    const skyCurve = Math.pow(0.8, (1 - skyEff) * 15);
     const blkCurve = Math.pow(0.8, (1 - blkEff) * 15);
 
-    const sr = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.r : 1);
-    const sg = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.g : 1);
-    const sb = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.b : 1);
+    const sr = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.r : 1);
+    const sg = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.g : 1);
+    const sb = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.b : 1);
 
-    const br = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.r : 1);
-    const bg = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.g : 0.78);
-    const bb = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.b : 0.48);
+    const br = Math.pow(Math.max(0.001, blkCurve), 2.0) * (torchTint ? torchTint.r : 1);
+    const bg = Math.pow(Math.max(0.001, blkCurve), 2.0) * (torchTint ? torchTint.g : 0.78);
+    const bb = Math.pow(Math.max(0.001, blkCurve), 2.0) * (torchTint ? torchTint.b : 0.48);
 
-    const minL = 0.06;
+    const minL = 0.07;
     const ar = Math.min(1, Math.max(minL, sr, br));
     const ag = Math.min(1, Math.max(minL, sg, bg));
     const ab = Math.min(1, Math.max(minL, sb, bb));
@@ -136,8 +174,10 @@ export class FirstPersonHand {
     this.armMaterial.color.setRGB(ar, ag, ab);
     if (heldEmit > 0) {
       this.blockMaterial.color.setRGB(1, 0.96, 0.90);
+      this.extrudedMaterial.color.setRGB(1, 0.96, 0.90);
     } else {
       this.blockMaterial.color.setRGB(ar, ag, ab);
+      this.extrudedMaterial.color.setRGB(ar, ag, ab);
     }
   }
 
@@ -189,18 +229,31 @@ export class FirstPersonHand {
     const bobY = -Math.abs(Math.sin(walkPhase)) * 0.038 * moveBlend;
     const crouchDrop = isCrouching ? -0.045 : 0;
 
-    if (this.currentHeldBlockId > 0) {
-      // Held 3D block pose in bottom-right corner
-      this.pivot.position.set(
-        0.52 + bobX + this.swayX - swingWave * 0.24,
-        -0.44 + bobY + crouchDrop + this.swayY - swingWave * 0.14 + swingDip,
-        -0.76 - swingWave * 0.18
-      );
-      this.pivot.rotation.set(
-        -swingWave * 0.72 + this.swayY * 0.7,
-        swingWave * 0.42 + this.swayX * 0.7,
-        swingWave * 0.22
-      );
+    if (this.currentHeldId > 0) {
+      if (this.currentHeldIsTool) {
+        // Extruded 3D tool with energetic forward chop swing
+        this.pivot.position.set(
+          0.48 + bobX + this.swayX - swingWave * 0.28,
+          -0.36 + bobY + crouchDrop + this.swayY - swingWave * 0.16 + swingDip,
+          -0.72 - swingWave * 0.14
+        );
+        this.pivot.rotation.set(
+          -swingWave * 0.96 + this.swayY * 0.7,
+          swingWave * 0.56 + this.swayX * 0.7,
+          swingWave * 0.34
+        );
+      } else {
+        this.pivot.position.set(
+          0.52 + bobX + this.swayX - swingWave * 0.24,
+          -0.44 + bobY + crouchDrop + this.swayY - swingWave * 0.14 + swingDip,
+          -0.76 - swingWave * 0.18
+        );
+        this.pivot.rotation.set(
+          -swingWave * 0.72 + this.swayY * 0.7,
+          swingWave * 0.42 + this.swayX * 0.7,
+          swingWave * 0.22
+        );
+      }
     } else {
       // Bare right arm pose: sleeve back-right, forearm extending forward-left-up
       this.pivot.position.set(
@@ -224,10 +277,11 @@ export class FirstPersonHand {
   dispose() {
     this.armMesh.geometry.dispose();
     this.armMaterial.dispose();
-    for (const mesh of this.heldBlockCache.values()) {
-      mesh.geometry.dispose();
+    for (const [id, mesh] of this.heldCache.entries()) {
+      if (id < 256) mesh.geometry.dispose();
     }
-    this.heldBlockCache.clear();
+    this.heldCache.clear();
     this.blockMaterial.dispose();
+    this.extrudedMaterial.dispose();
   }
 }

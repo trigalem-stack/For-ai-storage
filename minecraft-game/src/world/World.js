@@ -31,6 +31,7 @@ export class World {
     this.lastPlayerChunkX = null;
     this.lastPlayerChunkZ = null;
     this.pendingCoords = [];
+    this.pendingLightChunks = [];
     this._neighborScratch = new Array(9);
 
     // Offline Blob Web Worker pool for smooth zero-copy chunk generation
@@ -126,17 +127,12 @@ export class World {
     chunk.minY = minY;
     chunk.maxY = maxY;
     chunk.isGenerated = true;
-    chunk.dirty = true;
+    chunk.lightCalculated = false;
+    chunk.dirty = false;
 
     this._applyModifiedBlocksToChunk(chunk);
     this.chunks.set(key, chunk);
-    this.lighting.initChunkLighting(this, chunk);
-
-    if (this.unlimitedMemory) {
-      this._saveToCache(chunk);
-    }
-
-    this._markOrthogonalNeighborsDirty(cx, cz);
+    this.pendingLightChunks.push(chunk);
   }
 
   _saveToCache(chunk) {
@@ -184,6 +180,7 @@ export class World {
   loadModifiedBlocks(entries) {
     this.modifiedBlocks.clear();
     this.modifiedByChunk.clear();
+    this.pendingLightChunks.length = 0;
     if (!Array.isArray(entries)) return;
     for (const item of entries) {
       if (!Array.isArray(item) || item.length < 4) continue;
@@ -210,8 +207,14 @@ export class World {
       if (chunk && chunk.isGenerated) {
         chunk.setBlock(lx, wy, lz, id, meta);
         chunk.lightCalculated = false;
+        chunk.dirty = true;
+        this.pendingLightChunks.push(chunk);
       }
     }
+  }
+
+  setHeldLight(x, y, z, level) {
+    this.mesher.setHeldLight(x, y, z, level);
   }
 
   exportModifiedBlocks() {
@@ -508,7 +511,7 @@ export class World {
 
     if (this.workers.length > 0) {
       if (this.inFlightKeys.has(key)) return true;
-      if (this.inFlightKeys.size >= 8) return false;
+      if (this.inFlightKeys.size >= 4) return false;
       this.inFlightKeys.add(key);
       const worker = this.workers[this.nextWorkerIdx % this.workers.length];
       this.nextWorkerIdx++;
@@ -524,6 +527,7 @@ export class World {
     const oldOpaque = chunk.opaqueMesh;
     const oldCutout = chunk.cutoutMesh;
     const oldWater = chunk.waterMesh;
+    const oldIce = chunk.iceMesh;
 
     // Collect 3x3 neighbor chunk references once per chunk build (zero Map lookups in inner loop!)
     const nb = this._neighborScratch;
@@ -536,7 +540,7 @@ export class World {
       }
     }
 
-    const { opaqueGeometry, cutoutGeometry, waterGeometry } = this.mesher.buildChunkGeometries(chunk, nb);
+    const { opaqueGeometry, cutoutGeometry, waterGeometry, iceGeometry } = this.mesher.buildChunkGeometries(chunk, nb);
 
     const worldX = chunk.cx * CHUNK_SIZE;
     const worldZ = chunk.cz * CHUNK_SIZE;
@@ -555,6 +559,11 @@ export class World {
       this.scene.remove(oldWater);
       oldWater.geometry.dispose();
       chunk.waterMesh = null;
+    }
+    if (oldIce) {
+      this.scene.remove(oldIce);
+      oldIce.geometry.dispose();
+      chunk.iceMesh = null;
     }
 
     if (opaqueGeometry) {
@@ -575,6 +584,17 @@ export class World {
       mesh.frustumCulled = true;
       this.scene.add(mesh);
       chunk.cutoutMesh = mesh;
+    }
+
+    if (iceGeometry) {
+      const mesh = new THREE.Mesh(iceGeometry, this.mesher.iceMaterial);
+      mesh.position.set(worldX, 0, worldZ);
+      mesh.matrixAutoUpdate = false;
+      mesh.updateMatrix();
+      mesh.renderOrder = 1;
+      mesh.frustumCulled = true;
+      this.scene.add(mesh);
+      chunk.iceMesh = mesh;
     }
 
     if (waterGeometry) {
@@ -616,11 +636,34 @@ export class World {
           this.chunks.delete(key);
         }
       }
+      if (this.pendingLightChunks.length > 0) {
+        this.pendingLightChunks = this.pendingLightChunks.filter((c) => this.chunks.has(c.key));
+      }
 
       this.pendingCoords = this._collectSpiralCoords(pcx, pcz, this.renderDistance);
     }
 
     const startTime = performance.now();
+
+    // 1. Spread initial voxel lighting across frames under CHUNK_FRAME_BUDGET_MS (prevents mobile spikes!)
+    if (this.pendingLightChunks.length > 0) {
+      this.pendingLightChunks.sort((a, b) => {
+        const da = (a.cx - pcx) * (a.cx - pcx) + (a.cz - pcz) * (a.cz - pcz);
+        const db = (b.cx - pcx) * (b.cx - pcx) + (b.cz - pcz) * (b.cz - pcz);
+        return da - db;
+      });
+      let processedLight = 0;
+      while (this.pendingLightChunks.length > 0) {
+        if (processedLight > 0 && performance.now() - startTime >= CHUNK_FRAME_BUDGET_MS * 0.6) break;
+        const chunk = this.pendingLightChunks.shift();
+        if (!this.chunks.has(chunk.key) || chunk.lightCalculated) continue;
+        this.lighting.initChunkLighting(this, chunk);
+        chunk.dirty = true;
+        if (this.unlimitedMemory) this._saveToCache(chunk);
+        this._markOrthogonalNeighborsDirty(chunk.cx, chunk.cz);
+        processedLight++;
+      }
+    }
 
     while (this.pendingCoords.length > 0) {
       if (performance.now() - startTime >= CHUNK_FRAME_BUDGET_MS) break;
@@ -637,7 +680,7 @@ export class World {
 
     const dirtyChunks = [];
     for (const chunk of this.chunks.values()) {
-      if (chunk.dirty && chunk.isGenerated) {
+      if (chunk.dirty && chunk.isGenerated && chunk.lightCalculated) {
         const dx = chunk.cx - pcx;
         const dz = chunk.cz - pcz;
         dirtyChunks.push([chunk, dx * dx + dz * dz]);
@@ -656,6 +699,7 @@ export class World {
     this.disposed = true;
     this._terminateWorkers();
     this.lighting.clear();
+    this.pendingLightChunks.length = 0;
     for (const chunk of this.chunks.values()) {
       chunk.disposeMeshes(this.scene);
     }
@@ -664,5 +708,6 @@ export class World {
     this.mesher.opaqueMaterial.dispose();
     this.mesher.cutoutMaterial.dispose();
     this.mesher.waterMaterial.dispose();
+    this.mesher.iceMaterial.dispose();
   }
 }

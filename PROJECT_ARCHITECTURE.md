@@ -11,10 +11,10 @@ Because the repository root contains existing user assets (`*.jar`, `Astrummc.zi
 
 ```text
 minecraft-game/
-├── index.html                  # Web entry point (Main Menu, World Manager, Tabbed Settings, Sleep Fade, F3 + Time Bar)
-├── styles.css                  # Pixel Minecraft UI, 100vw x 100dvh, pure white crosshair, left-half dynamic joystick
+├── index.html                  # Web entry point (Main Menu, World Manager, Settings, Inventory/Crafting/Furnace/Chest UI, Recipe Book)
+├── styles.css                  # Pixel Minecraft UI, 100vw x 100dvh, pure white crosshair, durability bars, responsive mobile dialogs
 ├── manifest.json               # PWA web manifest for offline web caching
-├── sw.js                       # Service Worker for offline asset caching (minecraft-web-stage4-v1)
+├── sw.js                       # Service Worker for offline asset caching (minecraft-web-stage5-v1)
 ├── minecraft-offline.html      # Single-file standalone offline build (committed to Git)
 ├── package.json                # Dev tooling (three, esbuild) and npm scripts
 ├── vendor/
@@ -26,54 +26,62 @@ minecraft-game/
 │   ├── test-stage1.mjs         # Stage 1 test suite
 │   ├── test-stage2.mjs         # Stage 2 test suite
 │   ├── test-stage3.mjs         # Stage 3 test suite
-│   └── test-stage4.mjs         # Stage 4 test suite (day/night cycle, BFS lighting, torches, beds, item-4 fixes)
+│   ├── test-stage4.mjs         # Stage 4 test suite (day/night cycle, BFS lighting, torches, beds)
+│   └── test-stage5.mjs         # Stage 5 test suite (items, tools, durability, 2x2/3x3 crafting, smelting, chests, fixes)
 └── src/
-    ├── main.js                 # Game loop (MenuPanorama vs World), 20 TPS clock, torch/bed mechanics, dynamic entity lighting
-    ├── constants.js            # 24k tick day/night constants, light levels, swim/fly speeds, world dims (16x128x16)
+    ├── main.js                 # Game loop (Survival/Creative toggle, mining cracks, BlockEntities, held light, paper-doll render)
+    ├── constants.js            # Tick rate, 24k cycle, inventory/chest/furnace sizes, tool durabilities, swim/fly speeds
     ├── physics/
-    │   └── AABBPhysics.js      # Axis-separated AABB collisions (0.6x1.8 / 0.6x1.5 crouch / 0.6x0.9 swim), Edge Guard
+    │   └── AABBPhysics.js      # Axis-separated AABB collisions (0.6x1.8 / 0.6x1.5 crouch / 0.6x0.82 swim), Edge Guard
     ├── blocks/
-    │   └── BlockRegistry.js    # 45 blocks (0..44): Torch, Glowstone, Jack o'Lantern, Bed Foot/Head, Redstone Ore glow, opacity LUTs
+    │   └── BlockRegistry.js    # 57 blocks (0..56): Crafting Table, Furnace (Lit), Chest, Glass, Ladder, Wool, minToolTier & harvest drops
+    ├── items/
+    │   ├── ItemIds.js          # Non-block item IDs (256..322): materials, 5x5 tools, 3x4 armor sets, bucket, flint & steel, shears
+    │   ├── ItemRegistry.js     # Unified block + item lookup, stack sizes, tool speed/tier, armor points, held-light emission
+    │   ├── RecipeRegistry.js   # 2x2 & 3x3 shaped/mirrored/shapeless crafting recipes, smelting recipes, fuel burn ticks, Recipe Book
+    │   └── Inventory.js        # 36-slot + 4-armor-slot state, durability wear (`damageHeldTool`), slot drops & serialization
     ├── textures/
-    │   └── TextureAtlas.js     # Procedural 16x16 padded atlas (512x512) + 2D torch/bed/plant icons
+    │   ├── ItemSprites.js      # Procedural 16x16 pixel-art sprites for tools, swords, armor, ingots, coal, sticks, utility items
+    │   ├── ExtrudedItemMesh.js # Cached 1-pixel voxel-extruded 3D BufferGeometry builder for held & dropped 2D item sprites
+    │   └── TextureAtlas.js     # Procedural 16x16 padded atlas (512x512), borderless Ice tile, raw pixel buffer & 2D icons
     ├── world/
     │   ├── Noise.js            # Seeded PRNG + 2D/3D Simplex-style noise & FBM
     │   ├── ChunkGenKernel.js   # Zero-import multi-noise 8-biome 5x5 smoother, 4x4x4 caves, authentic-rarity ore clusters
     │   ├── BiomeManager.js     # Biome sampling, temperature/humidity/continentalness queries & foliage tints
     │   ├── WorldGen.js         # WorldGen wrapper + inline Blob Web Worker generator for offline mode
-    │   ├── Chunk.js            # Blocks (Uint8Array), biomes, packed dual light `(sky<<4)|block`, lazy metadata (Uint8Array)
+    │   ├── Chunk.js            # Blocks (Uint8Array), biomes, packed dual light, lazy metadata & `iceMesh`
     │   ├── LightingEngine.js   # Dual-channel Flood-Fill BFS (`Int32Array` ring buffer), cross-chunk sync, Redstone Ore glow
-    │   ├── ChunkMesher.js      # Per-vertex `aLight`, uniform-driven dual-light shader, 3x3 neighbor meshing, 3D Torch & Bed meshes
-    │   ├── Raycast.js          # 3D DDA targeting blocks, plants, torches & beds with adaptive SelectionBox
-    │   ├── SkyRenderer.js      # 24,000-tick sky dome, 420 stars, 3D Sun, 8-phase Moon, Y=108..112 volumetric clouds (toggleable)
+    │   ├── ChunkMesher.js      # `opaque` / `cutout` / `ice` (`renderOrder=1`) / `water` (`renderOrder=2`), `uHeldLightPos`/`uHeldLightLevel`
+    │   ├── BlockEntityManager.js # Tick-driven Furnaces (`FURNACE` <-> `FURNACE_LIT` light=13), 27-slot Chests, break loot spill
+    │   ├── Raycast.js          # 3D DDA targeting blocks, plants, ladders & tight sub-voxel torches + 10-stage BreakCrackOverlay
+    │   ├── SkyRenderer.js      # 24,000-tick sky dome, stars, Sun, 8-phase Moon, clouds, brighter moonlight curve
     │   ├── SkyEnvironment.js   # Compatibility re-export of SkyRenderer
     │   ├── MenuPanorama.js     # Lightweight 6-face procedural skybox cube for smooth 60 FPS Main Menu backdrop
-    │   └── World.js            # Blob Web Worker pool, LightingEngine wiring, 3x3 meshing, meta deltas & chunkDataCache light cache
+    │   └── World.js            # 4-in-flight worker cap, frame-budgeted `pendingLightChunks`, `iceMaterial`, held light forwarding
     ├── entities/
-    │   ├── ItemEntity.js       # 3D dropped & held geometries: flat cross-plant sprites, 3D torches, mini beds, cubes
+    │   ├── ItemEntity.js       # 3D blocks, 1-px voxel-extruded tools/items, durability metadata & 1.5s player-throw delay
     │   └── FallingBlockEntity.js # Gravity-driven 3D falling Sand & Gravel with cascade stability checks
     ├── player/
-    │   ├── PlayerSkin.js       # Procedural 64x64 Steve skin canvas + articulated PlayerModel with dynamic voxel lighting
-    │   ├── FirstPersonHand.js  # Upright depth-cleared 1st-person arm & held item/plant/torch with dynamic voxel lighting
-    │   └── PlayerController.js # Verlet AABB physics, water surface/ascend fixes, reliable 1-block swim exit, fly speed tuning
+    │   ├── PlayerSkin.js       # Procedural 64x64 Steve skin, lazy 3D armor layers, held 3D tools, swim pose & `InventoryPlayerPreview`
+    │   ├── FirstPersonHand.js  # Upright 1st-person arm holding 3D blocks/torches or 1-px voxel-extruded tools/items
+    │   └── PlayerController.js # Verlet AABB physics, controlled water buoyancy & 1-block swim, ladder climbing & crouch-hold
     ├── ui/
-    │   ├── Hotbar.js           # Creative 9-slot Hotbar (with Torch/Glowstone/Bed/Dandelion/Redstone) + full Block Catalog (`E`)
-    │   ├── MobileControls.js   # Left-half dynamic floating joystick (double-push-only sprint), right-half look/tap/hold
-    │   └── Hud.js              # Pure-white crosshair (no dark outline), F3 + time preset switcher, World Manager, Sleep overlay
+    │   ├── Hotbar.js           # 9-slot hotbar synced to `Inventory`, item icons, colored durability bars & `[•••]` inventory trigger
+    │   ├── InventoryUI.js      # Unified modal (Player 2x2 + Paper Doll, Crafting Table 3x3, Furnace, Chest, Recipe Book, Touch/PC UX)
+    │   ├── MobileControls.js   # Left-half dynamic floating joystick, right-half look/tap/hold
+    │   └── Hud.js              # Pure-white crosshair, F3 + swim status + time bar, World Manager, Game Mode switch, Sleep overlay
     └── storage/
-        └── SaveManager.js      # IndexedDB v2 multi-world CRUD + v4 worldTime/dayCount/spawnPoint/settings persistence
+        └── SaveManager.js      # IndexedDB v2 multi-world CRUD + v5 full Inventory, Armor & BlockEntity persistence
 ```
 
 ---
 
 ## Stage Roadmap & Extension Hooks (Stages 1–12)
 
-- **Stage 1 (Completed):** Offline Three.js setup, single-file `minecraft-offline.html` builder, procedural 16×16 padded texture atlas, seeded terrain + oak trees + water, chunked face-culled `BufferGeometry` with Smooth Voxel AO and directional face shading, Steve 64×64 skin & articulated model, depth-cleared 1st-person hand, PC + multitouch controls, Fullscreen button, IndexedDB save foundation.
-- **Stage 2 (Completed):** Axis-separated AABB physics (`0.6×1.8` / `0.6×1.5` sneak, `~1.252` jump, sprint FOV `+10°`, Sneak Edge Guard, double-tap Jump fly on PC & phone), 3D DDA raycast & wireframe `SelectionBox`, progressive crack & break overlays, `ItemEntity` 3D drops with stack merging & magnetic pickup, 9-slot `Hotbar` with 3D held block in hand, instant bordering chunk remeshing, unlimited world RAM cache setting, and full `IndexedDB` persistence of modified blocks + hotbar.
-- **Stage 3 (Completed):** Multi-noise 8-biome world generation (`Plains`, `Forest`, `Birch Forest`, `Desert`, `Snowy Taiga`, `Mountains`, `Swamp`, `Beach`) with `5×5` smoothing & meandering rivers; 3D `4×4×4` trilinear spaghetti/cheese caves & ravines; jagged `Bedrock` `Y=0..4`; underground `Granite/Diorite/Andesite/Dirt/Gravel` pockets; depth-based ores; X-shaped cross-mesh plants & inset `Cactus`; translucent `Ice`; cascading `FallingBlockEntity`; inline `Blob` Web Worker terrain generation; Main Menu + Multi-World Manager + Tabbed scrollable Settings; left-half dynamic floating mobile joystick.
-- **Stage 4 (Completed — Lighting & Day/Night Cycle):**
-  - **24,000-Tick Cycle & Sky (`SkyRenderer`):** 20 TPS progression (`0` dawn, `6000` noon, `12000` sunset, `12541..23458` night, `18000` midnight) + F3 quick time switcher; smooth sky dome & fog transitions; 420 night stars; opposite 3D Sun & 8-phase Moon (`dayCount % 8`); `Y=108..112` volumetric voxel clouds with Settings toggle.
-  - **Dual-Channel Voxel BFS Lighting (`LightingEngine`, `Chunk`, `ChunkMesher`):** Packed `(skyLight << 4) | blockLight` `Uint8Array(32768)` computed via `Int32Array` ring-buffer BFS with cross-chunk border sync, water/leaf light attenuation, true dark deep caves, and `aLight` + shader uniforms (`uSunIntensity`, `uSkyTint`, `uTorchTint`) for 0 ms CPU day/night transitions; dynamic `setEnvironmentLight` on 1st-person hand & 3rd-person `PlayerModel`.
-  - **Light Sources & Functional Bed:** Floor/wall `2×10×2` 3D `Torch` (`14`, support-break drop, ceiling-blocked), `Glowstone` (`15`), directional `Jack o'Lantern` (`15`), temporary `Redstone Ore` glow (`9` for 4.5 s), and 2-block `Bed` (`BED_FOOT` + `BED_HEAD`, linked breaking, night sleep transition advancing to dawn `worldTime = 0`, `spawnPoint` persistence).
-  - **Optimizations & Fixes:** Lightweight `MenuPanorama` skybox in Main Menu (zero world lag), reduced fly speed (`9.5` / `15.0`), authentic ore rarity tuning, flat 2-sided sprite rendering for cross plants (`Dandelion`) in hand/drops, fixed mobile joystick single-push sprint bug, water surfacing & reliable 1-block swim posture exit, and outline-free pure white `#crosshair`.
-- **Stages 5–12 (Crafting, Survival, Fluids, Mobs, Menus, Redstone, Dimensions, Audio/Particles):** `Game` (`src/main.js`) maintains a clean fixed `20 TPS` simulation tick (`fixedTick()`) separate from variable-timestep rendering (`_loop()`), and `SaveManager` v4 manages multi-world IndexedDB schemas cleanly.
+- **Stage 1–4 (Completed):** Offline Three.js setup, single-file builder, procedural atlas, AABB & DDA physics, 8-biome + caves + ores generation, 24,000-tick Sky & Stars/Sun/Moon/Clouds, dual-channel BFS voxel lighting, Torch/Glowstone/Bed/Redstone, MenuPanorama, mobile touch UX.
+- **Stage 5 (Completed — Survival, Inventory, Tools, Crafting & Block Entities):**
+  - **Unified Items & Sprites (`ItemIds`, `ItemRegistry`, `ItemSprites`, `ExtrudedItemMesh`):** Block IDs `0..56` + Item IDs `256..322` (5 tiers of tools/swords/hoes, 3 tiers of 4-piece armor, materials, bucket, flint & steel, shears), 16×16 procedural pixel art, and cached 1-pixel voxel-extruded 3D meshes in 1st/3rd person and drops.
+  - **Survival Mining & Durability (`BlockRegistry`, `Inventory`, `BreakCrackOverlay`):** Tool-tier harvest rules (`Wood` -> Stone/Coal, `Stone` -> Iron, `Iron` -> Diamond/Gold/Redstone/Emerald), tier speed multipliers, underwater/airborne slowdowns, 10-stage break crack overlay, and tool durability depletion + break.
+  - **Crafting, Smelting & Storage (`RecipeRegistry`, `BlockEntityManager`, `InventoryUI`):** Full 2×2 & 3×3 shaped/mirrored/shapeless crafting with interactive green-highlighted Recipe Book auto-fill; 20-TPS Furnace burning/smelting (`FURNACE` <-> `FURNACE_LIT` light=13); 27-slot Chests; loot spill on break; live cursor-tracking 3D Steve Paper Doll with 3D armor; full PC (LMB/RMB/Shift/Q/E) & Mobile (tap-transfer, `½ Разделить`, long-press split, `•••`) controls; SaveManager v5 persistence.
+  - **Refinements & Fixes:** Borderless translucent Ice (`renderOrder=1` before Water), ladder climbing/sneak-hold, sub-voxel Torch raycast passthrough, controlled water buoyancy + 1-block swim, dynamic held-item lighting, frame-budgeted async chunk lighting, and support-break drops in both modes.
+- **Stages 6–12 (Mobs/Combat, Health/Hunger, Water/Lava Flow, Redstone Logic, Nether/End, Sound & Particles):** `Inventory`, `BlockEntityManager`, `ItemRegistry`, `PlayerModel` armor/held hooks, and `SaveManager` v5 provide drop-in extension points for health/armor reduction, mob AI, fluid propagation, and audio/particle systems.

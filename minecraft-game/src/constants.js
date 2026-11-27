@@ -17,11 +17,24 @@ export const SLEEP_END_TICK = 23458;
 export const CLOUD_HEIGHT_MIN = 108;
 export const CLOUD_HEIGHT_MAX = 112;
 
+// Inventory, crafting, chest & furnace constants (Stage 5)
+export const INVENTORY_SIZE = 36;
+export const ARMOR_SLOTS = 4;
+export const CHEST_SIZE = 27;
+export const FURNACE_COOK_TICKS = 200; // 10 seconds at 20 TPS
+export const ITEM_DROP_PLAYER_DELAY = 1.5; // Seconds before player-thrown item is picked back up
+export const TOOL_DURABILITY_WOOD = 59;
+export const TOOL_DURABILITY_STONE = 131;
+export const TOOL_DURABILITY_IRON = 250;
+export const TOOL_DURABILITY_GOLD = 32;
+export const TOOL_DURABILITY_DIAMOND = 1561;
+
 // Lighting constants (Minecraft 0..15 channels)
 export const MAX_LIGHT_LEVEL = 15;
 export const TORCH_LIGHT_LEVEL = 14;
 export const GLOWSTONE_LIGHT_LEVEL = 15;
 export const JACK_O_LANTERN_LIGHT_LEVEL = 15;
+export const FURNACE_LIGHT_LEVEL = 13;
 export const REDSTONE_GLOW_LEVEL = 9;
 
 // Player AABB hitbox & eye dimensions (authentic Minecraft Java proportions)
@@ -31,15 +44,15 @@ export const PLAYER_HEIGHT = 1.8;
 export const PLAYER_EYE_HEIGHT = 1.62;
 export const PLAYER_CROUCH_HEIGHT = 1.5;
 export const PLAYER_CROUCH_EYE_HEIGHT = 1.27;
-export const PLAYER_SWIM_HEIGHT = 0.9;
-export const PLAYER_SWIM_EYE_HEIGHT = 0.65;
+export const PLAYER_SWIM_HEIGHT = 0.82;
+export const PLAYER_SWIM_EYE_HEIGHT = 0.52;
 
 // Movement speeds (blocks / second)
 export const WALK_SPEED = 4.317;
 export const SPRINT_SPEED = 5.612;
 export const CROUCH_SPEED = 1.295;
 export const SWIM_SPEED = 3.85;
-export const SWIM_SPRINT_SPEED = 6.0;
+export const SWIM_SPRINT_SPEED = 5.6;
 export const FLY_SPEED = 9.5;
 export const FLY_SPRINT_SPEED = 15.0;
 
@@ -61,15 +74,16 @@ export const SPRINT_FOV_BOOST = 10;
 export const REACH_DISTANCE = 5.0;
 export const HOTBAR_SIZE = 9;
 export const MAX_STACK_SIZE = 64;
+export const MAX_STACK_DEFAULT = MAX_STACK_SIZE;
 
 // Render distance presets (chunks radius around player)
 export const DEFAULT_RENDER_DISTANCE_PC = 7;
-export const DEFAULT_RENDER_DISTANCE_MOBILE = 5;
+export const DEFAULT_RENDER_DISTANCE_MOBILE = 4;
 export const MIN_RENDER_DISTANCE = 2;
 export const MAX_RENDER_DISTANCE = 16;
 
 // Chunk meshing frame budget (ms)
-export const CHUNK_FRAME_BUDGET_MS = 3.0;
+export const CHUNK_FRAME_BUDGET_MS = 2.6;
 
 // Texture atlas layout: 16x16 grid of 32x32 padded cells (inner 16x16 + 8px edge padding)
 export const ATLAS_GRID_SIZE = 16;

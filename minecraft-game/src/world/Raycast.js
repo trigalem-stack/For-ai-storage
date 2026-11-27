@@ -2,9 +2,79 @@ import * as THREE from '../../vendor/three.module.min.js';
 import { BlockRegistry } from '../blocks/BlockRegistry.js';
 import { REACH_DISTANCE, WORLD_HEIGHT } from '../constants.js';
 
+function intersectRayAABB(ox, oy, oz, dx, dy, dz, minX, minY, minZ, maxX, maxY, maxZ) {
+  let tmin = -Infinity;
+  let tmax = Infinity;
+  let hnx = 0, hny = 0, hnz = 0;
+
+  if (Math.abs(dx) < 1e-8) {
+    if (ox < minX || ox > maxX) return null;
+  } else {
+    const inv = 1 / dx;
+    let t1 = (minX - ox) * inv;
+    let t2 = (maxX - ox) * inv;
+    let nSign = -Math.sign(dx);
+    if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+    if (t1 > tmin) { tmin = t1; hnx = nSign; hny = 0; hnz = 0; }
+    if (t2 < tmax) tmax = t2;
+    if (tmin > tmax) return null;
+  }
+
+  if (Math.abs(dy) < 1e-8) {
+    if (oy < minY || oy > maxY) return null;
+  } else {
+    const inv = 1 / dy;
+    let t1 = (minY - oy) * inv;
+    let t2 = (maxY - oy) * inv;
+    let nSign = -Math.sign(dy);
+    if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+    if (t1 > tmin) { tmin = t1; hnx = 0; hny = nSign; hnz = 0; }
+    if (t2 < tmax) tmax = t2;
+    if (tmin > tmax) return null;
+  }
+
+  if (Math.abs(dz) < 1e-8) {
+    if (oz < minZ || oz > maxZ) return null;
+  } else {
+    const inv = 1 / dz;
+    let t1 = (minZ - oz) * inv;
+    let t2 = (maxZ - oz) * inv;
+    let nSign = -Math.sign(dz);
+    if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+    if (t1 > tmin) { tmin = t1; hnx = 0; hny = 0; hnz = nSign; }
+    if (t2 < tmax) tmax = t2;
+    if (tmin > tmax) return null;
+  }
+
+  if (tmax < 0) return null;
+  const hitT = tmin >= 0 ? tmin : 0;
+  return { t: hitT, normal: { x: hnx, y: hny, z: hnz } };
+}
+
+function getBlockHitBox(def, meta) {
+  if (def.isTorch) {
+    if (meta === 1) return [0.0, 0.16, 0.34, 0.38, 0.84, 0.66];
+    if (meta === 2) return [0.62, 0.16, 0.34, 1.0, 0.84, 0.66];
+    if (meta === 3) return [0.34, 0.16, 0.0, 0.66, 0.84, 0.38];
+    if (meta === 4) return [0.34, 0.16, 0.62, 0.66, 0.84, 1.0];
+    return [0.34, 0.0, 0.34, 0.66, 0.66, 0.66];
+  }
+  if (def.isLadder) {
+    if (meta === 1) return [0.0, 0.0, 0.0, 0.16, 1.0, 1.0];
+    if (meta === 2) return [0.84, 0.0, 0.0, 1.0, 1.0, 1.0];
+    if (meta === 4) return [0.0, 0.0, 0.84, 1.0, 1.0, 1.0];
+    return [0.0, 0.0, 0.0, 1.0, 1.0, 0.16];
+  }
+  if (def.isBed) {
+    return [0.0, 0.0, 0.0, 1.0, 0.5625, 1.0];
+  }
+  return null;
+}
+
 /**
  * Fast Amanatides & Woo 3D DDA Voxel Traversal Algorithm.
- * Skips Air and Water, returning the first solid hit block and its face normal.
+ * Skips Air and Water, and tests tight sub-voxel bounds for Torches/Ladders/Beds
+ * so aiming past a torch hits the block behind it naturally.
  */
 export function raycastVoxel(world, origin, direction, maxDistance = REACH_DISTANCE) {
   const dx = direction.x;
@@ -43,14 +113,39 @@ export function raycastVoxel(world, origin, direction, maxDistance = REACH_DISTA
     if (vy >= 0 && vy < WORLD_HEIGHT) {
       const id = world.getBlock(vx, vy, vz);
       if (BlockRegistry.isTargetable(id)) {
-        return {
-          x: vx,
-          y: vy,
-          z: vz,
-          blockId: id,
-          normal: { x: nx, y: ny, z: nz },
-          distance: t,
-        };
+        const def = BlockRegistry.get(id);
+        const meta = world?.getBlockMeta ? world.getBlockMeta(vx, vy, vz) : 0;
+        const box = getBlockHitBox(def, meta);
+        if (box) {
+          const subHit = intersectRayAABB(
+            origin.x, origin.y, origin.z,
+            ndx, ndy, ndz,
+            vx + box[0], vy + box[1], vz + box[2],
+            vx + box[3], vy + box[4], vz + box[5]
+          );
+          if (subHit && subHit.t <= maxDistance) {
+            const hitNormal = (subHit.normal.x || subHit.normal.y || subHit.normal.z)
+              ? subHit.normal
+              : { x: nx, y: ny, z: nz };
+            return {
+              x: vx,
+              y: vy,
+              z: vz,
+              blockId: id,
+              normal: hitNormal,
+              distance: subHit.t,
+            };
+          }
+        } else {
+          return {
+            x: vx,
+            y: vy,
+            z: vz,
+            blockId: id,
+            normal: { x: nx, y: ny, z: nz },
+            distance: t,
+          };
+        }
       }
     }
 
@@ -139,6 +234,24 @@ export class SelectionBox {
       this.mesh.visible = true;
       return;
     }
+    if (def.isLadder) {
+      const meta = world?.getBlockMeta ? world.getBlockMeta(hit.x, hit.y, hit.z) : 0;
+      if (meta === 1) {
+        this.mesh.scale.set(0.14, 1.0, 1.0);
+        this.mesh.position.set(hit.x + 0.07, hit.y + 0.5, hit.z + 0.5);
+      } else if (meta === 2) {
+        this.mesh.scale.set(0.14, 1.0, 1.0);
+        this.mesh.position.set(hit.x + 0.93, hit.y + 0.5, hit.z + 0.5);
+      } else if (meta === 4) {
+        this.mesh.scale.set(1.0, 1.0, 0.14);
+        this.mesh.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.93);
+      } else {
+        this.mesh.scale.set(1.0, 1.0, 0.14);
+        this.mesh.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.07);
+      }
+      this.mesh.visible = true;
+      return;
+    }
     const sx = def.inset > 0 ? 1 - def.inset * 2 + 0.005 : def.isCross ? 0.78 : 1.004;
     const sy = def.isCross ? 0.85 : 1.004;
     this.mesh.scale.set(sx, sy, sx);
@@ -180,9 +293,16 @@ export class BreakCrackOverlay {
       this.mesh.visible = false;
       return;
     }
+    const def = BlockRegistry.get(hit.blockId);
     const stage = Math.max(0, Math.min(9, Math.floor(progress * 10)));
     this.mesh.material = this.materials[stage];
-    this.mesh.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+    if (def.isBed) {
+      this.mesh.scale.set(1.0, 0.564, 1.0);
+      this.mesh.position.set(hit.x + 0.5, hit.y + 0.283, hit.z + 0.5);
+    } else {
+      this.mesh.scale.set(1.0, 1.0, 1.0);
+      this.mesh.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+    }
     this.mesh.visible = true;
   }
 

@@ -244,9 +244,10 @@ async function runStage3Tests() {
   testCh.setBlock(4, 65, 3, BLOCK_IDS.CACTUS);
   testCh.setBlock(5, 65, 3, BLOCK_IDS.ICE);
   const geomRes = mesher.buildChunkGeometries(testCh, () => 0);
-  assert.ok(geomRes.cutoutGeometry && geomRes.waterGeometry, 'Poppy/Cactus must emit cutoutGeometry and Ice waterGeometry');
+  assert.ok(geomRes.cutoutGeometry && geomRes.iceGeometry, 'Poppy/Cactus must emit cutoutGeometry and Ice iceGeometry');
   geomRes.cutoutGeometry.dispose();
-  geomRes.waterGeometry.dispose();
+  geomRes.iceGeometry.dispose();
+  geomRes.waterGeometry?.dispose();
 
   const scene = new THREE.Scene();
   const world = new World(scene, atlas, 42, 2, { useWorkers: false, fogEnabled: false });

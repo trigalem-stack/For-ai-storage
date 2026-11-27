@@ -15,17 +15,21 @@ import {
 } from './constants.js';
 import { FallingBlockManager } from './entities/FallingBlockEntity.js';
 import { ItemEntityManager } from './entities/ItemEntity.js';
+import { Inventory } from './items/Inventory.js';
+import { ItemRegistry } from './items/ItemRegistry.js';
 import { aabbIntersectsBlock, collidesWithWorld } from './physics/AABBPhysics.js';
 import { FirstPersonHand } from './player/FirstPersonHand.js';
 import { PlayerController } from './player/PlayerController.js';
-import { PlayerModel, createSteveSkinTexture } from './player/PlayerSkin.js';
+import { InventoryPlayerPreview, PlayerModel, createSteveSkinTexture } from './player/PlayerSkin.js';
 import { SaveManager } from './storage/SaveManager.js';
 import { TextureAtlas } from './textures/TextureAtlas.js';
 import { Hotbar } from './ui/Hotbar.js';
 import { Hud } from './ui/Hud.js';
+import { InventoryUI } from './ui/InventoryUI.js';
 import { MobileControls } from './ui/MobileControls.js';
+import { BlockEntityManager } from './world/BlockEntityManager.js';
 import { MenuPanorama } from './world/MenuPanorama.js';
-import { SelectionBox, raycastVoxel } from './world/Raycast.js';
+import { BreakCrackOverlay, SelectionBox, raycastVoxel } from './world/Raycast.js';
 import { SkyRenderer } from './world/SkyRenderer.js';
 import { World } from './world/World.js';
 
@@ -76,9 +80,8 @@ class MinecraftGame {
       cloudsEnabled: true,
       sensitivity: 1.0,
       hintsEnabled: true,
+      gameMode: 'survival',
     };
-
-    this.gameMode = 'creative';
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
@@ -90,13 +93,19 @@ class MinecraftGame {
     this._applyPixelRatio();
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
 
-    this.playerModel = new PlayerModel(this.skinTexture);
+    this.playerModel = new PlayerModel(this.skinTexture, this.atlas);
     this.scene.add(this.playerModel.root);
 
+    this.playerPreview = new InventoryPlayerPreview(this.skinTexture, this.atlas);
     this.firstPersonHand = new FirstPersonHand(this.skinTexture, this.atlas);
     this.selectionBox = new SelectionBox(this.scene);
+    this.breakOverlay = new BreakCrackOverlay(this.scene, this.atlas);
     this.itemManager = new ItemEntityManager(this.scene, this.atlas);
     this.fallingManager = new FallingBlockManager(this.scene, this.atlas);
+
+    this.inventory = new Inventory({ creativeMode: false });
+    this.blockEntities = new BlockEntityManager();
+    this.inventoryUI = null;
 
     this.world = null;
     this.player = null;
@@ -112,6 +121,8 @@ class MinecraftGame {
     this.currentTargetHit = null;
     this.creativeBreakTimer = 0;
     this.wasMiningHeld = false;
+    this.miningBlockKey = '';
+    this.miningElapsed = 0;
     this.isSleeping = false;
 
     this.lastFrameTime = performance.now();
@@ -122,6 +133,10 @@ class MinecraftGame {
     this.isRunning = false;
 
     window.__MC_GAME__ = this;
+  }
+
+  get gameMode() {
+    return this.settings.gameMode === 'creative' ? 'creative' : 'survival';
   }
 
   _applyPixelRatio() {
@@ -136,6 +151,41 @@ class MinecraftGame {
     if (this.mobileControls) this.mobileControls.touchSensitivity = 0.0052 * mult;
   }
 
+  _syncHeldAndArmorVisuals() {
+    const held = this.inventory.getHeldStack();
+    this.firstPersonHand.setHeldItem(held);
+    this.playerModel.setHeldItem(held);
+    this.playerModel.setArmor(this.inventory.armor);
+    this.playerPreview?.syncEquipment(held, this.inventory.armor);
+  }
+
+  _dropStackFromPlayer(stack) {
+    if (!stack || !stack.id || stack.count <= 0 || !this.player) return;
+    const eye = this.player.getEyeOrigin();
+    const dir = this.player.getLookDirection();
+    this.itemManager.spawnPlayerDrop(stack, eye.x, eye.y - 0.25, eye.z, dir);
+    this._scheduleSave();
+  }
+
+  openInventoryModal(mode = 'inventory', blockPos = null) {
+    if (!this.inventoryUI || !this.player || this.hud?.inMainMenu || this.hud?.isPaused) return;
+    if (document.pointerLockElement) {
+      document.exitPointerLock?.();
+    }
+    this.player.setPaused(true);
+    this.inventoryUI.open(mode, blockPos);
+  }
+
+  togglePlayerInventory() {
+    if (!this.inventoryUI || !this.player || this.hud?.inMainMenu) return;
+    if (this.inventoryUI.isOpen) {
+      this.inventoryUI.close();
+      return;
+    }
+    if (this.hud?.isPaused) return;
+    this.openInventoryModal(this.gameMode === 'creative' ? 'inventory' : 'inventory');
+  }
+
   async init() {
     this._setLoadingText('Загрузка настроек и списка миров...');
     await this.saveManager.init();
@@ -144,21 +194,37 @@ class MinecraftGame {
       Object.assign(this.settings, savedSettings);
     }
 
+    this.inventory.creativeMode = this.gameMode === 'creative';
     this._applyPixelRatio();
     this.skyRenderer.setCloudsEnabled(this.settings.cloudsEnabled);
 
     this.hotbar = new Hotbar(this.atlas, {
+      inventory: this.inventory,
       creativeMode: this.gameMode === 'creative',
-      onChange: (slot, shouldSave) => {
-        this.firstPersonHand.setHeldBlock(slot ? slot.id : 0);
+      initStarter: false,
+      disableHotbarKeyE: true,
+      onChange: (_slot, shouldSave) => {
+        this._syncHeldAndArmorVisuals();
+        if (this.inventoryUI?.isOpen) {
+          this.inventoryUI.render();
+        }
         if (shouldSave && this.activeWorldId) this._scheduleSave();
       },
-      onPaletteToggle: (open) => {
-        if (!this.hud?.inMainMenu) {
-          this.player?.setPaused(open);
-          if (!open && !this.settings.touchMode) {
-            this._requestPointerLockSafe();
-          }
+      onInventoryToggle: () => {
+        this.togglePlayerInventory();
+      },
+    });
+
+    this.inventoryUI = new InventoryUI(this.atlas, this.inventory, this.blockEntities, {
+      playerPreview: this.playerPreview,
+      onDropStack: (stack) => this._dropStackFromPlayer(stack),
+      onClose: () => {
+        this.player?.setPaused(false);
+        this.hotbar?.render();
+        this._syncHeldAndArmorVisuals();
+        if (this.activeWorldId) this._scheduleSave();
+        if (!this.settings.touchMode && !this.hud?.isPaused && !this.hud?.inMainMenu) {
+          this._requestPointerLockSafe();
         }
       },
     });
@@ -166,7 +232,10 @@ class MinecraftGame {
     this.hud = new Hud({
       onCycleCamera: () => this.player?.cycleCameraMode(),
       onPauseChange: (paused) => {
-        this.player?.setPaused(paused);
+        if (paused && this.inventoryUI?.isOpen) {
+          this.inventoryUI.close();
+        }
+        this.player?.setPaused(paused || Boolean(this.inventoryUI?.isOpen));
         this.hud.setPointerLocked(Boolean(this.player?.pointerLocked));
       },
       onResume: () => {
@@ -194,6 +263,7 @@ class MinecraftGame {
         this.hud.showToast('Мир удалён');
       },
       onExitToMenu: async () => {
+        if (this.inventoryUI?.isOpen) this.inventoryUI.close();
         await this.saveNow();
         this._unloadWorldFromEngine();
         this.hud.showMainMenu(true);
@@ -207,6 +277,15 @@ class MinecraftGame {
       },
       onToggleControlMode: () => {
         this.setTouchMode(!this.settings.touchMode);
+      },
+      onToggleGameMode: () => {
+        const nextCreative = this.gameMode !== 'creative';
+        this.settings.gameMode = nextCreative ? 'creative' : 'survival';
+        this.inventory.creativeMode = nextCreative;
+        this.hotbar.setCreativeMode(nextCreative);
+        this.hud.setGameModeLabel(nextCreative);
+        this.hud.showToast(nextCreative ? 'Режим: Креатив' : 'Режим: Выживание');
+        this.saveSettingsOnly();
       },
       onToggleFlyMode: () => {
         this.player?.toggleFlyMode();
@@ -262,11 +341,11 @@ class MinecraftGame {
       onStatusToast: (msg) => this.hud.showToast(msg),
     });
 
-    // Show Main Menu immediately over smooth lightweight MenuPanorama (zero world lag in menu!)
     this.setTouchMode(this.settings.touchMode, false);
     this._syncSettingsUI();
     this._applySensitivity();
     this._bindWindowEvents();
+    this._bindKeyboardShortcuts();
     this._bindPointerLock();
     this._startAutosave();
 
@@ -279,7 +358,33 @@ class MinecraftGame {
     requestAnimationFrame((t) => this._loop(t));
   }
 
+  _bindKeyboardShortcuts() {
+    window.addEventListener('keydown', (e) => {
+      if (this.hud?.inMainMenu) return;
+
+      if (e.code === 'KeyE' && !e.repeat) {
+        if (!this.hud?.isPaused) {
+          e.preventDefault();
+          this.togglePlayerInventory();
+        }
+        return;
+      }
+
+      if (e.code === 'KeyQ' && !e.repeat) {
+        if (this.inventoryUI?.isOpen || this.hud?.isPaused || !this.player) return;
+        const dropCount = (e.ctrlKey || e.metaKey || e.shiftKey) ? 64 : 1;
+        const dropped = this.inventory.dropFromSlot(this.inventory.selectedSlot, dropCount);
+        if (dropped) {
+          this._dropStackFromPlayer(dropped);
+          this.hotbar.render();
+          this._syncHeldAndArmorVisuals();
+        }
+      }
+    });
+  }
+
   _syncSettingsUI() {
+    this.hud.setGameModeLabel(this.gameMode === 'creative');
     this.hud.setFlyModeLabel(Boolean(this.player?.flyMode));
     this.mobileControls?.setFlyActive(Boolean(this.player?.flyMode));
     this.hud.setMemoryModeLabel(this.settings.unlimitedMemory);
@@ -292,11 +397,16 @@ class MinecraftGame {
   }
 
   _unloadWorldFromEngine() {
+    if (this.inventoryUI?.isOpen) this.inventoryUI.close();
+    this.blockEntities.clear();
     this.itemManager.clear();
     this.fallingManager.clear();
     this.selectionBox.update(null);
+    this.breakOverlay.update(null, 0);
     this.currentTargetHit = null;
     this.creativeBreakTimer = 0;
+    this.miningBlockKey = '';
+    this.miningElapsed = 0;
     this.isSleeping = false;
 
     if (this.world) {
@@ -322,23 +432,37 @@ class MinecraftGame {
       this.fallingManager.scheduleStabilityCheck(wx, wy + 1, wz);
     }
 
-    // 2. If block was removed, detach any torches supported by this block!
+    // 2. If block was removed, detach any torches/ladders supported by this block (drops in BOTH modes)
     if (newId === 0 && oldId !== 0) {
-      const checkSupportTorch = (tx, ty, tz, expectedMeta) => {
-        if (this.world.getBlock(tx, ty, tz) === BLOCK_IDS.TORCH &&
+      const checkSupportAttach = (tx, ty, tz, expectedMeta, targetBlockId) => {
+        if (this.world.getBlock(tx, ty, tz) === targetBlockId &&
             this.world.getBlockMeta(tx, ty, tz) === expectedMeta) {
           this.world.setBlock(tx, ty, tz, 0, true, false);
-          this.itemManager.spawnDrop(BLOCK_IDS.TORCH, tx + 0.5, ty + 0.3, tz + 0.5, 1);
+          this.itemManager.spawnDrop(targetBlockId, tx + 0.5, ty + 0.3, tz + 0.5, 1);
         }
       };
-      checkSupportTorch(wx, wy + 1, wz, 0); // Floor torch resting on top
-      checkSupportTorch(wx + 1, wy, wz, 1); // Torch attached to +X side
-      checkSupportTorch(wx - 1, wy, wz, 2); // Torch attached to -X side
-      checkSupportTorch(wx, wy, wz + 1, 3); // Torch attached to +Z side
-      checkSupportTorch(wx, wy, wz - 1, 4); // Torch attached to -Z side
+      checkSupportAttach(wx, wy + 1, wz, 0, BLOCK_IDS.TORCH);
+      checkSupportAttach(wx + 1, wy, wz, 1, BLOCK_IDS.TORCH);
+      checkSupportAttach(wx - 1, wy, wz, 2, BLOCK_IDS.TORCH);
+      checkSupportAttach(wx, wy, wz + 1, 3, BLOCK_IDS.TORCH);
+      checkSupportAttach(wx, wy, wz - 1, 4, BLOCK_IDS.TORCH);
+
+      checkSupportAttach(wx + 1, wy, wz, 1, BLOCK_IDS.LADDER);
+      checkSupportAttach(wx - 1, wy, wz, 2, BLOCK_IDS.LADDER);
+      checkSupportAttach(wx, wy, wz + 1, 3, BLOCK_IDS.LADDER);
+      checkSupportAttach(wx, wy, wz - 1, 4, BLOCK_IDS.LADDER);
+
+      // 3. Spill chest/furnace contents and close modal if currently viewing it
+      this.blockEntities.onBlockRemoved(wx, wy, wz, this.itemManager);
+      if (this.inventoryUI?.isOpen && this.inventoryUI.activeBlockPos &&
+          this.inventoryUI.activeBlockPos.x === wx &&
+          this.inventoryUI.activeBlockPos.y === wy &&
+          this.inventoryUI.activeBlockPos.z === wz) {
+        this.inventoryUI.close();
+      }
     }
 
-    // 3. Paired 2-block Bed cleanup when either half is broken
+    // 4. Paired 2-block Bed cleanup when either half is broken
     if (newId === 0 && (oldId === BLOCK_IDS.BED_FOOT || oldId === BLOCK_IDS.BED_HEAD)) {
       const dir = oldMeta & 3;
       const [dx, dz] = DIR_OFFSETS[dir] || DIR_OFFSETS[0];
@@ -378,6 +502,12 @@ class MinecraftGame {
       this.world.loadModifiedBlocks(saved.modifiedBlocks);
     }
 
+    if (saved?.blockEntities) {
+      this.blockEntities.loadState(saved.blockEntities);
+    } else {
+      this.blockEntities.clear();
+    }
+
     const spawn = saved?.player ?? this.world.worldGen.findSafeSpawn();
 
     this.player = new PlayerController(this.camera, this.world, this.playerModel, this.firstPersonHand, {
@@ -387,7 +517,13 @@ class MinecraftGame {
       onPickBlock: () => this._handlePickBlock(),
       onCameraModeChange: (mode) => this.hud?.onCameraModeChanged(mode),
       onToggleDebug: () => this.hud?.toggleDebug(),
-      onTogglePause: () => this.hud?.togglePause(),
+      onTogglePause: () => {
+        if (this.inventoryUI?.isOpen) {
+          this.inventoryUI.close();
+          return;
+        }
+        this.hud?.togglePause();
+      },
       onFlyModeChange: (active) => {
         this.hud?.setFlyModeLabel(active);
         this.mobileControls?.setFlyActive(active);
@@ -415,13 +551,20 @@ class MinecraftGame {
       }
     }
 
-    if (saved?.hotbar) {
+    this.inventory.creativeMode = this.gameMode === 'creative';
+    if (saved?.inventory) {
+      this.inventory.loadState(saved.inventory);
+    } else if (saved?.hotbar) {
+      this.inventory.clearAll();
       this.hotbar.loadState(saved.hotbar);
-    } else {
+    } else if (this.gameMode === 'creative') {
       this.hotbar.resetStarterKit();
+    } else {
+      this.inventory.clearAll();
     }
-    const initSlot = this.hotbar.getSelectedSlot();
-    this.firstPersonHand.setHeldBlock(initSlot ? initSlot.id : 0);
+    this.hotbar.render();
+    this._syncHeldAndArmorVisuals();
+
     this.skyRenderer.update(0.001, this.player.x, this.player.y, this.player.z, this.world);
     this.player.update(0.001);
   }
@@ -472,6 +615,7 @@ class MinecraftGame {
     if (!hit || hit.blockId <= 0) return;
     let pickId = hit.blockId;
     if (pickId === BLOCK_IDS.BED_HEAD) pickId = BLOCK_IDS.BED_FOOT;
+    if (pickId === BLOCK_IDS.FURNACE_LIT) pickId = BLOCK_IDS.FURNACE;
     const def = BlockRegistry.get(pickId);
     if (!def || def.isLiquid) return;
     this.hotbar.pickBlock(def.id);
@@ -505,9 +649,23 @@ class MinecraftGame {
 
     const targetDef = BlockRegistry.get(hit.blockId);
 
-    // 1. Clicking Bed triggers sleep / spawn point interaction (unless sneaking to place next to it)
-    if (targetDef.isBed && !this.player.isCrouching) {
-      return this._interactWithBed(hit);
+    // 1. Block interactions when NOT crouching (Bed, Crafting Table, Furnace, Chest)
+    if (!this.player.isCrouching) {
+      if (targetDef.isBed) {
+        return this._interactWithBed(hit);
+      }
+      if (hit.blockId === BLOCK_IDS.CRAFTING_TABLE) {
+        this.openInventoryModal('crafting', hit);
+        return true;
+      }
+      if (hit.blockId === BLOCK_IDS.FURNACE || hit.blockId === BLOCK_IDS.FURNACE_LIT) {
+        this.openInventoryModal('furnace', hit);
+        return true;
+      }
+      if (hit.blockId === BLOCK_IDS.CHEST) {
+        this.openInventoryModal('chest', hit);
+        return true;
+      }
     }
 
     // 2. Touching Redstone Ore activates its glow
@@ -522,6 +680,9 @@ class MinecraftGame {
     const slot = this.hotbar.getSelectedSlot();
     if (!slot || slot.id <= 0) return false;
 
+    // Non-placeable items (tools, swords, armor, coal, sticks, ingots...) cannot be placed as blocks
+    if (!ItemRegistry.isBlockId(slot.id)) return false;
+
     const px = targetDef.isCross ? hit.x : hit.x + hit.normal.x;
     const py = targetDef.isCross ? hit.y : hit.y + hit.normal.y;
     const pz = targetDef.isCross ? hit.z : hit.z + hit.normal.z;
@@ -533,9 +694,9 @@ class MinecraftGame {
 
     const placedDef = BlockRegistry.get(slot.id);
 
-    // 3. Torch placement validation & orientation (floor meta=0, wall meta=1..4, ceiling forbidden!)
+    // 3. Torch placement validation & orientation (floor meta=0, wall meta=1..4, ceiling forbidden)
     if (placedDef.isTorch) {
-      if (hit.normal.y === -1) return false; // Never attach to ceiling underside
+      if (hit.normal.y === -1) return false;
       let torchMeta = 0;
       if (targetDef.isCross) {
         if (!BlockRegistry.isSolid(this.world.getBlock(px, py - 1, pz))) return false;
@@ -555,7 +716,22 @@ class MinecraftGame {
       return true;
     }
 
-    // 4. Two-block Bed placement (BED_FOOT + BED_HEAD along player horizontal look)
+    // 4. Ladder placement validation (horizontal wall face only)
+    if (placedDef.isLadder) {
+      if (hit.normal.y !== 0) return false;
+      if (!BlockRegistry.isSolid(this.world.getBlock(hit.x, hit.y, hit.z))) return false;
+      let ladderMeta = 3;
+      if (hit.normal.x === 1) ladderMeta = 1;
+      else if (hit.normal.x === -1) ladderMeta = 2;
+      else if (hit.normal.z === 1) ladderMeta = 3;
+      else if (hit.normal.z === -1) ladderMeta = 4;
+      if (!this.world.setBlock(px, py, pz, BLOCK_IDS.LADDER, true, true, ladderMeta)) return false;
+      if (this.gameMode !== 'creative') this.hotbar.consumeSelected(1);
+      this._scheduleSave();
+      return true;
+    }
+
+    // 5. Two-block Bed placement (BED_FOOT + BED_HEAD along player horizontal look)
     if (placedDef.isBed) {
       const dir = this._getPlayerHorizontalDir();
       const [dx, dz] = DIR_OFFSETS[dir];
@@ -580,7 +756,7 @@ class MinecraftGame {
       return true;
     }
 
-    // 5. Standard & directional blocks
+    // 6. Standard & directional blocks (Furnace, Chest, Pumpkin, Jack o'Lantern)
     if (
       placedDef.isSolid &&
       aabbIntersectsBlock(
@@ -624,34 +800,92 @@ class MinecraftGame {
     this.selectionBox.update(hit, this.world);
 
     const miningHeld = this.player.isMiningHeld();
-    if (!miningHeld) {
+    if (!miningHeld || !hit) {
       this.wasMiningHeld = false;
       this.creativeBreakTimer = 0;
-      this.firstPersonHand.setMiningActive(false);
+      this.miningBlockKey = '';
+      this.miningElapsed = 0;
+      this.breakOverlay.update(null, 0);
+      this.firstPersonHand.setMiningActive(Boolean(miningHeld));
       return;
     }
 
     this.firstPersonHand.setMiningActive(true);
-    if (!hit) return;
+    const hitKey = `${hit.x},${hit.y},${hit.z}`;
+    const brokenDef = BlockRegistry.get(hit.blockId);
 
-    const justPressed = !this.wasMiningHeld;
-    this.wasMiningHeld = true;
-
-    if (justPressed || this.creativeBreakTimer <= 0) {
-      const brokenDef = BlockRegistry.get(hit.blockId);
-      if (brokenDef.redstoneGlow) {
-        this.world.triggerRedstoneGlow(hit.x, hit.y, hit.z);
-        this.hud.showToast('Редстоуновая руда светится!');
+    // Creative Mode: instant break with cooldown
+    if (this.gameMode === 'creative') {
+      this.breakOverlay.update(null, 0);
+      const justPressed = !this.wasMiningHeld;
+      this.wasMiningHeld = true;
+      if (justPressed || this.creativeBreakTimer <= 0) {
+        if (brokenDef.redstoneGlow) {
+          this.world.triggerRedstoneGlow(hit.x, hit.y, hit.z);
+          this.hud.showToast('Редстоуновая руда светится!');
+        }
+        this.world.setBlock(hit.x, hit.y, hit.z, 0, true, true);
+        this.firstPersonHand.triggerSwing();
+        this.creativeBreakTimer = CREATIVE_BREAK_COOLDOWN;
+        this._scheduleSave();
       }
+      return;
+    }
+
+    // Survival Mode: progressive mining time + crack stages + drops + tool wear
+    if (brokenDef.hardness < 0) {
+      // Unbreakable (Bedrock)
+      this.miningBlockKey = hitKey;
+      this.miningElapsed = 0;
+      this.breakOverlay.update(null, 0);
+      return;
+    }
+
+    if (hitKey !== this.miningBlockKey) {
+      this.miningBlockKey = hitKey;
+      this.miningElapsed = 0;
+    }
+
+    const heldStack = this.inventory.getHeldStack();
+    const heldDef = heldStack ? ItemRegistry.get(heldStack.id) : null;
+
+    if (brokenDef.redstoneGlow && this.miningElapsed === 0) {
+      this.world.triggerRedstoneGlow(hit.x, hit.y, hit.z);
+    }
+
+    const breakDuration = BlockRegistry.getBreakTime(hit.blockId, heldDef, {
+      inWater: this.player.inWater,
+      onGround: this.player.onGround || this.player.flyMode,
+    });
+
+    this.miningElapsed += dt;
+    const progress = breakDuration <= 0.001 ? 1.0 : Math.min(1.0, this.miningElapsed / breakDuration);
+    this.breakOverlay.update(hit, progress);
+
+    if (progress >= 1.0) {
+      const drops = BlockRegistry.getHarvestDrops(hit.blockId, heldDef);
       this.world.setBlock(hit.x, hit.y, hit.z, 0, true, true);
+      for (const drop of drops) {
+        this.itemManager.spawnDrop(drop.id, hit.x + 0.5, hit.y + 0.35, hit.z + 0.5, drop.count);
+      }
+
+      if (heldDef && heldDef.maxDurability > 0 && brokenDef.hardness > 0) {
+        const wear = heldDef.toolType === 'sword' ? 2 : 1;
+        this.inventory.damageHeldTool(wear);
+        this.hotbar.render();
+        this._syncHeldAndArmorVisuals();
+      }
+
       this.firstPersonHand.triggerSwing();
-      this.creativeBreakTimer = CREATIVE_BREAK_COOLDOWN;
+      this.miningBlockKey = '';
+      this.miningElapsed = 0;
+      this.breakOverlay.update(null, 0);
       this._scheduleSave();
     }
   }
 
   _requestPointerLockSafe() {
-    if (this.settings.touchMode || this.hud?.isPaused || this.hud?.inMainMenu) return;
+    if (this.settings.touchMode || this.hud?.isPaused || this.hud?.inMainMenu || this.inventoryUI?.isOpen) return;
     try {
       const promise = this.canvas.requestPointerLock?.();
       if (promise && typeof promise.catch === 'function') {
@@ -664,7 +898,13 @@ class MinecraftGame {
 
   _bindPointerLock() {
     this.canvas.addEventListener('click', () => {
-      if (!this.settings.touchMode && !this.hud.isPaused && !this.hud.inMainMenu && document.pointerLockElement !== this.canvas) {
+      if (
+        !this.settings.touchMode &&
+        !this.hud.isPaused &&
+        !this.hud.inMainMenu &&
+        !this.inventoryUI?.isOpen &&
+        document.pointerLockElement !== this.canvas
+      ) {
         this._requestPointerLockSafe();
       }
     });
@@ -741,6 +981,8 @@ class MinecraftGame {
       biomeName: this.world.getBiomeNameAt(this.player.x, this.player.z),
       player: this.player.getPose(),
       hotbar: this.hotbar.exportState(),
+      inventory: this.inventory.exportState(),
+      blockEntities: this.blockEntities.exportState(),
       modifiedBlocks: this.world.exportModifiedBlocks(),
       settings: this.settings,
     });
@@ -750,6 +992,14 @@ class MinecraftGame {
     this.tickCount++;
     if (!this.hud.inMainMenu && !this.hud.isPaused && !this.isSleeping) {
       this.skyRenderer.advanceTicks(1);
+      if (this.world) {
+        const changed = this.blockEntities.tick(1, this.world);
+        if (changed && this.inventoryUI?.isOpen && this.inventoryUI.mode === 'furnace') {
+          this.inventoryUI.updateFurnaceProgress();
+        } else if (this.inventoryUI?.isOpen && this.inventoryUI.mode === 'furnace') {
+          this.inventoryUI.updateFurnaceProgress();
+        }
+      }
     }
   }
 
@@ -773,31 +1023,48 @@ class MinecraftGame {
       }
 
       if (!this.isSleeping) {
-        this.player.update(dt);
-        this._updateInteraction(dt);
+        if (!this.inventoryUI?.isOpen) {
+          this.player.update(dt);
+          this._updateInteraction(dt);
+        } else {
+          this.breakOverlay.update(null, 0);
+        }
       }
-      this.fallingManager.update(dt, this.world, this.itemManager, this.gameMode !== 'creative');
-      this.itemManager.update(dt, this.world, this.player, this.hotbar);
+
+      this.fallingManager.update(dt, this.world, this.itemManager, true);
+      this.itemManager.update(dt, this.world, this.player, this.inventory);
       this.world.update(this.player.x, this.player.z, dt);
       this.skyRenderer.update(dt, this.player.x, this.player.y, this.player.z, this.world);
 
+      const heldStack = this.inventory.getHeldStack();
+      const heldLight = ItemRegistry.getHeldLightEmission(heldStack);
+      this.world.setHeldLight(this.player.x, this.player.y + 1.15, this.player.z, heldLight);
+
       const pLight = this.world.getLightAt(this.player.x, this.player.y + 1.0, this.player.z);
+      const effBlockLight = Math.max(pLight.block, heldLight);
       this.firstPersonHand.setEnvironmentLight(
         pLight.sky,
-        pLight.block,
+        effBlockLight,
         this.skyRenderer.sunIntensity,
         this.skyRenderer.skyTint,
         this.skyRenderer.torchTint
       );
       this.playerModel.setEnvironmentLight(
         pLight.sky,
-        pLight.block,
+        effBlockLight,
         this.skyRenderer.sunIntensity,
         this.skyRenderer.skyTint,
         this.skyRenderer.torchTint
       );
     }
 
+    // Render live 3D paper-doll Steve inside open Inventory (uses main WebGLRenderer)
+    if (this.inventoryUI?.isOpen && this.inventoryUI.mode === 'inventory') {
+      this.playerPreview.renderToTarget(this.renderer, this.player?.time || now * 0.001);
+    }
+
+    this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    this.renderer.setScissorTest(false);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
 

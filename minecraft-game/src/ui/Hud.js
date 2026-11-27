@@ -51,6 +51,7 @@ export class Hud {
     this.btnSettingsClose = document.getElementById('btn-settings-close');
 
     this.btnControlMode = document.getElementById('btn-control-mode');
+    this.btnGameMode = document.getElementById('btn-game-mode');
     this.btnFlyMode = document.getElementById('btn-fly-mode');
     this.btnMemoryMode = document.getElementById('btn-memory-mode');
     this.btnGraphicsMode = document.getElementById('btn-graphics-mode');
@@ -188,6 +189,11 @@ export class Hud {
     this.btnControlMode?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.callbacks.onToggleControlMode?.();
+    });
+
+    this.btnGameMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onToggleGameMode?.();
     });
 
     this.btnFlyMode?.addEventListener('click', (e) => {
@@ -452,6 +458,14 @@ export class Hud {
   setFlyModeLabel(isFly) {
     if (this.btnFlyMode) {
       this.btnFlyMode.textContent = isFly ? 'Полёт (2×Space / F): ВКЛ' : 'Полёт (2×Space / F): ВЫКЛ';
+    }
+  }
+
+  setGameModeLabel(creativeMode) {
+    if (this.btnGameMode) {
+      this.btnGameMode.textContent = creativeMode
+        ? 'Режим игры: Креатив (∞ блоки)'
+        : 'Режим игры: Выживание (Крафт)';
     }
   }
 

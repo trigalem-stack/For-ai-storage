@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#2d63b8">
-  <title>Minecraft Web Edition — Stage 4</title>
+  <title>Minecraft Web Edition — Stage 5</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -52,19 +52,58 @@
 
   <!-- PC Pointer Lock Hint -->
   <div id="pc-lock-hint" class="hidden">
-    Клик по миру · <b>ЛКМ</b> ломать · <b>ПКМ</b> ставить · <b>СКМ</b> пипетка · <b>E</b> блоки · <b>2×W</b> бег · <b>2×Space / F</b> полёт · <b>F5</b> камера
+    Клик по миру · <b>ЛКМ</b> копать · <b>ПКМ</b> ставить/открыть · <b>E</b> инвентарь · <b>Q</b> выбросить · <b>2×W</b> бег · <b>F</b> полёт
   </div>
 
   <!-- Status Toast -->
   <div id="hud-toast" class="hidden" role="status" aria-live="polite"></div>
 
-  <!-- 9-Slot Minecraft Hotbar + Creative Palette Button -->
+  <!-- 9-Slot Minecraft Hotbar + Inventory/Menu Button [•••] -->
   <div id="hotbar-wrapper">
     <div id="hotbar-item-name" class="hidden"></div>
     <div class="hotbar-row">
       <div id="hotbar" role="toolbar" aria-label="Хотбар блоков"></div>
-      <button id="btn-creative-palette" class="hotbar-palette-btn" type="button" title="Все блоки (E)">☰</button>
+      <button id="btn-creative-palette" class="hotbar-palette-btn" type="button" title="Инвентарь (E)">•••</button>
     </div>
+  </div>
+
+  <!-- Stage 5 Unified Inventory / Crafting Table / Furnace / Chest / Recipe Book Modal -->
+  <div id="inventory-overlay" class="hidden" role="dialog" aria-modal="true" aria-label="Инвентарь и крафт">
+    <div class="inv-shell">
+      <div id="inv-recipe-drawer" class="mc-modal inv-recipe-drawer hidden">
+        <div class="palette-header">
+          <h3>📖 Рецепты</h3>
+        </div>
+        <div id="inv-recipe-list" class="inv-recipe-list"></div>
+      </div>
+
+      <div id="inventory-window" class="mc-modal inv-main-modal">
+        <div class="inv-header">
+          <h2 id="inv-title">Инвентарь</h2>
+          <div class="inv-toolbar">
+            <button id="btn-inv-recipes" class="mc-hud-btn inv-tool-btn" type="button" title="Книга рецептов">📖 Рецепты</button>
+            <button id="btn-inv-creative" class="mc-hud-btn inv-tool-btn hidden" type="button" title="Творческий каталог">✨ Блоки</button>
+            <button id="btn-inv-split" class="mc-hud-btn inv-tool-btn" type="button" title="Разделить стак пополам (или долгое нажатие)">½ Разделить</button>
+            <button id="btn-inv-drop" class="mc-hud-btn inv-tool-btn" type="button" title="Выбросить выбранный предмет (Q)">Выбросить</button>
+            <button id="btn-inv-close" class="mc-hud-btn" type="button" title="Закрыть (E / Esc)">✕</button>
+          </div>
+        </div>
+
+        <div id="inv-top-section" class="inv-top-section"></div>
+
+        <div class="inv-section-label">Инвентарь</div>
+        <div id="inv-main-grid" class="inv-slot-grid-9"></div>
+
+        <div class="inv-hotbar-divider"></div>
+        <div id="inv-hotbar-grid" class="inv-slot-grid-9"></div>
+      </div>
+    </div>
+
+    <div id="inv-cursor-ghost" class="inv-cursor-ghost hidden">
+      <img alt="" draggable="false">
+      <span class="hidden"></span>
+    </div>
+    <div id="inv-tooltip" class="inv-tooltip hidden"></div>
   </div>
 
   <!-- Creative Block Catalog Overlay -->
@@ -109,7 +148,7 @@
       <div class="mc-logo-badge">
         <div class="mc-cube-badge"></div>
         <h1 id="main-title">MINECRAFT WEB</h1>
-        <p class="mc-modal-sub">Этап 4 · День/Ночь · Солнце и Луна · Воксельный свет · Факелы · Кровать</p>
+        <p class="mc-modal-sub">Этап 5 · Инвентарь · Верстак 3×3 · Инструменты · Броня · Печь · Сундук</p>
       </div>
       <div class="mc-modal-actions">
         <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">▶ Играть (Миры)</button>
@@ -161,6 +200,7 @@
         </div>
 
         <div class="settings-tab-panel hidden" data-tab-panel="controls">
+          <button id="btn-game-mode" class="mc-menu-btn" type="button">Режим игры: Выживание (Крафт)</button>
           <button id="btn-control-mode" class="mc-menu-btn" type="button">Управление: ПК (Мышь + WASD)</button>
           <button id="btn-fly-mode" class="mc-menu-btn" type="button">Полёт (2×Space / F): ВЫКЛ</button>
 
