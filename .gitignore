@@ -1,0 +1,10 @@
+# Dependencies (vendor/ and minecraft-offline.html MUST stay tracked in Git)
+node_modules/
+minecraft-game/node_modules/
+
+# OS / Editor / Temp
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

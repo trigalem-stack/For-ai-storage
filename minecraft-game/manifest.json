@@ -1,0 +1,11 @@
+{
+  "name": "Minecraft Web Edition",
+  "short_name": "MinecraftWeb",
+  "description": "Offline-first 3D voxel sandbox game built with Three.js",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#1e2a38",
+  "theme_color": "#1e2a38",
+  "icons": []
+}

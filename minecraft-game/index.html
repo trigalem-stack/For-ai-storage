@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1e2a38">
+  <title>Minecraft Web Edition — Stage 1</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <canvas id="game-canvas" aria-label="Minecraft 3D World"></canvas>
+
+  <!-- Center Crosshair -->
+  <div id="crosshair" aria-hidden="true"></div>
+
+  <!-- Top-Left F3 Debug Panel -->
+  <pre id="debug-panel" class="hidden" aria-live="polite"></pre>
+
+  <!-- Top-Right Utility HUD -->
+  <div id="hud-top-right">
+    <button id="btn-camera" class="mc-hud-btn" type="button" title="Сменить вид камеры (F5)">
+      <span aria-hidden="true">🎥</span><span class="btn-sub">F5</span>
+    </button>
+    <button id="btn-debug" class="mc-hud-btn" type="button" title="Отладка (F3)">
+      <span>F3</span>
+    </button>
+    <button id="btn-fullscreen" class="mc-hud-btn mc-fs-btn" type="button" title="На весь экран">
+      <span aria-hidden="true">⛶</span>
+      <span class="fs-label">На весь экран</span>
+    </button>
+    <button id="btn-pause" class="mc-hud-btn" type="button" title="Пауза и настройки (Esc)">
+      <span aria-hidden="true">⏸</span>
+    </button>
+  </div>
+
+  <!-- PC Pointer Lock Hint -->
+  <div id="pc-lock-hint">
+    Кликните по экрану для захвата мыши · <b>WASD</b> движение · <b>Space</b> прыжок · <b>Shift</b> присед · <b>F</b> полёт · <b>F5</b> камера · <b>F3</b> отладка
+  </div>
+
+  <!-- Status Toast -->
+  <div id="hud-toast" class="hidden" role="status" aria-live="polite"></div>
+
+  <!-- Mobile Multitouch Controls -->
+  <div id="mobile-controls" class="hidden">
+    <div id="touch-look-zone" aria-label="Зона поворота камеры"></div>
+
+    <div id="touch-joystick-base" aria-label="Виртуальный джойстик движения">
+      <div class="joystick-ring"></div>
+      <div id="touch-joystick-knob"></div>
+    </div>
+
+    <div id="touch-action-cluster">
+      <button id="btn-touch-fly" class="mc-touch-btn mc-touch-small" type="button" title="Полёт">✈</button>
+      <button id="btn-touch-action" class="mc-touch-btn mc-touch-action" type="button" title="Взмах / Действие">✊</button>
+      <div class="touch-vert-pair">
+        <button id="btn-touch-jump" class="mc-touch-btn" type="button" title="Прыжок / Вверх">▲</button>
+        <button id="btn-touch-crouch" class="mc-touch-btn" type="button" title="Присед / Вниз">▼</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause / Settings Modal -->
+  <div id="pause-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <div class="mc-modal">
+      <h1 id="pause-title">Меню игры (Этап 1)</h1>
+      <p class="mc-modal-sub">Оффлайн 3D воксельный мир · Three.js + IndexedDB</p>
+
+      <div class="mc-modal-actions">
+        <button id="btn-resume" class="mc-menu-btn mc-menu-primary" type="button">Продолжить игру</button>
+        <button id="btn-control-mode" class="mc-menu-btn" type="button">Управление: ПК (Мышь + WASD)</button>
+        <button id="btn-fly-mode" class="mc-menu-btn" type="button">Полёт (F): ВЫКЛ</button>
+
+        <label class="mc-slider-row" for="range-render-dist">
+          <span>Дальность прорисовки: <strong id="label-render-dist">6 чанков</strong></span>
+          <input id="range-render-dist" type="range" min="2" max="10" step="1" value="6">
+        </label>
+
+        <button id="btn-new-world" class="mc-menu-btn mc-menu-danger" type="button">Создать новый мир (новый сид)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay">
+    <div class="mc-loading-card">
+      <div class="mc-cube-badge"></div>
+      <h2>Загрузка мира</h2>
+      <p id="loading-status">Подготовка оффлайн-движка...</p>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
