@@ -328,6 +328,27 @@ export class PlayerModel {
     this.root.visible = visible;
   }
 
+  setEnvironmentLight(skyLevel, blockLevel, sunIntensity, skyTint, torchTint) {
+    const skyEff = Math.min(1, Math.max(0, (skyLevel / 15) * sunIntensity));
+    const blkEff = Math.min(1, Math.max(0, blockLevel / 15));
+    const skyCurve = Math.pow(0.8, (1 - skyEff) * 15);
+    const blkCurve = Math.pow(0.8, (1 - blkEff) * 15);
+
+    const sr = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.r : 1);
+    const sg = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.g : 1);
+    const sb = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.b : 1);
+
+    const br = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.r : 1);
+    const bg = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.g : 0.78);
+    const bb = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.b : 0.48);
+
+    this.material.color.setRGB(
+      Math.min(1, Math.max(0.06, sr, br)),
+      Math.min(1, Math.max(0.06, sg, bg)),
+      Math.min(1, Math.max(0.06, sb, bb))
+    );
+  }
+
   updatePose({ x, y, z, yaw, pitch, walkPhase, moveBlend, swingProgress, isCrouching, time }) {
     this.root.position.set(x, y, z);
     // Model front faces +Z; yaw=0 looks toward -Z -> rotate by yaw + PI

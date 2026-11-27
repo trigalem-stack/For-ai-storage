@@ -42,33 +42,52 @@ export const BLOCK_IDS = Object.freeze({
   BROWN_MUSHROOM: 37,
   BLUE_ORCHID: 38,
   VINE: 39,
+  TORCH: 40,
+  GLOWSTONE: 41,
+  JACK_O_LANTERN: 42,
+  BED_FOOT: 43,
+  BED_HEAD: 44,
 });
 
 class BlockRegistryImpl {
   constructor() {
     this.byId = new Array(256).fill(null);
     this.byKey = new Map();
+    this.opacityTable = new Uint8Array(256);
+    this.emissionTable = new Uint8Array(256);
+    this.opaqueTable = new Uint8Array(256);
+    this.aoTable = new Uint8Array(256);
     this._registerAllBlocks();
   }
 
   register(def) {
     const isCross = Boolean(def.isCross);
+    const isTorch = Boolean(def.isTorch);
+    const isBed = Boolean(def.isBed);
+    const isOpaque = def.isOpaque !== undefined
+      ? def.isOpaque
+      : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !(def.inset > 0));
+    const lightOpacity = def.lightOpacity !== undefined
+      ? def.lightOpacity
+      : (isOpaque ? 15 : 0);
+
     const entry = {
       id: def.id,
       key: def.key,
       name: def.name,
       isAir: Boolean(def.isAir),
       isCross,
-      isSolid: def.isSolid !== undefined ? def.isSolid : (!def.isAir && !def.isLiquid && !isCross),
-      isOpaque: def.isOpaque !== undefined
-        ? def.isOpaque
-        : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !(def.inset > 0)),
+      isTorch,
+      isBed,
+      directional: Boolean(def.directional),
+      isSolid: def.isSolid !== undefined ? def.isSolid : (!def.isAir && !def.isLiquid && !isCross && !isTorch),
+      isOpaque,
       isTransparent: Boolean(def.isTransparent || def.isLiquid),
-      isCutout: Boolean(def.isCutout || isCross),
+      isCutout: Boolean(def.isCutout || isCross || isTorch || isBed),
       isLiquid: Boolean(def.isLiquid),
       occludesAO: def.occludesAO !== undefined
         ? def.occludesAO
-        : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !(def.inset > 0)),
+        : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !(def.inset > 0)),
       fallsWithGravity: Boolean(def.fallsWithGravity),
       slipperiness: def.slipperiness ?? 0.0,
       inset: def.inset ?? 0,
@@ -80,11 +99,17 @@ class BlockRegistryImpl {
       dropId: def.dropId !== undefined ? def.dropId : def.id,
       dropChance: def.dropChance ?? 1.0,
       lightEmission: def.lightEmission ?? 0,
+      touchLightEmission: def.touchLightEmission ?? 0,
+      lightOpacity,
       redstoneGlow: Boolean(def.redstoneGlow),
       faces: def.faces || null,
     };
     this.byId[entry.id] = entry;
     this.byKey.set(entry.key, entry);
+    this.opacityTable[entry.id] = entry.lightOpacity;
+    this.emissionTable[entry.id] = entry.lightEmission;
+    this.opaqueTable[entry.id] = entry.isOpaque ? 1 : 0;
+    this.aoTable[entry.id] = entry.occludesAO ? 1 : 0;
     return entry;
   }
 
@@ -97,8 +122,7 @@ class BlockRegistryImpl {
   }
 
   isOpaque(id) {
-    const b = this.byId[id];
-    return b ? b.isOpaque : false;
+    return this.opaqueTable[id] === 1;
   }
 
   isSolid(id) {
@@ -108,7 +132,23 @@ class BlockRegistryImpl {
 
   isTargetable(id) {
     const b = this.byId[id];
-    return b ? (b.isSolid || b.isCross) : false;
+    return b ? (b.isSolid || b.isCross || b.isTorch || b.isBed) : false;
+  }
+
+  isTorch(id) {
+    return id === BLOCK_IDS.TORCH;
+  }
+
+  isBed(id) {
+    return id === BLOCK_IDS.BED_FOOT || id === BLOCK_IDS.BED_HEAD;
+  }
+
+  getLightOpacity(id) {
+    return this.opacityTable[id];
+  }
+
+  getLightEmission(id) {
+    return this.emissionTable[id];
   }
 
   isLiquid(id) {
@@ -117,8 +157,7 @@ class BlockRegistryImpl {
   }
 
   occludesAO(id) {
-    const b = this.byId[id];
-    return b ? b.occludesAO : false;
+    return this.aoTable[id] === 1;
   }
 
   fallsWithGravity(id) {
@@ -159,7 +198,9 @@ class BlockRegistryImpl {
   }
 
   getPlaceableBlocks() {
-    return this.byId.filter((b) => b && !b.isAir && !b.isLiquid && b.id !== BLOCK_IDS.BEDROCK);
+    return this.byId.filter(
+      (b) => b && !b.isAir && !b.isLiquid && b.id !== BLOCK_IDS.BEDROCK && b.id !== BLOCK_IDS.BED_HEAD
+    );
   }
 
   _allFaces(tileName) {
@@ -286,6 +327,7 @@ class BlockRegistryImpl {
       isOpaque: false,
       isCutout: true,
       occludesAO: false,
+      lightOpacity: 1,
       faces: this._allFaces('oak_leaves'),
     });
 
@@ -338,6 +380,7 @@ class BlockRegistryImpl {
       isTransparent: true,
       isLiquid: true,
       occludesAO: false,
+      lightOpacity: 2,
       dropId: 0,
       faces: this._allFaces('water'),
     });
@@ -391,6 +434,7 @@ class BlockRegistryImpl {
       isOpaque: false,
       isTransparent: true,
       occludesAO: false,
+      lightOpacity: 2,
       preferredTool: 'pickaxe',
       dropId: 0,
       faces: this._allFaces('ice'),
@@ -423,6 +467,7 @@ class BlockRegistryImpl {
       isOpaque: false,
       isCutout: true,
       occludesAO: false,
+      lightOpacity: 1,
       faces: this._allFaces('birch_leaves'),
     });
 
@@ -453,6 +498,7 @@ class BlockRegistryImpl {
       isOpaque: false,
       isCutout: true,
       occludesAO: false,
+      lightOpacity: 1,
       faces: this._allFaces('spruce_leaves'),
     });
 
@@ -466,6 +512,7 @@ class BlockRegistryImpl {
       isOpaque: false,
       isCutout: true,
       occludesAO: false,
+      lightOpacity: 1,
       faces: {
         top: 'cactus_top',
         bottom: 'cactus_bottom',
@@ -561,7 +608,8 @@ class BlockRegistryImpl {
       hardness: 3.0,
       requiresTool: true,
       preferredTool: 'pickaxe',
-      lightEmission: 9,
+      lightEmission: 0,
+      touchLightEmission: 9,
       redstoneGlow: true,
       faces: this._allFaces('redstone_ore'),
     });
@@ -671,6 +719,98 @@ class BlockRegistryImpl {
       tintType: 'swamp',
       hardness: 0.2,
       faces: this._allFaces('vine'),
+    });
+
+    // Stage 4 Light Sources & Functional Bed
+    this.register({
+      id: BLOCK_IDS.TORCH,
+      key: 'torch',
+      name: 'Факел',
+      materialType: 'wood',
+      isTorch: true,
+      isSolid: false,
+      isOpaque: false,
+      isCutout: true,
+      occludesAO: false,
+      lightOpacity: 0,
+      lightEmission: 14,
+      hardness: 0,
+      faces: this._allFaces('torch'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.GLOWSTONE,
+      key: 'glowstone',
+      name: 'Светящийся камень',
+      materialType: 'glass',
+      hardness: 0.3,
+      lightEmission: 15,
+      faces: this._allFaces('glowstone'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.JACK_O_LANTERN,
+      key: 'jack_o_lantern',
+      name: 'Светильник Джека',
+      materialType: 'wood',
+      hardness: 1.0,
+      preferredTool: 'axe',
+      directional: true,
+      lightEmission: 15,
+      faces: {
+        top: 'pumpkin_top',
+        bottom: 'pumpkin_top',
+        south: 'jack_o_lantern_face',
+        north: 'pumpkin_side',
+        east: 'pumpkin_side',
+        west: 'pumpkin_side',
+      },
+    });
+
+    this.register({
+      id: BLOCK_IDS.BED_FOOT,
+      key: 'bed',
+      name: 'Кровать',
+      materialType: 'wood',
+      isBed: true,
+      isSolid: true,
+      isOpaque: false,
+      isCutout: true,
+      occludesAO: false,
+      lightOpacity: 0,
+      hardness: 0.2,
+      dropId: BLOCK_IDS.BED_FOOT,
+      faces: {
+        top: 'bed_foot_top',
+        bottom: 'oak_planks',
+        north: 'bed_side_foot',
+        south: 'bed_end_foot',
+        east: 'bed_side_foot',
+        west: 'bed_side_foot',
+      },
+    });
+
+    this.register({
+      id: BLOCK_IDS.BED_HEAD,
+      key: 'bed_head',
+      name: 'Кровать (изголовье)',
+      materialType: 'wood',
+      isBed: true,
+      isSolid: true,
+      isOpaque: false,
+      isCutout: true,
+      occludesAO: false,
+      lightOpacity: 0,
+      hardness: 0.2,
+      dropId: BLOCK_IDS.BED_FOOT,
+      faces: {
+        top: 'bed_head_top',
+        bottom: 'oak_planks',
+        north: 'bed_end_head',
+        south: 'bed_side_head',
+        east: 'bed_side_head',
+        west: 'bed_side_head',
+      },
     });
   }
 }

@@ -113,12 +113,32 @@ export class SelectionBox {
     scene.add(this.mesh);
   }
 
-  update(hit) {
+  update(hit, world = null) {
     if (!hit) {
       this.mesh.visible = false;
       return;
     }
     const def = BlockRegistry.get(hit.blockId);
+    if (def.isTorch) {
+      const meta = world?.getBlockMeta ? world.getBlockMeta(hit.x, hit.y, hit.z) : 0;
+      let ox = 0.5;
+      let oy = 0.34;
+      let oz = 0.5;
+      if (meta === 1) { ox = 0.20; oy = 0.48; }
+      else if (meta === 2) { ox = 0.80; oy = 0.48; }
+      else if (meta === 3) { oz = 0.20; oy = 0.48; }
+      else if (meta === 4) { oz = 0.80; oy = 0.48; }
+      this.mesh.scale.set(0.32, 0.66, 0.32);
+      this.mesh.position.set(hit.x + ox, hit.y + oy, hit.z + oz);
+      this.mesh.visible = true;
+      return;
+    }
+    if (def.isBed) {
+      this.mesh.scale.set(1.004, 0.57, 1.004);
+      this.mesh.position.set(hit.x + 0.5, hit.y + 0.285, hit.z + 0.5);
+      this.mesh.visible = true;
+      return;
+    }
     const sx = def.inset > 0 ? 1 - def.inset * 2 + 0.005 : def.isCross ? 0.78 : 1.004;
     const sy = def.isCross ? 0.85 : 1.004;
     this.mesh.scale.set(sx, sy, sx);

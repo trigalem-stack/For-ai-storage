@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#2d63b8">
-  <title>Minecraft Web Edition — Stage 3</title>
+  <title>Minecraft Web Edition — Stage 4</title>
   <style>
 :root {
   --mc-bg-panel: rgba(20, 24, 30, 0.72);
@@ -64,16 +64,19 @@ body.pseudo-fullscreen {
   touch-action: none;
 }
 
-/* Crisp Non-Blurry Solid White Crosshair */
+/* Crisp Non-Blurry Pure White Crosshair (zero dark outline/shadow) */
 #crosshair {
   position: fixed;
   left: 50%;
   top: 50%;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 15;
+  mix-blend-mode: normal;
+  filter: none;
+  opacity: 1;
 }
 
 #crosshair::before,
@@ -81,39 +84,98 @@ body.pseudo-fullscreen {
   content: '';
   position: absolute;
   background: #ffffff;
-  outline: 1px solid rgba(0, 0, 0, 0.55);
+  background-color: #ffffff;
+  border: none;
+  outline: none;
+  box-shadow: none;
 }
 
 #crosshair::before {
-  left: 7px;
+  left: 8px;
   top: 0;
   width: 2px;
-  height: 16px;
+  height: 18px;
 }
 
 #crosshair::after {
   left: 0;
-  top: 7px;
-  width: 16px;
+  top: 8px;
+  width: 18px;
   height: 2px;
 }
 
-/* Compact Top-Left F3 Debug Panel */
-#debug-panel {
+/* Sleep Fade Overlay */
+#sleep-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 8, 20, 0.92);
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+  z-index: 48;
+}
+
+#sleep-overlay.active {
+  opacity: 1;
+}
+
+.sleep-msg {
+  font-size: 20px;
+  font-weight: 700;
+  color: #e8f0ff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+/* Compact Top-Left F3 Debug Panel + Time Switcher */
+#debug-container {
   position: fixed;
   top: var(--safe-top);
   left: var(--safe-left);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: min(92vw, 520px);
+  pointer-events: none;
+  z-index: 25;
+}
+
+#debug-panel {
   margin: 0;
   padding: 7px 10px;
-  max-width: min(90vw, 500px);
-  background: rgba(10, 14, 20, 0.72);
+  background: rgba(10, 14, 20, 0.76);
   border: 2px solid rgba(255, 255, 255, 0.16);
   color: #f4f8fc;
   font-size: 12px;
   line-height: 1.4;
   white-space: pre-wrap;
   pointer-events: none;
-  z-index: 25;
+}
+
+#time-test-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.time-pill-btn {
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(20, 26, 36, 0.84);
+  color: #f4f8fc;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.time-pill-btn:hover,
+.time-pill-btn:active {
+  background: rgba(74, 148, 42, 0.88);
+  border-color: rgba(255, 255, 255, 0.65);
 }
 
 /* Top-Right HUD Toolbar */
@@ -894,8 +956,21 @@ body.pseudo-fullscreen {
   <!-- Crisp White Crosshair (hidden in F5 3rd-person camera modes) -->
   <div id="crosshair" aria-hidden="true"></div>
 
-  <!-- Compact Top-Left F3 Debug Panel -->
-  <pre id="debug-panel" class="hidden" aria-live="polite"></pre>
+  <!-- Sleep Fade Animation Overlay -->
+  <div id="sleep-overlay" class="hidden" aria-hidden="true">
+    <div class="sleep-msg">Спокойной ночи...</div>
+  </div>
+
+  <!-- Compact Top-Left F3 Debug Panel + Quick Day/Night Test Switcher -->
+  <div id="debug-container" class="hidden">
+    <pre id="debug-panel" aria-live="polite"></pre>
+    <div id="time-test-bar" role="group" aria-label="Быстрая смена времени суток">
+      <button type="button" class="time-pill-btn" data-time="0">🌅 Утро</button>
+      <button type="button" class="time-pill-btn" data-time="6000">☀️ Полдень</button>
+      <button type="button" class="time-pill-btn" data-time="12100">🌇 Закат</button>
+      <button type="button" class="time-pill-btn" data-time="18000">🌙 Полночь</button>
+    </div>
+  </div>
 
   <!-- Top-Right Utility HUD -->
   <div id="hud-top-right">
@@ -973,7 +1048,7 @@ body.pseudo-fullscreen {
       <div class="mc-logo-badge">
         <div class="mc-cube-badge"></div>
         <h1 id="main-title">MINECRAFT WEB</h1>
-        <p class="mc-modal-sub">Этап 3 · Биомы · 3D-пещеры · Каньоны · Руды · Креатив</p>
+        <p class="mc-modal-sub">Этап 4 · День/Ночь · Солнце и Луна · Воксельный свет · Факелы · Кровать</p>
       </div>
       <div class="mc-modal-actions">
         <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">▶ Играть (Миры)</button>
@@ -4850,10 +4925,68 @@ body.pseudo-fullscreen {
       return this;
     }
   };
+  var Ar = class extends Pe {
+    constructor(t) {
+      super(), this.isPointsMaterial = true, this.type = "PointsMaterial", this.color = new bt(16777215), this.map = null, this.alphaMap = null, this.size = 1, this.sizeAttenuation = true, this.fog = true, this.setValues(t);
+    }
+    copy(t) {
+      return super.copy(t), this.color.copy(t.color), this.map = t.map, this.alphaMap = t.alphaMap, this.size = t.size, this.sizeAttenuation = t.sizeAttenuation, this.fog = t.fog, this;
+    }
+  };
   var Kd = new Ht();
   var ph = new xi();
   var Va = new Ie();
   var Ha = new C();
+  var Ro = class extends le {
+    constructor(t = new Yt(), e = new Ar()) {
+      super(), this.isPoints = true, this.type = "Points", this.geometry = t, this.material = e, this.morphTargetDictionary = void 0, this.morphTargetInfluences = void 0, this.updateMorphTargets();
+    }
+    copy(t, e) {
+      return super.copy(t, e), t.morphTargetInfluences !== void 0 ? this.morphTargetInfluences = t.morphTargetInfluences.slice() : this.morphTargetInfluences = void 0, t.morphTargetDictionary !== void 0 ? this.morphTargetDictionary = Object.assign({}, t.morphTargetDictionary) : this.morphTargetDictionary = void 0, this.material = Array.isArray(t.material) ? t.material.slice() : t.material, this.geometry = t.geometry, this;
+    }
+    intersectsFrustum(t) {
+      return t.intersectsObject(this);
+    }
+    raycast(t, e) {
+      let n = this.geometry, i = this.matrixWorld, r = t.params.Points.threshold, a = n.drawRange;
+      if (n.boundingSphere === null && n.computeBoundingSphere(), Va.copy(n.boundingSphere), Va.applyMatrix4(i), Va.radius += r, t.ray.intersectsSphere(Va) === false) return;
+      Kd.copy(i).invert(), ph.copy(t.ray).applyMatrix4(Kd);
+      let o = r / ((this.scale.x + this.scale.y + this.scale.z) / 3), l = o * o, c = n.index, d = n.attributes.position;
+      if (c !== null) {
+        let u = Math.max(0, a.start), f = Math.min(c.count, a.start + a.count);
+        for (let p = u, _ = f; p < _; p++) {
+          let m = c.getX(p);
+          Ha.fromBufferAttribute(d, m), Qd(Ha, m, l, i, t, e, this);
+        }
+      } else {
+        let u = Math.max(0, a.start), f = Math.min(d.count, a.start + a.count);
+        for (let p = u, _ = f; p < _; p++) Ha.fromBufferAttribute(d, p), Qd(Ha, p, l, i, t, e, this);
+      }
+    }
+    updateMorphTargets() {
+      let e = this.geometry.morphAttributes, n = Object.keys(e);
+      if (n.length > 0) {
+        let i = e[n[0]];
+        if (i !== void 0) {
+          this.morphTargetInfluences = [], this.morphTargetDictionary = {};
+          for (let r = 0, a = i.length; r < a; r++) {
+            let o = i[r].name || String(r);
+            this.morphTargetInfluences.push(0), this.morphTargetDictionary[o] = r;
+          }
+        }
+      }
+    }
+  };
+  function Qd(s30, t, e, n, i, r, a) {
+    let o = ph.distanceSqToPoint(s30);
+    if (o < e) {
+      let l = new C();
+      ph.closestPointToPoint(s30, l), l.applyMatrix4(n);
+      let c = i.ray.origin.distanceTo(l);
+      if (c < i.near || c > i.far) return;
+      r.push({ distance: c, distanceToRay: Math.sqrt(o), point: l, index: t, face: null, faceIndex: null, barycoord: null, object: a });
+    }
+  }
   var Xi = class extends Ae {
     constructor(t = [], e = si, n, i, r, a, o, l, c, h) {
       super(t, e, n, i, r, a, o, l, c, h), this.isCubeTexture = true, this.flipY = false;
@@ -15813,28 +15946,44 @@ void main() {
     RED_MUSHROOM: 36,
     BROWN_MUSHROOM: 37,
     BLUE_ORCHID: 38,
-    VINE: 39
+    VINE: 39,
+    TORCH: 40,
+    GLOWSTONE: 41,
+    JACK_O_LANTERN: 42,
+    BED_FOOT: 43,
+    BED_HEAD: 44
   });
   var BlockRegistryImpl = class {
     constructor() {
       this.byId = new Array(256).fill(null);
       this.byKey = /* @__PURE__ */ new Map();
+      this.opacityTable = new Uint8Array(256);
+      this.emissionTable = new Uint8Array(256);
+      this.opaqueTable = new Uint8Array(256);
+      this.aoTable = new Uint8Array(256);
       this._registerAllBlocks();
     }
     register(def) {
       const isCross = Boolean(def.isCross);
+      const isTorch = Boolean(def.isTorch);
+      const isBed = Boolean(def.isBed);
+      const isOpaque = def.isOpaque !== void 0 ? def.isOpaque : !def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !(def.inset > 0);
+      const lightOpacity = def.lightOpacity !== void 0 ? def.lightOpacity : isOpaque ? 15 : 0;
       const entry = {
         id: def.id,
         key: def.key,
         name: def.name,
         isAir: Boolean(def.isAir),
         isCross,
-        isSolid: def.isSolid !== void 0 ? def.isSolid : !def.isAir && !def.isLiquid && !isCross,
-        isOpaque: def.isOpaque !== void 0 ? def.isOpaque : !def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !(def.inset > 0),
+        isTorch,
+        isBed,
+        directional: Boolean(def.directional),
+        isSolid: def.isSolid !== void 0 ? def.isSolid : !def.isAir && !def.isLiquid && !isCross && !isTorch,
+        isOpaque,
         isTransparent: Boolean(def.isTransparent || def.isLiquid),
-        isCutout: Boolean(def.isCutout || isCross),
+        isCutout: Boolean(def.isCutout || isCross || isTorch || isBed),
         isLiquid: Boolean(def.isLiquid),
-        occludesAO: def.occludesAO !== void 0 ? def.occludesAO : !def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !(def.inset > 0),
+        occludesAO: def.occludesAO !== void 0 ? def.occludesAO : !def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !(def.inset > 0),
         fallsWithGravity: Boolean(def.fallsWithGravity),
         slipperiness: def.slipperiness ?? 0,
         inset: def.inset ?? 0,
@@ -15847,11 +15996,17 @@ void main() {
         dropId: def.dropId !== void 0 ? def.dropId : def.id,
         dropChance: def.dropChance ?? 1,
         lightEmission: def.lightEmission ?? 0,
+        touchLightEmission: def.touchLightEmission ?? 0,
+        lightOpacity,
         redstoneGlow: Boolean(def.redstoneGlow),
         faces: def.faces || null
       };
       this.byId[entry.id] = entry;
       this.byKey.set(entry.key, entry);
+      this.opacityTable[entry.id] = entry.lightOpacity;
+      this.emissionTable[entry.id] = entry.lightEmission;
+      this.opaqueTable[entry.id] = entry.isOpaque ? 1 : 0;
+      this.aoTable[entry.id] = entry.occludesAO ? 1 : 0;
       return entry;
     }
     get(id2) {
@@ -15861,8 +16016,7 @@ void main() {
       return this.byKey.get(key) || this.byId[0];
     }
     isOpaque(id2) {
-      const b = this.byId[id2];
-      return b ? b.isOpaque : false;
+      return this.opaqueTable[id2] === 1;
     }
     isSolid(id2) {
       const b = this.byId[id2];
@@ -15870,15 +16024,26 @@ void main() {
     }
     isTargetable(id2) {
       const b = this.byId[id2];
-      return b ? b.isSolid || b.isCross : false;
+      return b ? b.isSolid || b.isCross || b.isTorch || b.isBed : false;
+    }
+    isTorch(id2) {
+      return id2 === BLOCK_IDS.TORCH;
+    }
+    isBed(id2) {
+      return id2 === BLOCK_IDS.BED_FOOT || id2 === BLOCK_IDS.BED_HEAD;
+    }
+    getLightOpacity(id2) {
+      return this.opacityTable[id2];
+    }
+    getLightEmission(id2) {
+      return this.emissionTable[id2];
     }
     isLiquid(id2) {
       const b = this.byId[id2];
       return b ? b.isLiquid : false;
     }
     occludesAO(id2) {
-      const b = this.byId[id2];
-      return b ? b.occludesAO : false;
+      return this.aoTable[id2] === 1;
     }
     fallsWithGravity(id2) {
       const b = this.byId[id2];
@@ -15911,7 +16076,9 @@ void main() {
       return this.byId.filter((b) => b && !b.isAir);
     }
     getPlaceableBlocks() {
-      return this.byId.filter((b) => b && !b.isAir && !b.isLiquid && b.id !== BLOCK_IDS.BEDROCK);
+      return this.byId.filter(
+        (b) => b && !b.isAir && !b.isLiquid && b.id !== BLOCK_IDS.BEDROCK && b.id !== BLOCK_IDS.BED_HEAD
+      );
     }
     _allFaces(tileName) {
       return {
@@ -16028,6 +16195,7 @@ void main() {
         isOpaque: false,
         isCutout: true,
         occludesAO: false,
+        lightOpacity: 1,
         faces: this._allFaces("oak_leaves")
       });
       this.register({
@@ -16076,6 +16244,7 @@ void main() {
         isTransparent: true,
         isLiquid: true,
         occludesAO: false,
+        lightOpacity: 2,
         dropId: 0,
         faces: this._allFaces("water")
       });
@@ -16125,6 +16294,7 @@ void main() {
         isOpaque: false,
         isTransparent: true,
         occludesAO: false,
+        lightOpacity: 2,
         preferredTool: "pickaxe",
         dropId: 0,
         faces: this._allFaces("ice")
@@ -16155,6 +16325,7 @@ void main() {
         isOpaque: false,
         isCutout: true,
         occludesAO: false,
+        lightOpacity: 1,
         faces: this._allFaces("birch_leaves")
       });
       this.register({
@@ -16183,6 +16354,7 @@ void main() {
         isOpaque: false,
         isCutout: true,
         occludesAO: false,
+        lightOpacity: 1,
         faces: this._allFaces("spruce_leaves")
       });
       this.register({
@@ -16195,6 +16367,7 @@ void main() {
         isOpaque: false,
         isCutout: true,
         occludesAO: false,
+        lightOpacity: 1,
         faces: {
           top: "cactus_top",
           bottom: "cactus_bottom",
@@ -16282,7 +16455,8 @@ void main() {
         hardness: 3,
         requiresTool: true,
         preferredTool: "pickaxe",
-        lightEmission: 9,
+        lightEmission: 0,
+        touchLightEmission: 9,
         redstoneGlow: true,
         faces: this._allFaces("redstone_ore")
       });
@@ -16382,6 +16556,92 @@ void main() {
         hardness: 0.2,
         faces: this._allFaces("vine")
       });
+      this.register({
+        id: BLOCK_IDS.TORCH,
+        key: "torch",
+        name: "\u0424\u0430\u043A\u0435\u043B",
+        materialType: "wood",
+        isTorch: true,
+        isSolid: false,
+        isOpaque: false,
+        isCutout: true,
+        occludesAO: false,
+        lightOpacity: 0,
+        lightEmission: 14,
+        hardness: 0,
+        faces: this._allFaces("torch")
+      });
+      this.register({
+        id: BLOCK_IDS.GLOWSTONE,
+        key: "glowstone",
+        name: "\u0421\u0432\u0435\u0442\u044F\u0449\u0438\u0439\u0441\u044F \u043A\u0430\u043C\u0435\u043D\u044C",
+        materialType: "glass",
+        hardness: 0.3,
+        lightEmission: 15,
+        faces: this._allFaces("glowstone")
+      });
+      this.register({
+        id: BLOCK_IDS.JACK_O_LANTERN,
+        key: "jack_o_lantern",
+        name: "\u0421\u0432\u0435\u0442\u0438\u043B\u044C\u043D\u0438\u043A \u0414\u0436\u0435\u043A\u0430",
+        materialType: "wood",
+        hardness: 1,
+        preferredTool: "axe",
+        directional: true,
+        lightEmission: 15,
+        faces: {
+          top: "pumpkin_top",
+          bottom: "pumpkin_top",
+          south: "jack_o_lantern_face",
+          north: "pumpkin_side",
+          east: "pumpkin_side",
+          west: "pumpkin_side"
+        }
+      });
+      this.register({
+        id: BLOCK_IDS.BED_FOOT,
+        key: "bed",
+        name: "\u041A\u0440\u043E\u0432\u0430\u0442\u044C",
+        materialType: "wood",
+        isBed: true,
+        isSolid: true,
+        isOpaque: false,
+        isCutout: true,
+        occludesAO: false,
+        lightOpacity: 0,
+        hardness: 0.2,
+        dropId: BLOCK_IDS.BED_FOOT,
+        faces: {
+          top: "bed_foot_top",
+          bottom: "oak_planks",
+          north: "bed_side_foot",
+          south: "bed_end_foot",
+          east: "bed_side_foot",
+          west: "bed_side_foot"
+        }
+      });
+      this.register({
+        id: BLOCK_IDS.BED_HEAD,
+        key: "bed_head",
+        name: "\u041A\u0440\u043E\u0432\u0430\u0442\u044C (\u0438\u0437\u0433\u043E\u043B\u043E\u0432\u044C\u0435)",
+        materialType: "wood",
+        isBed: true,
+        isSolid: true,
+        isOpaque: false,
+        isCutout: true,
+        occludesAO: false,
+        lightOpacity: 0,
+        hardness: 0.2,
+        dropId: BLOCK_IDS.BED_FOOT,
+        faces: {
+          top: "bed_head_top",
+          bottom: "oak_planks",
+          north: "bed_end_head",
+          south: "bed_side_head",
+          east: "bed_side_head",
+          west: "bed_side_head"
+        }
+      });
     }
   };
   var BlockRegistry = new BlockRegistryImpl();
@@ -16393,6 +16653,14 @@ void main() {
   var SEA_LEVEL = 62;
   var TICK_RATE = 20;
   var TICK_MS = 1e3 / TICK_RATE;
+  var DAY_LENGTH_TICKS = 24e3;
+  var DEFAULT_WORLD_TIME = 1e3;
+  var SLEEP_START_TICK = 12541;
+  var SLEEP_END_TICK = 23458;
+  var CLOUD_HEIGHT_MIN = 108;
+  var CLOUD_HEIGHT_MAX = 112;
+  var MAX_LIGHT_LEVEL = 15;
+  var REDSTONE_GLOW_LEVEL = 9;
   var PLAYER_WIDTH = 0.6;
   var PLAYER_HALF_WIDTH = PLAYER_WIDTH * 0.5;
   var PLAYER_HEIGHT = 1.8;
@@ -16405,9 +16673,9 @@ void main() {
   var SPRINT_SPEED = 5.612;
   var CROUCH_SPEED = 1.295;
   var SWIM_SPEED = 3.85;
-  var SWIM_SPRINT_SPEED = 6.2;
-  var FLY_SPEED = 11.5;
-  var FLY_SPRINT_SPEED = 23;
+  var SWIM_SPRINT_SPEED = 6;
+  var FLY_SPEED = 9.5;
+  var FLY_SPRINT_SPEED = 15;
   var GRAVITY = 32;
   var JUMP_VELOCITY = 8.952;
   var TERMINAL_VELOCITY = 54;
@@ -16421,7 +16689,7 @@ void main() {
   var MAX_STACK_SIZE = 64;
   var DEFAULT_RENDER_DISTANCE_PC = 7;
   var DEFAULT_RENDER_DISTANCE_MOBILE = 5;
-  var CHUNK_FRAME_BUDGET_MS = 3.5;
+  var CHUNK_FRAME_BUDGET_MS = 3;
   var ATLAS_GRID_SIZE = 16;
   var ATLAS_TILE_INNER = 16;
   var ATLAS_TILE_PAD = 8;
@@ -16709,12 +16977,86 @@ void main() {
   function buildBlockItemGeometry(atlas, blockId, scale = 1) {
     const def = BlockRegistry.get(blockId);
     if (!def || !def.faces) return null;
-    const h = 0.5 * scale;
     const positions = [];
     const normals = [];
     const uvs = [];
     const colors = [];
     const indices = [];
+    const addQuad = (p02, p1, p2, p3, nx2, ny2, nz, u02, u1, vBot, vTop, shade) => {
+      const base = positions.length / 3;
+      const b = Math.pow(shade, 2.2);
+      positions.push(...p02, ...p1, ...p2, ...p3);
+      for (let i = 0; i < 4; i++) {
+        normals.push(nx2, ny2, nz);
+        colors.push(b, b, b);
+      }
+      uvs.push(u02, vBot, u1, vBot, u1, vTop, u02, vTop);
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    };
+    if (def.isCross) {
+      const uv2 = atlas.getUV(def.faces.top);
+      const h = 0.54 * scale;
+      const zOff = 0.015 * scale;
+      addQuad([-h, -h, zOff], [h, -h, zOff], [h, h, zOff], [-h, h, zOff], 0, 0, 1, uv2.u0, uv2.u1, uv2.vBottom, uv2.vTop, 1);
+      addQuad([h, -h, -zOff], [-h, -h, -zOff], [-h, h, -zOff], [h, h, -zOff], 0, 0, -1, uv2.u0, uv2.u1, uv2.vBottom, uv2.vTop, 0.94);
+      const geom2 = new Yt();
+      geom2.setAttribute("position", new At(positions, 3));
+      geom2.setAttribute("normal", new At(normals, 3));
+      geom2.setAttribute("uv", new At(uvs, 2));
+      geom2.setAttribute("color", new At(colors, 3));
+      geom2.setIndex(indices);
+      return geom2;
+    }
+    if (def.isTorch) {
+      const uv2 = atlas.getUV("torch");
+      const du = uv2.u1 - uv2.u0;
+      const dv2 = uv2.vTop - uv2.vBottom;
+      const u02 = uv2.u0 + du * (7 / 16);
+      const u1 = uv2.u0 + du * (9 / 16);
+      const vBot = uv2.vBottom;
+      const vTop = uv2.vBottom + dv2 * (10 / 16);
+      const vTip0 = uv2.vBottom + dv2 * (8 / 16);
+      const hw = 1 / 16 * scale * 1.65;
+      const hh = 5 / 16 * scale * 1.65;
+      addQuad([-hw, -hh, hw], [hw, -hh, hw], [hw, hh, hw], [-hw, hh, hw], 0, 0, 1, u02, u1, vBot, vTop, 1);
+      addQuad([hw, -hh, -hw], [-hw, -hh, -hw], [-hw, hh, -hw], [hw, hh, -hw], 0, 0, -1, u02, u1, vBot, vTop, 0.95);
+      addQuad([hw, -hh, hw], [hw, -hh, -hw], [hw, hh, -hw], [hw, hh, hw], 1, 0, 0, u02, u1, vBot, vTop, 0.92);
+      addQuad([-hw, -hh, -hw], [-hw, -hh, hw], [-hw, hh, hw], [-hw, hh, -hw], -1, 0, 0, u02, u1, vBot, vTop, 0.92);
+      addQuad([-hw, hh, hw], [hw, hh, hw], [hw, hh, -hw], [-hw, hh, -hw], 0, 1, 0, u02, u1, vTip0, vTop, 1);
+      const geom2 = new Yt();
+      geom2.setAttribute("position", new At(positions, 3));
+      geom2.setAttribute("normal", new At(normals, 3));
+      geom2.setAttribute("uv", new At(uvs, 2));
+      geom2.setAttribute("color", new At(colors, 3));
+      geom2.setIndex(indices);
+      return geom2;
+    }
+    if (def.isBed) {
+      const headUv = atlas.getUV("bed_head_top");
+      const footUv = atlas.getUV("bed_foot_top");
+      const woodUv = atlas.getUV("oak_planks");
+      const sideUv = atlas.getUV("bed_side_foot");
+      const hw = 0.36 * scale;
+      const hl = 0.68 * scale;
+      const yBot = -0.14 * scale;
+      const yTop = 0.16 * scale;
+      addQuad([-hw, yTop, 0], [hw, yTop, 0], [hw, yTop, -hl], [-hw, yTop, -hl], 0, 1, 0, headUv.u0, headUv.u1, headUv.vBottom, headUv.vTop, 1);
+      addQuad([-hw, yTop, hl], [hw, yTop, hl], [hw, yTop, 0], [-hw, yTop, 0], 0, 1, 0, footUv.u0, footUv.u1, footUv.vBottom, footUv.vTop, 1);
+      addQuad([-hw, yBot, -hl], [hw, yBot, -hl], [hw, yBot, hl], [-hw, yBot, hl], 0, -1, 0, woodUv.u0, woodUv.u1, woodUv.vBottom, woodUv.vTop, 0.6);
+      addQuad([-hw, yBot, hl], [hw, yBot, hl], [hw, yTop, hl], [-hw, yTop, hl], 0, 0, 1, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.35, sideUv.vTop, 0.85);
+      addQuad([hw, yBot, -hl], [-hw, yBot, -hl], [-hw, yTop, -hl], [hw, yTop, -hl], 0, 0, -1, woodUv.u0, woodUv.u1, woodUv.vBottom, woodUv.vTop, 0.8);
+      addQuad([hw, yBot, hl], [hw, yBot, -hl], [hw, yTop, -hl], [hw, yTop, hl], 1, 0, 0, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.35, sideUv.vTop, 0.72);
+      addQuad([-hw, yBot, -hl], [-hw, yBot, hl], [-hw, yTop, hl], [-hw, yTop, -hl], -1, 0, 0, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.35, sideUv.vTop, 0.7);
+      const geom2 = new Yt();
+      geom2.setAttribute("position", new At(positions, 3));
+      geom2.setAttribute("normal", new At(normals, 3));
+      geom2.setAttribute("uv", new At(uvs, 2));
+      geom2.setAttribute("color", new At(colors, 3));
+      geom2.setIndex(indices);
+      return geom2;
+    }
+    const hY = 0.5 * scale;
+    const hXZ = (0.5 - (def.inset || 0)) * scale;
     for (let f = 0; f < 6; f++) {
       const face = CUBE_FACES[f];
       const uv2 = atlas.getUV(def.faces[face.key]);
@@ -16722,7 +17064,7 @@ void main() {
       const b = Math.pow(face.shade, 2.2);
       for (let i = 0; i < 4; i++) {
         const v = face.verts[i];
-        positions.push(v[0] * h, v[1] * h, v[2] * h);
+        positions.push(v[0] * hXZ, v[1] * hY, v[2] * hXZ);
         normals.push(face.nx, face.ny, face.nz);
         colors.push(b, b, b);
       }
@@ -16766,7 +17108,7 @@ void main() {
         vertexColors: true,
         fog: true,
         alphaTest: 0.5,
-        side: Mi
+        side: Bn
       });
     }
     _getGeometry(blockId) {
@@ -17318,6 +17660,23 @@ void main() {
     setVisible(visible) {
       this.root.visible = visible;
     }
+    setEnvironmentLight(skyLevel, blockLevel, sunIntensity, skyTint, torchTint) {
+      const skyEff = Math.min(1, Math.max(0, skyLevel / 15 * sunIntensity));
+      const blkEff = Math.min(1, Math.max(0, blockLevel / 15));
+      const skyCurve = Math.pow(0.8, (1 - skyEff) * 15);
+      const blkCurve = Math.pow(0.8, (1 - blkEff) * 15);
+      const sr2 = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.r : 1);
+      const sg = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.g : 1);
+      const sb = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.b : 1);
+      const br = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.r : 1);
+      const bg = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.g : 0.78);
+      const bb = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.b : 0.48);
+      this.material.color.setRGB(
+        Math.min(1, Math.max(0.06, sr2, br)),
+        Math.min(1, Math.max(0.06, sg, bg)),
+        Math.min(1, Math.max(0.06, sb, bb))
+      );
+    }
     updatePose({ x, y, z, yaw, pitch, walkPhase, moveBlend, swingProgress, isCrouching, time }) {
       this.root.position.set(x, y, z);
       this.root.rotation.y = yaw + Math.PI;
@@ -17367,7 +17726,7 @@ void main() {
         map: atlas.texture,
         vertexColors: true,
         alphaTest: 0.5,
-        side: Mi
+        side: Bn
       });
       this.pivot = new gi();
       this.scene.add(this.pivot);
@@ -17415,12 +17774,49 @@ void main() {
           return;
         }
         mesh = new Ce(geom, this.blockMaterial);
-        mesh.rotation.set(0.18, Math.PI * 0.25, 0.08);
+        const def = BlockRegistry.get(id2);
+        if (def.isCross) {
+          mesh.rotation.set(0.06, -0.22, -0.06);
+        } else if (def.isTorch) {
+          mesh.rotation.set(-0.22, 0.12, -0.14);
+        } else if (def.isBed) {
+          mesh.rotation.set(0.28, Math.PI * 0.35, 0.08);
+        } else {
+          mesh.rotation.set(0.18, Math.PI * 0.25, 0.08);
+        }
         this.heldBlockCache.set(id2, mesh);
       }
       this.heldItemMount.add(mesh);
       this.armHolder.visible = false;
       this.heldItemMount.visible = true;
+    }
+    /**
+     * Dynamically tints the 1st-person arm & held item from surrounding voxel sky/block light.
+     * Emissive held items (torch, glowstone, jack o'lantern) stay bright even inside dark caves.
+     */
+    setEnvironmentLight(skyLevel, blockLevel, sunIntensity, skyTint, torchTint) {
+      const def = BlockRegistry.get(this.currentHeldBlockId);
+      const heldEmit = def?.lightEmission || 0;
+      const skyEff = Math.min(1, Math.max(0, skyLevel / 15 * sunIntensity));
+      const blkEff = Math.min(1, Math.max(0, Math.max(blockLevel, heldEmit * 0.6) / 15));
+      const skyCurve = Math.pow(0.8, (1 - skyEff) * 15);
+      const blkCurve = Math.pow(0.8, (1 - blkEff) * 15);
+      const sr2 = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.r : 1);
+      const sg = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.g : 1);
+      const sb = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.b : 1);
+      const br = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.r : 1);
+      const bg = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.g : 0.78);
+      const bb = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.b : 0.48);
+      const minL = 0.06;
+      const ar2 = Math.min(1, Math.max(minL, sr2, br));
+      const ag = Math.min(1, Math.max(minL, sg, bg));
+      const ab = Math.min(1, Math.max(minL, sb, bb));
+      this.armMaterial.color.setRGB(ar2, ag, ab);
+      if (heldEmit > 0) {
+        this.blockMaterial.color.setRGB(1, 0.96, 0.9);
+      } else {
+        this.blockMaterial.color.setRGB(ar2, ag, ab);
+      }
     }
     setMiningActive(active) {
       this.isMining = Boolean(active);
@@ -17766,14 +18162,17 @@ void main() {
       const waistInWater = this.world.getBlock(this.x, this.y + 0.72, this.z) === BLOCK_IDS.WATER;
       const headInWater = this.world.getBlock(this.x, this.y + 1.48, this.z) === BLOCK_IDS.WATER;
       const inWater = feetInWater || waistInWater;
+      const ceilingBlocksStand = !this.flyMode && this.isSwimming ? collidesWithWorld(this.world, this.x, this.y, this.z, PLAYER_HALF_WIDTH, PLAYER_HEIGHT) : false;
       let nextSwim = false;
-      if (!this.flyMode && headInWater && wantSprint && forward > 0.25) {
-        nextSwim = true;
-      } else if (!this.flyMode && this.isSwimming) {
-        if (inWater && forward > 0.1 && wantSprint) {
+      if (!this.flyMode) {
+        if (headInWater && wantSprint && forward > 0.25 && !wantJump) {
           nextSwim = true;
-        } else if (collidesWithWorld(this.world, this.x, this.y, this.z, PLAYER_HALF_WIDTH, PLAYER_HEIGHT)) {
-          nextSwim = true;
+        } else if (this.isSwimming) {
+          if (ceilingBlocksStand) {
+            nextSwim = true;
+          } else if (headInWater && wantSprint && forward > 0.25 && !wantJump) {
+            nextSwim = true;
+          }
         }
       }
       this.isSwimming = nextSwim;
@@ -17860,16 +18259,18 @@ void main() {
             if (wantJump) {
               const nearShoreWall = len > 0.05 && collidesWithWorld(
                 this.world,
-                this.x + moveDirX * 0.36,
-                this.y + 0.32,
-                this.z + moveDirZ * 0.36,
+                this.x + moveDirX * 0.42,
+                this.y + 0.35,
+                this.z + moveDirZ * 0.42,
                 PLAYER_HALF_WIDTH,
-                0.8
+                0.85
               );
               if (!subHeadWater && (nearShoreWall || !subWaistWater)) {
-                this.vy = Math.max(this.vy, 7.15);
+                this.vy = Math.max(this.vy, 7.25);
+              } else if (!subHeadWater && subWaistWater) {
+                this.vy = Math.max(this.vy, 3.6);
               } else {
-                this.vy = Math.min(4.8, this.vy + 26 * subDt);
+                this.vy = Math.min(5.2, Math.max(this.vy + 28 * subDt, 3.8));
               }
             } else if (wantCrouch) {
               this.vy = Math.max(-5.2, this.vy - 24 * subDt);
@@ -18137,10 +18538,13 @@ void main() {
       const cleanName = (name || "").trim() || `\u041C\u0438\u0440 ${list.length + 1}`;
       const cleanSeed = Number.isFinite(seed) && seed !== 0 ? seed | 0 : Math.floor(Math.random() * 2147483647) + 1 | 0;
       const worldData = {
-        version: 3,
+        version: 4,
         id: id2,
         name: cleanName,
         worldSeed: cleanSeed,
+        worldTime: 1e3,
+        dayCount: 1,
+        spawnPoint: null,
         player: null,
         hotbar: null,
         modifiedBlocks: [],
@@ -18176,10 +18580,13 @@ void main() {
       const createdAt = existing?.createdAt || now;
       const mods = Array.isArray(state.modifiedBlocks) ? state.modifiedBlocks : [];
       const payload = {
-        version: 3,
+        version: 4,
         id: worldId,
         name,
         worldSeed: state.worldSeed,
+        worldTime: Number.isFinite(state.worldTime) ? state.worldTime : existing?.worldTime ?? 1e3,
+        dayCount: Number.isFinite(state.dayCount) ? state.dayCount : existing?.dayCount ?? 1,
+        spawnPoint: state.spawnPoint ?? existing?.spawnPoint ?? null,
         player: state.player,
         hotbar: state.hotbar || null,
         modifiedBlocks: mods,
@@ -18375,7 +18782,7 @@ void main() {
       const topRec = this.getUV(blockDef.faces.top);
       const sideLeftRec = this.getUV(blockDef.faces.west);
       const sideRightRec = this.getUV(blockDef.faces.south);
-      if (blockDef.isCross) {
+      if (blockDef.isCross || blockDef.isTorch) {
         g.drawImage(
           this.canvas,
           topRec.cx * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
@@ -18387,6 +18794,22 @@ void main() {
           28,
           28
         );
+        const url2 = c.toDataURL();
+        this.previewCache.set(cacheKey, url2);
+        return url2;
+      }
+      if (blockDef.isBed) {
+        g.fillStyle = "#7b532f";
+        g.fillRect(3, 21, 3, 6);
+        g.fillRect(26, 21, 3, 6);
+        g.fillStyle = "#9c6e44";
+        g.fillRect(3, 18, 26, 4);
+        g.fillStyle = "#f2f2f2";
+        g.fillRect(4, 12, 9, 6);
+        g.fillStyle = "#c82424";
+        g.fillRect(13, 12, 16, 6);
+        g.fillStyle = "#9e1919";
+        g.fillRect(13, 16, 16, 2);
         const url2 = c.toDataURL();
         this.previewCache.set(cacheKey, url2);
         return url2;
@@ -19056,6 +19479,127 @@ void main() {
         g: [66, 132, 46],
         l: [94, 164, 64]
       });
+      drawSpriteTile("torch", [
+        "................",
+        "................",
+        ".......yy.......",
+        "......yYYy......",
+        "......oYYo......",
+        ".......oo.......",
+        ".......WW.......",
+        "......oYYo......",
+        "......oYYo......",
+        ".......cc.......",
+        ".......ww.......",
+        ".......dd.......",
+        ".......ww.......",
+        ".......dd.......",
+        ".......ww.......",
+        ".......dd......."
+      ], {
+        y: [255, 198, 42],
+        Y: [255, 242, 108],
+        W: [255, 252, 224],
+        o: [248, 128, 28],
+        c: [76, 52, 30],
+        w: [154, 114, 64],
+        d: [112, 78, 40]
+      });
+      const glowBright = [255, 238, 162];
+      const glowMid = [228, 174, 72];
+      const glowDark = [128, 84, 34];
+      this.addTile("glowstone", (x, y) => {
+        const cell = pxHash(2301, x >> 1, y >> 1);
+        const px2 = pxHash(2302, x, y);
+        if (x === 0 || x === 15 || y === 0 || y === 15) return shadeRgb(glowDark, (px2 - 0.5) * 18);
+        if (cell > 0.65) return shadeRgb(glowBright, (px2 - 0.5) * 20);
+        if (cell < 0.25) return shadeRgb(glowDark, (px2 - 0.5) * 20);
+        return shadeRgb(glowMid, (px2 - 0.5) * 24);
+      });
+      const pumpOrange = [214, 122, 24];
+      const pumpDark = [166, 84, 12];
+      this.addTile("pumpkin_side", (x, y) => {
+        const rib = x % 4 === 0 ? -24 : x % 4 === 2 ? 12 : 0;
+        const border = y === 0 || y === 15 ? -20 : 0;
+        return shadeRgb(pumpOrange, rib + border + (pxHash(2401, x, y) - 0.5) * 14);
+      });
+      this.addTile("pumpkin_top", (x, y) => {
+        if (x >= 7 && x <= 8 && y >= 7 && y <= 8) return [124, 106, 56];
+        const dx2 = Math.abs(x - 7.5);
+        const dy2 = Math.abs(y - 7.5);
+        const ring = Math.floor(Math.max(dx2, dy2)) % 2 === 0 ? 8 : -12;
+        return shadeRgb(pumpOrange, ring + (pxHash(2402, x, y) - 0.5) * 14);
+      });
+      const carvedFace = [
+        "................",
+        "................",
+        "................",
+        "................",
+        "...LL......LL...",
+        "..LLLL....LLLL..",
+        "..LLLL....LLLL..",
+        "................",
+        ".......LL.......",
+        ".......LL.......",
+        "................",
+        "..L..........L..",
+        "..LL..LLLL..LL..",
+        "...LLLLLLLLLL...",
+        "................",
+        "................"
+      ];
+      this.addTile("jack_o_lantern_face", (x, y) => {
+        if (carvedFace[y][x] === "L") {
+          return y % 2 === 0 ? [255, 232, 96] : [255, 198, 42];
+        }
+        const rib = x % 4 === 0 ? -22 : x % 4 === 2 ? 10 : 0;
+        return shadeRgb(pumpDark, rib + (pxHash(2403, x, y) - 0.5) * 14);
+      });
+      const bedRed = [188, 34, 34];
+      const bedRedDark = [148, 22, 22];
+      const bedWhite = [238, 240, 244];
+      const bedWood = [146, 104, 62];
+      this.addTile("bed_foot_top", (x, y) => {
+        if (x === 0 || x === 15 || y === 15) return bedRedDark;
+        return shadeRgb(bedRed, (pxHash(2501, x, y) - 0.5) * 14);
+      });
+      this.addTile("bed_head_top", (x, y) => {
+        if (y <= 7) {
+          if (x === 0 || x === 15 || y === 0) return [198, 200, 208];
+          return shadeRgb(bedWhite, (pxHash(2502, x, y) - 0.5) * 10);
+        }
+        if (y === 8) return [218, 218, 222];
+        if (x === 0 || x === 15) return bedRedDark;
+        return shadeRgb(bedRed, (pxHash(2503, x, y) - 0.5) * 14);
+      });
+      this.addTile("bed_side_foot", (x, y) => {
+        if (y <= 6) return [0, 0, 0, 0];
+        if (y <= 10) return shadeRgb(bedRed, (pxHash(2504, x, y) - 0.5) * 14);
+        if (y <= 12) return shadeRgb(bedWood, (pxHash(2505, x, y) - 0.5) * 14);
+        if (x <= 2) return shadeRgb(bedWood, -18);
+        return [0, 0, 0, 0];
+      });
+      this.addTile("bed_side_head", (x, y) => {
+        if (y <= 6) return [0, 0, 0, 0];
+        if (y <= 10) return x <= 7 ? shadeRgb(bedWhite, -8) : shadeRgb(bedRed, (pxHash(2506, x, y) - 0.5) * 14);
+        if (y <= 12) return shadeRgb(bedWood, (pxHash(2507, x, y) - 0.5) * 14);
+        if (x >= 13) return shadeRgb(bedWood, -18);
+        return [0, 0, 0, 0];
+      });
+      this.addTile("bed_end_foot", (x, y) => {
+        if (y <= 6) return [0, 0, 0, 0];
+        if (y <= 10) return shadeRgb(bedRedDark, (pxHash(2508, x, y) - 0.5) * 12);
+        if (y <= 12) return shadeRgb(bedWood, (pxHash(2509, x, y) - 0.5) * 14);
+        if (x <= 2 || x >= 13) return shadeRgb(bedWood, -18);
+        return [0, 0, 0, 0];
+      });
+      this.addTile("bed_end_head", (x, y) => {
+        if (y <= 6) return [0, 0, 0, 0];
+        if (y <= 10) return shadeRgb(bedWhite, -12);
+        if (y <= 12) return shadeRgb(bedWood, (pxHash(2510, x, y) - 0.5) * 14);
+        if (x <= 2 || x >= 13) return shadeRgb(bedWood, -18);
+        return [0, 0, 0, 0];
+      });
     }
   };
 
@@ -19087,13 +19631,13 @@ void main() {
       this.slots = [
         { id: BLOCK_IDS.COBBLESTONE, count: 64 },
         { id: BLOCK_IDS.OAK_PLANKS, count: 64 },
+        { id: BLOCK_IDS.TORCH, count: 64 },
+        { id: BLOCK_IDS.GLOWSTONE, count: 64 },
+        { id: BLOCK_IDS.JACK_O_LANTERN, count: 64 },
+        { id: BLOCK_IDS.BED_FOOT, count: 64 },
         { id: BLOCK_IDS.SAND, count: 64 },
-        { id: BLOCK_IDS.GRAVEL, count: 64 },
-        { id: BLOCK_IDS.OAK_LOG, count: 64 },
-        { id: BLOCK_IDS.BIRCH_LOG, count: 64 },
-        { id: BLOCK_IDS.ICE, count: 64 },
-        { id: BLOCK_IDS.POPPY, count: 64 },
-        { id: BLOCK_IDS.DIAMOND_ORE, count: 64 }
+        { id: BLOCK_IDS.DANDELION, count: 64 },
+        { id: BLOCK_IDS.REDSTONE_ORE, count: 64 }
       ];
       this.selectedIndex = 0;
     }
@@ -19346,7 +19890,10 @@ void main() {
     constructor(callbacks = {}) {
       this.callbacks = callbacks;
       this.crosshairEl = document.getElementById("crosshair");
+      this.debugContainer = document.getElementById("debug-container");
       this.debugPanel = document.getElementById("debug-panel");
+      this.timePillButtons = Array.from(document.querySelectorAll(".time-pill-btn"));
+      this.sleepOverlay = document.getElementById("sleep-overlay");
       this.pauseOverlay = document.getElementById("pause-overlay");
       this.mainMenuOverlay = document.getElementById("main-menu-overlay");
       this.menuHome = document.getElementById("menu-home");
@@ -19404,6 +19951,15 @@ void main() {
         e.stopPropagation();
         this.toggleDebug();
       });
+      for (const btn of this.timePillButtons) {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const ticks = parseInt(btn.dataset.time, 10);
+          if (Number.isFinite(ticks)) {
+            this.callbacks.onSetWorldTime?.(ticks);
+          }
+        });
+      }
       this.btnFullscreen?.addEventListener("click", (e) => {
         e.stopPropagation();
         this.toggleFullscreen();
@@ -19655,9 +20211,26 @@ void main() {
     }
     toggleDebug() {
       this.debugVisible = !this.debugVisible;
-      this.debugPanel?.classList.toggle("hidden", !this.debugVisible);
+      this.debugContainer?.classList.toggle("hidden", !this.debugVisible);
       this.btnDebug?.classList.toggle("active", this.debugVisible);
       return this.debugVisible;
+    }
+    playSleepTransition(onWakeCallback) {
+      if (!this.sleepOverlay) {
+        onWakeCallback?.();
+        return;
+      }
+      this.sleepOverlay.classList.remove("hidden");
+      requestAnimationFrame(() => {
+        this.sleepOverlay?.classList.add("active");
+      });
+      setTimeout(() => {
+        onWakeCallback?.();
+        this.sleepOverlay?.classList.remove("active");
+        setTimeout(() => {
+          this.sleepOverlay?.classList.add("hidden");
+        }, 450);
+      }, 1050);
     }
     setPaused(paused) {
       this.isPaused = Boolean(paused);
@@ -19748,7 +20321,7 @@ void main() {
         this.toastEl?.classList.add("hidden");
       }, durationMs);
     }
-    updateDebug({ player, world, targetHit }) {
+    updateDebug({ player, world, sky, targetHit }) {
       this.fpsFrames++;
       const now = performance.now();
       const elapsed = now - this.fpsLastTime;
@@ -19761,10 +20334,13 @@ void main() {
       const cx2 = Math.floor(player.x / CHUNK_SIZE);
       const cz = Math.floor(player.z / CHUNK_SIZE);
       const biomeName = world.getBiomeNameAt(player.x, player.z);
+      const light = world.getLightAt(player.x, player.y + 0.5, player.z);
+      const timePart = sky ? `Day ${sky.dayCount} (${sky.getFormattedClock()})` : "Day 1";
       const modeLabel = player.flyMode ? "\u041F\u043E\u043B\u0451\u0442" : player.isSwimming ? "\u041F\u043B\u0430\u0432\u0430\u043D\u0438\u0435" : player.isCrouching ? "\u041F\u0440\u0438\u0441\u0435\u0434" : player.isSprinting ? "\u0411\u0435\u0433" : "\u0425\u043E\u0434\u044C\u0431\u0430";
       const hitDesc = targetHit ? `${BlockRegistry.get(targetHit.blockId).name} (${targetHit.x}, ${targetHit.y}, ${targetHit.z})` : "\u2014";
       this.debugPanel.textContent = [
         `FPS: ${this.currentFps} | XYZ: ${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}`,
+        `${timePart} | Light: Sky ${light.sky} / Block ${light.block}`,
         `Biome: ${biomeName}`,
         `Chunk: ${cx2}, ${cz} | ${player.getFacingCardinal()} | ${modeLabel} | Chunks: ${world.chunks.size}`,
         `Target: ${hitDesc}`
@@ -19796,6 +20372,8 @@ void main() {
       this.maxRadius = 48;
       this.lastForwardStartTime = 0;
       this.forwardTapReleased = false;
+      this.inCenterSincePush = false;
+      this.lastForwardPeakTime = 0;
       this.sprintLocked = false;
       this.lookTouchId = null;
       this.lookStartPos = { x: 0, y: 0 };
@@ -20063,25 +20641,160 @@ void main() {
       const normX = dx2 / this.maxRadius;
       const normZ = -dy2 / this.maxRadius;
       const mag = Math.min(1, dist / this.maxRadius);
-      if (mag < 0.14) {
+      if (mag < 0.16) {
         this.player.touchInput.moveX = 0;
         this.player.touchInput.moveZ = 0;
         this.player.touchInput.sprint = false;
+        this.inCenterSincePush = true;
+        this.sprintLocked = false;
         this.joystickBase?.classList.remove("sprinting");
         return;
       }
       this.player.touchInput.moveX = normX;
       this.player.touchInput.moveZ = normZ;
-      const isForwardPush = normZ > 0.45;
-      const autoSprint = isForwardPush && (this.sprintLocked || mag > 0.9 && normZ > 0.72);
-      this.player.touchInput.sprint = autoSprint;
-      this.joystickBase?.classList.toggle("sprinting", autoSprint);
+      const now = performance.now();
+      if (normZ > 0.52) {
+        if (this.inCenterSincePush && now - this.lastForwardPeakTime < 380) {
+          this.sprintLocked = true;
+        }
+        this.inCenterSincePush = false;
+        this.lastForwardPeakTime = now;
+      } else if (normZ < 0.22) {
+        this.inCenterSincePush = true;
+        this.sprintLocked = false;
+      }
+      const isForwardPush = normZ > 0.42;
+      const activeSprint = isForwardPush && this.sprintLocked;
+      this.player.touchInput.sprint = activeSprint;
+      this.joystickBase?.classList.toggle("sprinting", activeSprint);
     }
     dispose() {
       clearTimeout(this.longPressTimer);
       window.removeEventListener("touchmove", this._onTouchMove);
       window.removeEventListener("touchend", this._onTouchEnd);
       window.removeEventListener("touchcancel", this._onTouchEnd);
+    }
+  };
+
+  // src/world/MenuPanorama.js
+  var MenuPanorama = class {
+    constructor() {
+      this.scene = new xo();
+      this.camera = new Oe(
+        76,
+        window.innerWidth / Math.max(1, window.innerHeight),
+        0.1,
+        50
+      );
+      this.yaw = 0;
+      this.pitch = -0.06;
+      const materials = [];
+      const faces = ["px", "nx", "py", "ny", "pz", "nz"];
+      this.textures = [];
+      for (const face of faces) {
+        const tex = this._paintPanoramaFace(face);
+        this.textures.push(tex);
+        materials.push(new jn({
+          map: tex,
+          side: tn,
+          depthWrite: false
+        }));
+      }
+      const geom = new qi(20, 20, 20);
+      this.boxMesh = new Ce(geom, materials);
+      this.scene.add(this.boxMesh);
+    }
+    _paintPanoramaFace(face) {
+      const size = 128;
+      const c = document.createElement("canvas");
+      c.width = size;
+      c.height = size;
+      const g = c.getContext("2d");
+      g.imageSmoothingEnabled = false;
+      if (face === "py") {
+        g.fillStyle = "#69a9f6";
+        g.fillRect(0, 0, size, size);
+        g.fillStyle = "rgba(255,255,255,0.75)";
+        g.fillRect(14, 22, 34, 14);
+        g.fillRect(72, 48, 40, 18);
+        g.fillRect(28, 86, 36, 12);
+      } else if (face === "ny") {
+        g.fillStyle = "#3372bc";
+        g.fillRect(0, 0, size, size);
+        g.fillStyle = "#487d2e";
+        g.fillRect(0, 0, 32, 32);
+        g.fillRect(96, 80, 32, 48);
+      } else {
+        const sky = g.createLinearGradient(0, 0, 0, size * 0.56);
+        sky.addColorStop(0, "#69a9f6");
+        sky.addColorStop(1, "#bce0ff");
+        g.fillStyle = sky;
+        g.fillRect(0, 0, size, Math.floor(size * 0.56));
+        if (face === "pz") {
+          g.fillStyle = "#fff5b8";
+          g.fillRect(42, 16, 16, 16);
+          g.fillStyle = "#ffffff";
+          g.fillRect(46, 20, 8, 8);
+        }
+        g.fillStyle = "rgba(255, 255, 255, 0.85)";
+        g.fillRect(8, 22, 26, 6);
+        g.fillRect(74, 18, 34, 7);
+        const seedOff = face.charCodeAt(0) * 19 + face.charCodeAt(1) * 7;
+        for (let x = 0; x < size; x += 4) {
+          const mh = 12 + Math.floor(Math.abs(Math.sin((x + seedOff) * 0.065)) * 24);
+          const topY = 66 - mh;
+          g.fillStyle = "#6f8096";
+          g.fillRect(x, topY, 4, mh);
+          if (mh > 25) {
+            g.fillStyle = "#f2f7fc";
+            g.fillRect(x, topY, 4, 5);
+          }
+        }
+        g.fillStyle = "#3372bc";
+        g.fillRect(0, 68, size, 60);
+        for (let x = 0; x < size; x += 4) {
+          const gh = 68 + Math.floor(Math.sin((x + seedOff * 2) * 0.09) * 8);
+          if (x % 24 < 16) {
+            g.fillStyle = "#5fa440";
+            g.fillRect(x, gh, 4, 60);
+            g.fillStyle = "#487d2e";
+            g.fillRect(x, gh + 6, 4, 54);
+            if ((x + seedOff) % 20 === 0) {
+              g.fillStyle = "#6b4a2b";
+              g.fillRect(x + 1, gh - 8, 2, 8);
+              g.fillStyle = "#3f7c2a";
+              g.fillRect(x - 3, gh - 15, 10, 8);
+            }
+          }
+        }
+      }
+      const tex = new vh(c);
+      tex.magFilter = Te;
+      tex.minFilter = Te;
+      tex.wrapS = rn;
+      tex.wrapT = rn;
+      tex.colorSpace = sn;
+      return tex;
+    }
+    resize(width, height) {
+      this.camera.aspect = width / Math.max(1, height);
+      this.camera.updateProjectionMatrix();
+    }
+    render(renderer, dt) {
+      this.yaw += dt * 0.085;
+      this.camera.rotation.order = "YXZ";
+      this.camera.rotation.y = this.yaw;
+      this.camera.rotation.x = this.pitch + Math.sin(this.yaw * 0.7) * 0.035;
+      renderer.clear();
+      renderer.render(this.scene, this.camera);
+    }
+    dispose() {
+      this.scene.remove(this.boxMesh);
+      this.boxMesh.geometry.dispose();
+      if (Array.isArray(this.boxMesh.material)) {
+        for (const m of this.boxMesh.material) m.dispose();
+      }
+      for (const t of this.textures) t.dispose();
     }
   };
 
@@ -20176,12 +20889,41 @@ void main() {
       this.mesh.renderOrder = 3;
       scene.add(this.mesh);
     }
-    update(hit) {
+    update(hit, world = null) {
       if (!hit) {
         this.mesh.visible = false;
         return;
       }
       const def = BlockRegistry.get(hit.blockId);
+      if (def.isTorch) {
+        const meta = world?.getBlockMeta ? world.getBlockMeta(hit.x, hit.y, hit.z) : 0;
+        let ox2 = 0.5;
+        let oy2 = 0.34;
+        let oz = 0.5;
+        if (meta === 1) {
+          ox2 = 0.2;
+          oy2 = 0.48;
+        } else if (meta === 2) {
+          ox2 = 0.8;
+          oy2 = 0.48;
+        } else if (meta === 3) {
+          oz = 0.2;
+          oy2 = 0.48;
+        } else if (meta === 4) {
+          oz = 0.8;
+          oy2 = 0.48;
+        }
+        this.mesh.scale.set(0.32, 0.66, 0.32);
+        this.mesh.position.set(hit.x + ox2, hit.y + oy2, hit.z + oz);
+        this.mesh.visible = true;
+        return;
+      }
+      if (def.isBed) {
+        this.mesh.scale.set(1.004, 0.57, 1.004);
+        this.mesh.position.set(hit.x + 0.5, hit.y + 0.285, hit.z + 0.5);
+        this.mesh.visible = true;
+        return;
+      }
       const sx2 = def.inset > 0 ? 1 - def.inset * 2 + 5e-3 : def.isCross ? 0.78 : 1.004;
       const sy2 = def.isCross ? 0.85 : 1.004;
       this.mesh.scale.set(sx2, sy2, sx2);
@@ -20195,25 +20937,56 @@ void main() {
     }
   };
 
-  // src/world/SkyEnvironment.js
-  var SkyEnvironment = class {
-    constructor(scene) {
+  // src/world/SkyRenderer.js
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+  function clamp01(v) {
+    return v < 0 ? 0 : v > 1 ? 1 : v;
+  }
+  function smoothstep(e02, e1, x) {
+    const t = clamp01((x - e02) / (e1 - e02));
+    return t * t * (3 - 2 * t);
+  }
+  var SkyRenderer = class {
+    constructor(scene, initialTime = DEFAULT_WORLD_TIME, initialDay = 1) {
       this.scene = scene;
-      this.enabled = true;
-      const skyGeom = new zr(420, 20, 12);
-      const skyMat = new Rn({
+      this.worldTime = (initialTime % DAY_LENGTH_TICKS + DAY_LENGTH_TICKS) % DAY_LENGTH_TICKS;
+      this.dayCount = Math.max(1, initialDay | 0);
+      this.cloudsEnabled = true;
+      this.cloudScroll = 0;
+      this.sunIntensity = 1;
+      this.skyTint = new bt("#ffffff");
+      this.torchTint = new bt("#ffc478");
+      this.fogColor = new bt("#a4d4ff");
+      this._sunDir = new C(0, 1, 0);
+      this._cDayTop = new bt("#4488eb");
+      this._cDayHor = new bt("#a4d4ff");
+      this._cSunsetTop = new bt("#354078");
+      this._cSunsetHor = new bt("#f47c44");
+      this._cNightTop = new bt("#040814");
+      this._cNightHor = new bt("#0c152b");
+      this._cSunTintDay = new bt("#ffffff");
+      this._cSunTintSunset = new bt("#ffd0b2");
+      this._cSunTintNight = new bt("#6f88c2");
+      this._cCloudColor = new bt("#ffffff");
+      const skyGeom = new zr(430, 24, 14);
+      this.skyMat = new Rn({
         side: tn,
         depthWrite: false,
         fog: false,
         uniforms: {
-          topColor: { value: new bt("#4789eb") },
+          topColor: { value: new bt("#4488eb") },
           horizonColor: { value: new bt("#a4d4ff") },
-          bottomColor: { value: new bt("#6ea8e6") }
+          bottomColor: { value: new bt("#5a90cb") },
+          sunDir: { value: new C(0, 1, 0) },
+          glowColor: { value: new bt("#ff8438") },
+          glowStrength: { value: 0 }
         },
         vertexShader: `
-        varying vec3 vLocalPos;
+        varying vec3 vDir;
         void main() {
-          vLocalPos = position;
+          vDir = normalize(position);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
@@ -20221,105 +20994,369 @@ void main() {
         uniform vec3 topColor;
         uniform vec3 horizonColor;
         uniform vec3 bottomColor;
-        varying vec3 vLocalPos;
+        uniform vec3 sunDir;
+        uniform vec3 glowColor;
+        uniform float glowStrength;
+        varying vec3 vDir;
         void main() {
-          float h = normalize(vLocalPos).y;
-          vec3 col = h >= 0.0
-            ? mix(horizonColor, topColor, pow(clamp(h, 0.0, 1.0), 0.55))
-            : mix(horizonColor, bottomColor, clamp(-h * 3.0, 0.0, 1.0));
+          float h = vDir.y;
+          vec3 base = h >= 0.0
+            ? mix(horizonColor, topColor, pow(max(clamp(h, 0.0, 1.0), 0.0001), 0.52))
+            : mix(horizonColor, bottomColor, clamp(-h * 3.5, 0.0, 1.0));
+          float sunDot = max(dot(vDir, normalize(sunDir)), 0.0);
+          float horizonMask = 1.0 - smoothstep(0.0, 0.55, abs(h));
+          float glow = pow(max(sunDot, 0.0001), 3.5) * horizonMask * glowStrength;
+          vec3 col = mix(base, glowColor, clamp(glow, 0.0, 0.92));
           gl_FragColor = vec4(col, 1.0);
         }
       `
       });
-      this.skyDome = new Ce(skyGeom, skyMat);
-      this.skyDome.renderOrder = -2;
+      this.skyDome = new Ce(skyGeom, this.skyMat);
+      this.skyDome.renderOrder = -4;
       this.scene.add(this.skyDome);
-      const sunGeom = new Fs(34, 34);
-      const sunMat = new jn({
-        color: 16774592,
-        fog: false,
-        depthWrite: false,
-        side: Bn
-      });
-      this.sunMesh = new Ce(sunGeom, sunMat);
-      this.sunOffset = new C(140, 230, -160);
-      this.sunMesh.renderOrder = -1;
-      this.scene.add(this.sunMesh);
-      this.cloudGroup = this._buildClouds();
-      this.scene.add(this.cloudGroup);
-      this.cloudDrift = 0;
+      this.starsGroup = this._buildStars();
+      this.scene.add(this.starsGroup);
+      this.sunMesh = this._buildSun();
+      this.moonPhaseDrawn = -1;
+      this.moonMesh = this._buildMoon();
+      this._redrawMoonPhase(this._getMoonPhase());
+      this.scene.add(this.sunMesh, this.moonMesh);
+      this.cloudBandWidth = 768;
+      this.cloudMesh = this._buildVolumetricClouds();
+      this.scene.add(this.cloudMesh);
+      this._updateVisuals(0);
     }
-    _buildClouds() {
+    _getMoonPhase() {
+      return ((this.dayCount - 1) % 8 + 8) % 8;
+    }
+    _buildSun() {
       const c = document.createElement("canvas");
-      c.width = 64;
-      c.height = 64;
+      c.width = 16;
+      c.height = 16;
       const g = c.getContext("2d");
-      g.clearRect(0, 0, 64, 64);
-      let s30 = 918273;
-      const rand = () => {
-        s30 = s30 * 1664525 + 1013904223 >>> 0;
-        return s30 / 4294967296;
-      };
-      for (let i = 0; i < 42; i++) {
-        const cx2 = Math.floor(rand() * 64);
-        const cz = Math.floor(rand() * 64);
-        const rw = 2 + Math.floor(rand() * 5);
-        const rh = 2 + Math.floor(rand() * 4);
-        g.fillStyle = rand() > 0.3 ? "rgba(255,255,255,0.88)" : "rgba(235,244,255,0.78)";
-        for (let dz = 0; dz < rh; dz++) {
-          for (let dx2 = 0; dx2 < rw; dx2++) {
-            g.fillRect(cx2 + dx2 & 63, cz + dz & 63, 1, 1);
-          }
-        }
-      }
+      g.fillStyle = "#ffdf73";
+      g.fillRect(0, 0, 16, 16);
+      g.fillStyle = "#fff9d6";
+      g.fillRect(2, 2, 12, 12);
+      g.fillStyle = "#ffffff";
+      g.fillRect(4, 4, 8, 8);
       const tex = new vh(c);
       tex.magFilter = Te;
       tex.minFilter = Te;
-      tex.wrapS = dr;
-      tex.wrapT = dr;
-      tex.repeat.set(3, 3);
-      const geom = new Fs(760, 760);
-      geom.rotateX(-Math.PI / 2);
+      tex.colorSpace = sn;
+      this.sunTex = tex;
+      const geom = new Fs(40, 40);
       const mat = new jn({
         map: tex,
         transparent: true,
-        opacity: 0.72,
         depthWrite: false,
         fog: false,
         side: Bn
       });
       const mesh = new Ce(geom, mat);
-      mesh.position.y = 132;
-      this.cloudTex = tex;
+      mesh.renderOrder = -2;
+      return mesh;
+    }
+    _buildMoon() {
+      this.moonCanvas = document.createElement("canvas");
+      this.moonCanvas.width = 24;
+      this.moonCanvas.height = 24;
+      this.moonCtx = this.moonCanvas.getContext("2d");
+      this.moonTex = new vh(this.moonCanvas);
+      this.moonTex.magFilter = Te;
+      this.moonTex.minFilter = Te;
+      this.moonTex.colorSpace = sn;
+      const geom = new Fs(34, 34);
+      const mat = new jn({
+        map: this.moonTex,
+        transparent: true,
+        depthWrite: false,
+        fog: false,
+        side: Bn
+      });
+      const mesh = new Ce(geom, mat);
+      mesh.renderOrder = -2;
+      return mesh;
+    }
+    _redrawMoonPhase(phase) {
+      if (this.moonPhaseDrawn === phase) return;
+      this.moonPhaseDrawn = phase;
+      const g = this.moonCtx;
+      const S = 24;
+      g.clearRect(0, 0, S, S);
+      const ox2 = 4;
+      const oy2 = 4;
+      const w = 16;
+      g.fillStyle = "rgba(26, 34, 58, 0.72)";
+      g.fillRect(ox2, oy2, w, w);
+      const litBounds = [
+        [0, 16],
+        // 0: Full
+        [4, 16],
+        // 1: Waning Gibbous
+        [8, 16],
+        // 2: Last Quarter
+        [12, 16],
+        // 3: Waning Crescent
+        [0, 0],
+        // 4: New Moon (tiny faint rim)
+        [0, 4],
+        // 5: Waxing Crescent
+        [0, 8],
+        // 6: First Quarter
+        [0, 12]
+        // 7: Waxing Gibbous
+      ][phase];
+      const [lx0, lx1] = litBounds;
+      for (let py2 = 0; py2 < w; py2++) {
+        for (let px2 = 0; px2 < w; px2++) {
+          const isLit = px2 >= lx0 && px2 < lx1;
+          if (!isLit) continue;
+          const crater = (px2 * 13 + py2 * 29) % 17 === 0 || (px2 * 7 + py2 * 11) % 23 === 0;
+          g.fillStyle = crater ? "#b9c4de" : px2 === lx0 || px2 === lx1 - 1 || py2 === 0 || py2 === 15 ? "#d0daef" : "#edf2ff";
+          g.fillRect(ox2 + px2, oy2 + py2, 1, 1);
+        }
+      }
+      if (phase === 4) {
+        g.strokeStyle = "rgba(130, 150, 195, 0.55)";
+        g.lineWidth = 1;
+        g.strokeRect(ox2 + 0.5, oy2 + 0.5, w - 1, w - 1);
+      }
+      this.moonTex.needsUpdate = true;
+    }
+    _buildStars() {
+      const count = 420;
+      const positions = new Float32Array(count * 3);
+      let s30 = 421973;
+      const rand = () => {
+        s30 = s30 * 1664525 + 1013904223 >>> 0;
+        return s30 / 4294967296;
+      };
+      for (let i = 0; i < count; i++) {
+        const u = rand() * 2 - 1;
+        const theta = rand() * Math.PI * 2;
+        const r = Math.sqrt(Math.max(0, 1 - u * u));
+        const dist = 395;
+        positions[i * 3] = dist * r * Math.cos(theta);
+        positions[i * 3 + 1] = dist * u;
+        positions[i * 3 + 2] = dist * r * Math.sin(theta);
+      }
+      const geom = new Yt();
+      geom.setAttribute("position", new me(positions, 3));
+      this.starMat = new Ar({
+        color: 15134463,
+        size: 2.3,
+        sizeAttenuation: false,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        fog: false
+      });
+      const pts = new Ro(geom, this.starMat);
+      pts.renderOrder = -3;
+      return pts;
+    }
+    /**
+     * Builds a single batched 3D voxel cloud BufferGeometry spanning Y=108..112.
+     */
+    _buildVolumetricClouds() {
+      const cell = 12;
+      const grid = 32;
+      const span = cell * grid;
+      this.cloudSpan = span;
+      const map = new Uint8Array(grid * grid);
+      let s30 = 881723;
+      const rand = () => {
+        s30 = s30 * 1664525 + 1013904223 >>> 0;
+        return s30 / 4294967296;
+      };
+      for (let i = 0; i < 34; i++) {
+        const cx2 = Math.floor(rand() * grid);
+        const cz = Math.floor(rand() * grid);
+        const rw = 2 + Math.floor(rand() * 4);
+        const rh = 2 + Math.floor(rand() * 3);
+        for (let dz = 0; dz < rh; dz++) {
+          for (let dx2 = 0; dx2 < rw; dx2++) {
+            map[(cz + dz) % grid * grid + (cx2 + dx2) % grid] = 1;
+          }
+        }
+      }
+      const pos = [];
+      const col = [];
+      const idx = [];
+      const y02 = CLOUD_HEIGHT_MIN;
+      const y1 = CLOUD_HEIGHT_MAX;
+      const half = span * 0.5;
+      const pushBoxFace = (x02, yy0, z02, x1, yy1, z1, shade, nx2, ny2, nz) => {
+        const base = pos.length / 3;
+        if (ny2 > 0) {
+          pos.push(x02, yy1, z1, x1, yy1, z1, x1, yy1, z02, x02, yy1, z02);
+        } else if (ny2 < 0) {
+          pos.push(x02, yy0, z02, x1, yy0, z02, x1, yy0, z1, x02, yy0, z1);
+        } else if (nz > 0) {
+          pos.push(x02, yy0, z1, x1, yy0, z1, x1, yy1, z1, x02, yy1, z1);
+        } else if (nz < 0) {
+          pos.push(x1, yy0, z02, x02, yy0, z02, x02, yy1, z02, x1, yy1, z02);
+        } else if (nx2 > 0) {
+          pos.push(x1, yy0, z1, x1, yy0, z02, x1, yy1, z02, x1, yy1, z1);
+        } else {
+          pos.push(x02, yy0, z02, x02, yy0, z1, x02, yy1, z1, x02, yy1, z02);
+        }
+        for (let i = 0; i < 4; i++) col.push(shade, shade, shade);
+        idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      };
+      for (let tz = -1; tz <= 0; tz++) {
+        for (let tx2 = -1; tx2 <= 0; tx2++) {
+          const offX = tx2 * span;
+          const offZ = tz * span;
+          for (let gz = 0; gz < grid; gz++) {
+            for (let gx2 = 0; gx2 < grid; gx2++) {
+              if (!map[gz * grid + gx2]) continue;
+              const x02 = offX + gx2 * cell;
+              const x1 = x02 + cell;
+              const z02 = offZ + gz * cell;
+              const z1 = z02 + cell;
+              pushBoxFace(x02, y02, z02, x1, y1, z1, 1, 0, 1, 0);
+              pushBoxFace(x02, y02, z02, x1, y1, z1, 0.78, 0, -1, 0);
+              if (!map[(gz + 1) % grid * grid + gx2]) pushBoxFace(x02, y02, z02, x1, y1, z1, 0.9, 0, 0, 1);
+              if (!map[(gz - 1 + grid) % grid * grid + gx2]) pushBoxFace(x02, y02, z02, x1, y1, z1, 0.88, 0, 0, -1);
+              if (!map[gz * grid + (gx2 + 1) % grid]) pushBoxFace(x02, y02, z02, x1, y1, z1, 0.84, 1, 0, 0);
+              if (!map[gz * grid + (gx2 - 1 + grid) % grid]) pushBoxFace(x02, y02, z02, x1, y1, z1, 0.82, -1, 0, 0);
+            }
+          }
+        }
+      }
+      for (let i = 0; i < pos.length; i += 3) {
+        pos[i] += half * 0.5;
+        pos[i + 2] += half * 0.5;
+      }
+      const geom = new Yt();
+      geom.setAttribute("position", new At(pos, 3));
+      geom.setAttribute("color", new At(col, 3));
+      geom.setIndex(idx);
+      this.cloudMat = new jn({
+        color: 16777215,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.82,
+        depthWrite: false,
+        fog: true,
+        side: Mi
+      });
+      const mesh = new Ce(geom, this.cloudMat);
+      mesh.renderOrder = -1;
       return mesh;
     }
     setCloudsEnabled(enabled) {
-      this.enabled = Boolean(enabled);
-      this.cloudGroup.visible = this.enabled;
+      this.cloudsEnabled = Boolean(enabled);
+      this.cloudMesh.visible = this.cloudsEnabled;
     }
-    update(dt, playerX, playerY, playerZ) {
+    setTime(ticks, dayCount = null) {
+      const wrapped = (ticks % DAY_LENGTH_TICKS + DAY_LENGTH_TICKS) % DAY_LENGTH_TICKS;
+      this.worldTime = wrapped;
+      if (Number.isFinite(dayCount) && dayCount >= 1) {
+        this.dayCount = Math.floor(dayCount);
+      }
+      this._redrawMoonPhase(this._getMoonPhase());
+      this._updateVisuals(0);
+    }
+    advanceTicks(tickDelta) {
+      const total = this.worldTime + tickDelta;
+      if (total >= DAY_LENGTH_TICKS) {
+        this.dayCount += Math.floor(total / DAY_LENGTH_TICKS);
+        this.worldTime = total % DAY_LENGTH_TICKS;
+        this._redrawMoonPhase(this._getMoonPhase());
+      } else {
+        this.worldTime = total;
+      }
+    }
+    sleepToMorning() {
+      this.dayCount += 1;
+      this.worldTime = 0;
+      this._redrawMoonPhase(this._getMoonPhase());
+      this._updateVisuals(0);
+    }
+    getFormattedClock() {
+      const shifted = (this.worldTime + 6e3) % DAY_LENGTH_TICKS;
+      const totalMinutes = Math.floor(shifted / DAY_LENGTH_TICKS * 1440);
+      const hh = Math.floor(totalMinutes / 60);
+      const mm = totalMinutes % 60;
+      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+    }
+    _updateVisuals(dt) {
+      const angle = this.worldTime / DAY_LENGTH_TICKS * Math.PI * 2;
+      const sunX = Math.cos(angle);
+      const sunY = Math.sin(angle);
+      const sunZ = -0.18;
+      this._sunDir.set(sunX, sunY, sunZ).normalize();
+      const dayFactor = smoothstep(-0.22, 0.28, sunY);
+      const twilightFactor = Math.exp(-Math.pow((sunY - 0.02) / 0.16, 2));
+      const nightFactor = 1 - dayFactor;
+      const topCol = this.skyMat.uniforms.topColor.value;
+      const horCol = this.skyMat.uniforms.horizonColor.value;
+      const botCol = this.skyMat.uniforms.bottomColor.value;
+      topCol.copy(this._cNightTop).lerp(this._cDayTop, dayFactor).lerp(this._cSunsetTop, twilightFactor * 0.55);
+      horCol.copy(this._cNightHor).lerp(this._cDayHor, dayFactor).lerp(this._cSunsetHor, twilightFactor * 0.72);
+      botCol.copy(horCol).multiplyScalar(0.62);
+      this.skyMat.uniforms.sunDir.value.copy(this._sunDir);
+      this.skyMat.uniforms.glowStrength.value = twilightFactor * 1.15;
+      this.fogColor.copy(horCol);
+      this.sunIntensity = lerp(0.17, 1, dayFactor);
+      this.skyTint.copy(this._cSunTintNight).lerp(this._cSunTintDay, dayFactor).lerp(this._cSunTintSunset, twilightFactor * 0.42);
+      this.starMat.opacity = clamp01((nightFactor - 0.28) * 1.45);
+      this.starsGroup.rotation.z = angle;
+      this._cCloudColor.setRGB(
+        lerp(0.16, 1, dayFactor) + twilightFactor * 0.16,
+        lerp(0.2, 1, dayFactor) + twilightFactor * 0.04,
+        lerp(0.32, 1, dayFactor)
+      );
+      this.cloudMat.color.copy(this._cCloudColor);
+      this.cloudMat.opacity = lerp(0.45, 0.84, dayFactor);
+      this.cloudScroll = (this.cloudScroll + dt * 1.6) % this.cloudSpan;
+    }
+    update(dt, playerX, playerY, playerZ, world = null) {
+      this._updateVisuals(dt);
+      const orbitDist = 340;
       this.skyDome.position.set(playerX, playerY, playerZ);
+      this.starsGroup.position.set(playerX, playerY, playerZ);
       this.sunMesh.position.set(
-        playerX + this.sunOffset.x,
-        playerY + this.sunOffset.y,
-        playerZ + this.sunOffset.z
+        playerX + this._sunDir.x * orbitDist,
+        playerY + this._sunDir.y * orbitDist,
+        playerZ + this._sunDir.z * orbitDist
       );
       this.sunMesh.lookAt(playerX, playerY, playerZ);
-      if (this.enabled) {
-        this.cloudDrift += dt * 25e-4;
-        this.cloudTex.offset.set(this.cloudDrift, this.cloudDrift * 0.35);
-        this.cloudGroup.position.set(playerX, 132, playerZ);
+      this.sunMesh.visible = this._sunDir.y > -0.25;
+      this.moonMesh.position.set(
+        playerX - this._sunDir.x * orbitDist,
+        playerY - this._sunDir.y * orbitDist,
+        playerZ - this._sunDir.z * orbitDist
+      );
+      this.moonMesh.lookAt(playerX, playerY, playerZ);
+      this.moonMesh.visible = -this._sunDir.y > -0.25;
+      if (this.cloudsEnabled) {
+        const snapX = Math.floor((playerX + this.cloudScroll) / this.cloudSpan) * this.cloudSpan;
+        const snapZ = Math.floor(playerZ / this.cloudSpan) * this.cloudSpan;
+        this.cloudMesh.position.set(snapX - this.cloudScroll, 0, snapZ);
+      }
+      if (world) {
+        world.mesher.setLightingUniforms(this.sunIntensity, this.skyTint, this.torchTint);
+        world.setSkyColor(this.fogColor);
       }
     }
     dispose() {
-      this.scene.remove(this.skyDome, this.sunMesh, this.cloudGroup);
+      this.scene.remove(this.skyDome, this.starsGroup, this.sunMesh, this.moonMesh, this.cloudMesh);
       this.skyDome.geometry.dispose();
-      this.skyDome.material.dispose();
+      this.skyMat.dispose();
+      this.starsGroup.geometry.dispose();
+      this.starMat.dispose();
       this.sunMesh.geometry.dispose();
       this.sunMesh.material.dispose();
-      this.cloudGroup.geometry.dispose();
-      this.cloudGroup.material.dispose();
-      this.cloudTex?.dispose();
+      this.sunTex?.dispose();
+      this.moonMesh.geometry.dispose();
+      this.moonMesh.material.dispose();
+      this.moonTex?.dispose();
+      this.cloudMesh.geometry.dispose();
+      this.cloudMat.dispose();
     }
   };
 
@@ -20334,11 +21371,12 @@ void main() {
       this.key = chunkKey(cx2, cz);
       this.blocks = new Uint8Array(CHUNK_VOLUME);
       this.biomes = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+      this.light = new Uint8Array(CHUNK_VOLUME);
+      this.meta = null;
       this.minY = 0;
       this.maxY = WORLD_HEIGHT - 1;
-      this.skyLight = null;
-      this.blockLight = null;
       this.isGenerated = false;
+      this.lightCalculated = false;
       this.dirty = true;
       this.hasMeshed = false;
       this.opaqueMesh = null;
@@ -20351,17 +21389,63 @@ void main() {
       }
       return this.blocks[(y * CHUNK_SIZE + z) * CHUNK_SIZE + x];
     }
-    setBlock(x, y, z, id2) {
+    setBlock(x, y, z, id2, meta = 0) {
       if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT) {
         return false;
       }
-      this.blocks[(y * CHUNK_SIZE + z) * CHUNK_SIZE + x] = id2;
+      const idx = (y * CHUNK_SIZE + z) * CHUNK_SIZE + x;
+      this.blocks[idx] = id2;
+      if (meta !== 0) {
+        if (!this.meta) this.meta = new Uint8Array(CHUNK_VOLUME);
+        this.meta[idx] = meta;
+      } else if (this.meta) {
+        this.meta[idx] = 0;
+      }
       if (id2 !== 0) {
         if (y < this.minY) this.minY = y;
         if (y > this.maxY) this.maxY = y;
       }
       this.dirty = true;
       return true;
+    }
+    getMeta(x, y, z) {
+      if (!this.meta || x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT) {
+        return 0;
+      }
+      return this.meta[(y * CHUNK_SIZE + z) * CHUNK_SIZE + x];
+    }
+    setMeta(x, y, z, meta) {
+      if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT) {
+        return;
+      }
+      const idx = (y * CHUNK_SIZE + z) * CHUNK_SIZE + x;
+      if (meta !== 0) {
+        if (!this.meta) this.meta = new Uint8Array(CHUNK_VOLUME);
+        this.meta[idx] = meta;
+      } else if (this.meta) {
+        this.meta[idx] = 0;
+      }
+      this.dirty = true;
+    }
+    getSkyLight(x, y, z) {
+      if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) return 15;
+      if (y >= WORLD_HEIGHT) return 15;
+      if (y < 0) return 0;
+      return this.light[(y * CHUNK_SIZE + z) * CHUNK_SIZE + x] >> 4 & 15;
+    }
+    setSkyLight(x, y, z, val) {
+      if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT) return;
+      const idx = (y * CHUNK_SIZE + z) * CHUNK_SIZE + x;
+      this.light[idx] = (val & 15) << 4 | this.light[idx] & 15;
+    }
+    getBlockLight(x, y, z) {
+      if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT) return 0;
+      return this.light[(y * CHUNK_SIZE + z) * CHUNK_SIZE + x] & 15;
+    }
+    setBlockLight(x, y, z, val) {
+      if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT) return;
+      const idx = (y * CHUNK_SIZE + z) * CHUNK_SIZE + x;
+      this.light[idx] = this.light[idx] & 240 | val & 15;
     }
     getBiome(x, z) {
       if (x < 0 || x >= CHUNK_SIZE || z < 0 || z >= CHUNK_SIZE) return 0;
@@ -20447,7 +21531,7 @@ void main() {
     function fade(t) {
       return t * t * t * (t * (t * 6 - 15) + 10);
     }
-    function lerp(a, b, t) {
+    function lerp2(a, b, t) {
       return a + t * (b - a);
     }
     function grad2(hash, x, y) {
@@ -20504,9 +21588,9 @@ void main() {
         const ab = p[p[X] + Y + 1];
         const ba2 = p[p[X + 1] + Y];
         const bb = p[p[X + 1] + Y + 1];
-        const x1 = lerp(grad2(aa2, xf, yf2), grad2(ba2, xf - 1, yf2), u);
-        const x2 = lerp(grad2(ab, xf, yf2 - 1), grad2(bb, xf - 1, yf2 - 1), u);
-        return lerp(x1, x2, v);
+        const x1 = lerp2(grad2(aa2, xf, yf2), grad2(ba2, xf - 1, yf2), u);
+        const x2 = lerp2(grad2(ab, xf, yf2 - 1), grad2(bb, xf - 1, yf2 - 1), u);
+        return lerp2(x1, x2, v);
       }
       noise3D(x, y, z) {
         const fx2 = Math.floor(x);
@@ -20528,13 +21612,13 @@ void main() {
         const B2 = p[X + 1] + Y;
         const BA = p[B2] + Z;
         const BB = p[B2 + 1] + Z;
-        const x1 = lerp(grad3(p[AA], xf, yf2, zf2), grad3(p[BA], xf - 1, yf2, zf2), u);
-        const x2 = lerp(grad3(p[AB], xf, yf2 - 1, zf2), grad3(p[BB], xf - 1, yf2 - 1, zf2), u);
-        const y1 = lerp(x1, x2, v);
-        const x3 = lerp(grad3(p[AA + 1], xf, yf2, zf2 - 1), grad3(p[BA + 1], xf - 1, yf2, zf2 - 1), u);
-        const x4 = lerp(grad3(p[AB + 1], xf, yf2 - 1, zf2 - 1), grad3(p[BB + 1], xf - 1, yf2 - 1, zf2 - 1), u);
-        const y2 = lerp(x3, x4, v);
-        return lerp(y1, y2, w);
+        const x1 = lerp2(grad3(p[AA], xf, yf2, zf2), grad3(p[BA], xf - 1, yf2, zf2), u);
+        const x2 = lerp2(grad3(p[AB], xf, yf2 - 1, zf2), grad3(p[BB], xf - 1, yf2 - 1, zf2), u);
+        const y1 = lerp2(x1, x2, v);
+        const x3 = lerp2(grad3(p[AA + 1], xf, yf2, zf2 - 1), grad3(p[BA + 1], xf - 1, yf2, zf2 - 1), u);
+        const x4 = lerp2(grad3(p[AB + 1], xf, yf2 - 1, zf2 - 1), grad3(p[BB + 1], xf - 1, yf2 - 1, zf2 - 1), u);
+        const y2 = lerp2(x3, x4, v);
+        return lerp2(y1, y2, w);
       }
       fbm2D(x, y, octaves, persistence, lacunarity) {
         let total = 0;
@@ -20643,7 +21727,7 @@ void main() {
           const t = 1 - riverDist / 0.052;
           const smooth = t * t * (3 - 2 * t);
           const riverBed = 57.5 + this.detailNoise.noise2D(wx2 * 0.05, wz * 0.05) * 1.4;
-          h = lerp(h, riverBed, smooth * 0.92);
+          h = lerp2(h, riverBed, smooth * 0.92);
           if (riverDist < 0.036) isRiver = true;
         }
         const height = Math.max(8, Math.min(WORLD_HEIGHT2 - 12, Math.round(h)));
@@ -20788,6 +21872,26 @@ void main() {
         for (let y = groundY + 1; y <= topY; y++) {
           setBlockSafe(blocks, tlx, y, tlz, B.SPRUCE_LOG);
         }
+      }
+    }
+    function placeOreCluster(blocks, rand, blockId, startX, startY, startZ, maxCount, clampMinY = 5, clampMaxY = WORLD_HEIGHT2 - 2) {
+      let bx2 = Math.max(0, Math.min(CHUNK_SIZE2 - 1, Math.floor(startX)));
+      let by2 = Math.max(clampMinY, Math.min(clampMaxY, Math.floor(startY)));
+      let bz = Math.max(0, Math.min(CHUNK_SIZE2 - 1, Math.floor(startZ)));
+      let placed = 0;
+      for (let step = 0; step < maxCount * 2 && placed < maxCount; step++) {
+        const idx = (by2 * CHUNK_SIZE2 + bz) * CHUNK_SIZE2 + bx2;
+        if (blocks[idx] === B.STONE) {
+          blocks[idx] = blockId;
+          placed++;
+        }
+        const dir = Math.floor(rand() * 6);
+        if (dir === 0 && bx2 < CHUNK_SIZE2 - 1) bx2++;
+        else if (dir === 1 && bx2 > 0) bx2--;
+        else if (dir === 2 && bz < CHUNK_SIZE2 - 1) bz++;
+        else if (dir === 3 && bz > 0) bz--;
+        else if (dir === 4 && by2 < clampMaxY) by2++;
+        else if (dir === 5 && by2 > clampMinY) by2--;
       }
     }
     function placeOreVein(blocks, rand, blockId, centerX, centerY, centerZ, size, clampMinY = 5, clampMaxY = WORLD_HEIGHT2 - 2) {
@@ -20966,9 +22070,9 @@ void main() {
               const a101 = caveALat[c10 + gy2 + 1];
               const a011 = caveALat[c01 + gy2 + 1];
               const a111 = caveALat[c11 + gy2 + 1];
-              const nA = lerp(
-                lerp(lerp(a000, a100, fx2), lerp(a010, a110, fx2), fz),
-                lerp(lerp(a001, a101, fx2), lerp(a011, a111, fx2), fz),
+              const nA = lerp2(
+                lerp2(lerp2(a000, a100, fx2), lerp2(a010, a110, fx2), fz),
+                lerp2(lerp2(a001, a101, fx2), lerp2(a011, a111, fx2), fz),
                 fy2
               );
               const b000 = caveBLat[c00 + gy2];
@@ -20979,9 +22083,9 @@ void main() {
               const b101 = caveBLat[c10 + gy2 + 1];
               const b011 = caveBLat[c01 + gy2 + 1];
               const b111 = caveBLat[c11 + gy2 + 1];
-              const nB = lerp(
-                lerp(lerp(b000, b100, fx2), lerp(b010, b110, fx2), fz),
-                lerp(lerp(b001, b101, fx2), lerp(b011, b111, fx2), fz),
+              const nB = lerp2(
+                lerp2(lerp2(b000, b100, fx2), lerp2(b010, b110, fx2), fz),
+                lerp2(lerp2(b001, b101, fx2), lerp2(b011, b111, fx2), fz),
                 fy2
               );
               const spagTh = y > 52 ? 0.088 : 0.105;
@@ -20995,9 +22099,9 @@ void main() {
                 const ch101 = cheeseLat[c10 + gy2 + 1];
                 const ch011 = cheeseLat[c01 + gy2 + 1];
                 const ch111 = cheeseLat[c11 + gy2 + 1];
-                const cheese = lerp(
-                  lerp(lerp(ch000, ch100, fx2), lerp(ch010, ch110, fx2), fz),
-                  lerp(lerp(ch001, ch101, fx2), lerp(ch011, ch111, fx2), fz),
+                const cheese = lerp2(
+                  lerp2(lerp2(ch000, ch100, fx2), lerp2(ch010, ch110, fx2), fz),
+                  lerp2(lerp2(ch001, ch101, fx2), lerp2(ch011, ch111, fx2), fz),
                   fy2
                 );
                 if (cheese > 0.37) carved = true;
@@ -21028,39 +22132,41 @@ void main() {
         placeOreVein(blocks, chunkRand, B.DIORITE, chunkRand() * 16, 6 + chunkRand() * 68, chunkRand() * 16, 16);
         placeOreVein(blocks, chunkRand, B.ANDESITE, chunkRand() * 16, 6 + chunkRand() * 68, chunkRand() * 16, 16);
       }
-      for (let i = 0; i < 18; i++) {
+      for (let i = 0; i < 12; i++) {
         const y = 5 + Math.floor(chunkRand() * 110);
-        const size = 8 + Math.floor(chunkRand() * 9);
-        placeOreVein(blocks, chunkRand, B.COAL_ORE, chunkRand() * 16, y, chunkRand() * 16, size, 5, 115);
+        const count = 6 + Math.floor(chunkRand() * 8);
+        placeOreCluster(blocks, chunkRand, B.COAL_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 115);
       }
-      const ironMaxY = mountainCols > 60 ? 102 : 64;
-      for (let i = 0; i < 15; i++) {
+      const ironMaxY = mountainCols > 60 ? 90 : 64;
+      const ironTries = mountainCols > 60 ? 11 : 9;
+      for (let i = 0; i < ironTries; i++) {
         const y = 5 + Math.floor(chunkRand() * (ironMaxY - 5));
-        const size = 4 + Math.floor(chunkRand() * 6);
-        placeOreVein(blocks, chunkRand, B.IRON_ORE, chunkRand() * 16, y, chunkRand() * 16, size, 5, ironMaxY);
+        const count = 4 + Math.floor(chunkRand() * 5);
+        placeOreCluster(blocks, chunkRand, B.IRON_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, ironMaxY);
       }
-      for (let i = 0; i < 4; i++) {
+      const lapisTries = chunkRand() < 0.45 ? 2 : 1;
+      for (let i = 0; i < lapisTries; i++) {
         const y = Math.floor(5 + (chunkRand() + chunkRand()) * 0.5 * 27);
-        const size = 4 + Math.floor(chunkRand() * 4);
-        placeOreVein(blocks, chunkRand, B.LAPIS_ORE, chunkRand() * 16, y, chunkRand() * 16, size, 5, 32);
+        const count = 3 + Math.floor(chunkRand() * 4);
+        placeOreCluster(blocks, chunkRand, B.LAPIS_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 32);
       }
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 2; i++) {
         const y = 5 + Math.floor(chunkRand() * 28);
-        const size = 4 + Math.floor(chunkRand() * 5);
-        placeOreVein(blocks, chunkRand, B.GOLD_ORE, chunkRand() * 16, y, chunkRand() * 16, size, 5, 32);
+        const count = 4 + Math.floor(chunkRand() * 4);
+        placeOreCluster(blocks, chunkRand, B.GOLD_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 32);
       }
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 5; i++) {
         const y = 5 + Math.floor(chunkRand() * 12);
-        const size = 4 + Math.floor(chunkRand() * 5);
-        placeOreVein(blocks, chunkRand, B.REDSTONE_ORE, chunkRand() * 16, y, chunkRand() * 16, size, 5, 16);
+        const count = 4 + Math.floor(chunkRand() * 4);
+        placeOreCluster(blocks, chunkRand, B.REDSTONE_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 16);
       }
-      for (let i = 0; i < 3; i++) {
+      if (chunkRand() < 0.85) {
         const y = 5 + Math.floor(chunkRand() * 12);
-        const size = 1 + Math.floor(chunkRand() * 6);
-        placeOreVein(blocks, chunkRand, B.DIAMOND_ORE, chunkRand() * 16, y, chunkRand() * 16, size, 5, 16);
+        const count = 2 + Math.floor(chunkRand() * 4);
+        placeOreCluster(blocks, chunkRand, B.DIAMOND_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 16);
       }
       if (mountainCols > 16) {
-        const tries = 4 + Math.floor(mountainCols / 256 * 8);
+        const tries = 2 + Math.floor(mountainCols / 256 * 4);
         for (let i = 0; i < tries; i++) {
           const lx2 = Math.floor(chunkRand() * 16);
           const lz = Math.floor(chunkRand() * 16);
@@ -21071,9 +22177,6 @@ void main() {
           const idx = y * slice + lz * CHUNK_SIZE2 + lx2;
           if (blocks[idx] === B.STONE) {
             blocks[idx] = B.EMERALD_ORE;
-            if (chunkRand() < 0.3 && lx2 + 1 < 16 && biomes[lz * CHUNK_SIZE2 + (lx2 + 1)] === BI.MOUNTAINS && blocks[idx + 1] === B.STONE) {
-              blocks[idx + 1] = B.EMERALD_ORE;
-            }
           }
         }
       }
@@ -21317,6 +22420,7 @@ void main() {
       ]
     }
   ];
+  var DIR_FACE_KEYS = ["north", "east", "south", "west"];
   var CROSS_PLANES = [
     {
       verts: [
@@ -21350,6 +22454,7 @@ void main() {
       this.normals = new Float32Array(initialQuads * 12);
       this.uvs = new Float32Array(initialQuads * 8);
       this.colors = new Float32Array(initialQuads * 12);
+      this.lights = new Float32Array(initialQuads * 8);
       this.indices = new Uint32Array(initialQuads * 6);
       this.vertexCount = 0;
       this.indexCount = 0;
@@ -21371,9 +22476,42 @@ void main() {
       this.normals = growFloat(this.normals, 12);
       this.uvs = growFloat(this.uvs, 8);
       this.colors = growFloat(this.colors, 12);
+      this.lights = growFloat(this.lights, 8);
       const nextIdx = new Uint32Array(this.capacityQuads * 6);
       nextIdx.set(this.indices);
       this.indices = nextIdx;
+    }
+    pushQuad(verts, norm, uvs, colorRgb, skyL, blkL) {
+      this.ensureQuadCapacity();
+      const baseVert = this.vertexCount;
+      let pOff = baseVert * 3;
+      let uOff = baseVert * 2;
+      for (let i = 0; i < 4; i++) {
+        this.positions[pOff] = verts[i][0];
+        this.positions[pOff + 1] = verts[i][1];
+        this.positions[pOff + 2] = verts[i][2];
+        this.normals[pOff] = norm[0];
+        this.normals[pOff + 1] = norm[1];
+        this.normals[pOff + 2] = norm[2];
+        this.uvs[uOff] = uvs[i][0];
+        this.uvs[uOff + 1] = uvs[i][1];
+        this.colors[pOff] = colorRgb[0];
+        this.colors[pOff + 1] = colorRgb[1];
+        this.colors[pOff + 2] = colorRgb[2];
+        this.lights[uOff] = skyL;
+        this.lights[uOff + 1] = blkL;
+        pOff += 3;
+        uOff += 2;
+      }
+      const idxOff = this.indexCount;
+      this.indices[idxOff] = baseVert;
+      this.indices[idxOff + 1] = baseVert + 1;
+      this.indices[idxOff + 2] = baseVert + 2;
+      this.indices[idxOff + 3] = baseVert;
+      this.indices[idxOff + 4] = baseVert + 2;
+      this.indices[idxOff + 5] = baseVert + 3;
+      this.vertexCount += 4;
+      this.indexCount += 6;
     }
     toGeometry() {
       if (this.vertexCount === 0) return null;
@@ -21384,6 +22522,7 @@ void main() {
       geometry.setAttribute("normal", new me(this.normals.slice(0, vCount * 3), 3));
       geometry.setAttribute("uv", new me(this.uvs.slice(0, vCount * 2), 2));
       geometry.setAttribute("color", new me(this.colors.slice(0, vCount * 3), 3));
+      geometry.setAttribute("aLight", new me(this.lights.slice(0, vCount * 2), 2));
       if (vCount <= 65535) {
         const idx16 = new Uint16Array(iCount);
         for (let i = 0; i < iCount; i++) idx16[i] = this.indices[i];
@@ -21398,31 +22537,37 @@ void main() {
   var ChunkMesher = class {
     constructor(atlas) {
       this.atlas = atlas;
+      this.lightUniforms = {
+        uSunIntensity: { value: 1 },
+        uSkyTint: { value: new bt("#ffffff") },
+        uTorchTint: { value: new bt("#ffc478") },
+        uMinLight: { value: 6e-3 }
+      };
       this.shadeAoLUT = new Float32Array(6 * 4);
       for (let f = 0; f < 6; f++) {
         for (let ao2 = 0; ao2 < 4; ao2++) {
           this.shadeAoLUT[f * 4 + ao2] = Math.pow(FACES[f].shade * AO_CURVE[ao2], 2.2);
         }
       }
-      this.opaqueMaterial = new jn({
+      this.opaqueMaterial = this._createLitMaterial({
         map: atlas.texture,
         vertexColors: true,
         fog: true,
         side: Mi
       });
-      this.cutoutMaterial = new jn({
+      this.cutoutMaterial = this._createLitMaterial({
         map: atlas.texture,
         vertexColors: true,
         fog: true,
         alphaTest: 0.5,
         side: Bn
       });
-      this.waterMaterial = new jn({
+      this.waterMaterial = this._createLitMaterial({
         map: atlas.texture,
         vertexColors: true,
         fog: true,
         transparent: true,
-        opacity: 0.92,
+        opacity: 0.88,
         depthWrite: false,
         side: Bn
       });
@@ -21430,7 +22575,58 @@ void main() {
       this._cutoutBuf = new ScratchMeshBuffer(1024);
       this._waterBuf = new ScratchMeshBuffer(1024);
     }
-    buildChunkGeometries(chunk, getWorldBlock) {
+    _createLitMaterial(params) {
+      const mat = new jn(params);
+      const uniforms = this.lightUniforms;
+      mat.onBeforeCompile = (shader) => {
+        shader.uniforms.uSunIntensity = uniforms.uSunIntensity;
+        shader.uniforms.uSkyTint = uniforms.uSkyTint;
+        shader.uniforms.uTorchTint = uniforms.uTorchTint;
+        shader.uniforms.uMinLight = uniforms.uMinLight;
+        shader.vertexShader = shader.vertexShader.replace(
+          "#include <common>",
+          `#include <common>
+attribute vec2 aLight;
+varying vec2 vVoxelLight;`
+        ).replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>
+vVoxelLight = aLight;`
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <common>",
+          `#include <common>
+uniform float uSunIntensity;
+uniform vec3 uSkyTint;
+uniform vec3 uTorchTint;
+uniform float uMinLight;
+varying vec2 vVoxelLight;`
+        ).replace(
+          "#include <color_fragment>",
+          `#include <color_fragment>
+float skyEff = clamp(vVoxelLight.x * uSunIntensity, 0.0, 1.0);
+float blkEff = clamp(vVoxelLight.y, 0.0, 1.0);
+float skyCurve = pow(0.8, (1.0 - skyEff) * 15.0);
+float blkCurve = pow(0.8, (1.0 - blkEff) * 15.0);
+vec3 skyTerm = pow(max(skyCurve, 0.001), 2.2) * uSkyTint;
+vec3 blkTerm = pow(max(blkCurve, 0.001), 2.2) * uTorchTint;
+diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
+        );
+      };
+      mat.customProgramCacheKey = () => "mc-dual-light-v1";
+      return mat;
+    }
+    setLightingUniforms(sunIntensity, skyTintColor, torchTintColor) {
+      this.lightUniforms.uSunIntensity.value = sunIntensity;
+      if (skyTintColor) this.lightUniforms.uSkyTint.value.copy(skyTintColor);
+      if (torchTintColor) this.lightUniforms.uTorchTint.value.copy(torchTintColor);
+    }
+    /**
+     * Builds chunk geometries using direct local+neighbor chunk references (no per-voxel Map lookups).
+     * `neighbors` can be either an array of 8 chunk refs [W, E, N, S, NW, NE, SW, SE]
+     * or a fallback getWorldBlock(wx, wy, wz) function for unit tests.
+     */
+    buildChunkGeometries(chunk, neighborsOrFn) {
       const opaqueBuf = this._opaqueBuf;
       const cutoutBuf = this._cutoutBuf;
       const waterBuf = this._waterBuf;
@@ -21440,58 +22636,77 @@ void main() {
       const baseX = chunk.cx * CHUNK_SIZE;
       const baseZ = chunk.cz * CHUNK_SIZE;
       const blocks = chunk.blocks;
+      const light = chunk.light;
       const biomes = chunk.biomes;
       const lut = this.shadeAoLUT;
-      const getBlockAtWorld = (wx2, wy2, wz) => {
-        if (wy2 < 0 || wy2 >= WORLD_HEIGHT) return 0;
-        const lx2 = wx2 - baseX;
-        const lz = wz - baseZ;
+      const aoTable = BlockRegistry.aoTable;
+      const opaqueTable = BlockRegistry.opaqueTable;
+      const slice = CHUNK_SIZE * CHUNK_SIZE;
+      const isFnFallback = typeof neighborsOrFn === "function";
+      const nbChunks = isFnFallback ? null : neighborsOrFn;
+      const sampleBlock = (lx2, y, lz) => {
+        if (y < 0 || y >= WORLD_HEIGHT) return 0;
         if (lx2 >= 0 && lx2 < CHUNK_SIZE && lz >= 0 && lz < CHUNK_SIZE) {
-          return blocks[(wy2 * CHUNK_SIZE + lz) * CHUNK_SIZE + lx2];
+          return blocks[y * slice + lz * CHUNK_SIZE + lx2];
         }
-        return getWorldBlock(wx2, wy2, wz);
+        if (isFnFallback) {
+          return neighborsOrFn(baseX + lx2, y, baseZ + lz);
+        }
+        const dcx = lx2 < 0 ? -1 : lx2 >= CHUNK_SIZE ? 1 : 0;
+        const dcz = lz < 0 ? -1 : lz >= CHUNK_SIZE ? 1 : 0;
+        const nc2 = nbChunks ? nbChunks[(dcz + 1) * 3 + (dcx + 1)] : null;
+        if (!nc2 || !nc2.isGenerated) return 0;
+        const nlx = lx2 - dcx * CHUNK_SIZE;
+        const nlz = lz - dcz * CHUNK_SIZE;
+        return nc2.blocks[y * slice + nlz * CHUNK_SIZE + nlx];
       };
-      const isOccludingAO = (wx2, wy2, wz) => BlockRegistry.occludesAO(getBlockAtWorld(wx2, wy2, wz)) ? 1 : 0;
-      const computeVertexAO = (bx2, by2, bz, nx2, ny2, nz, ox2, oy2, oz) => {
-        let s1 = 0;
-        let s210 = 0;
-        let c = 0;
-        if (nx2 !== 0) {
-          s1 = isOccludingAO(bx2, by2 + oy2, bz);
-          s210 = isOccludingAO(bx2, by2, bz + oz);
-          c = isOccludingAO(bx2, by2 + oy2, bz + oz);
-        } else if (ny2 !== 0) {
-          s1 = isOccludingAO(bx2 + ox2, by2, bz);
-          s210 = isOccludingAO(bx2, by2, bz + oz);
-          c = isOccludingAO(bx2 + ox2, by2, bz + oz);
-        } else {
-          s1 = isOccludingAO(bx2 + ox2, by2, bz);
-          s210 = isOccludingAO(bx2, by2 + oy2, bz);
-          c = isOccludingAO(bx2 + ox2, by2 + oy2, bz);
+      const sampleLightByte = (lx2, y, lz) => {
+        if (y >= WORLD_HEIGHT) return 240;
+        if (y < 0) return 0;
+        if (lx2 >= 0 && lx2 < CHUNK_SIZE && lz >= 0 && lz < CHUNK_SIZE) {
+          return light[y * slice + lz * CHUNK_SIZE + lx2];
         }
-        if (s1 && s210) return 0;
-        return 3 - (s1 + s210 + c);
+        if (isFnFallback) return 240;
+        const dcx = lx2 < 0 ? -1 : lx2 >= CHUNK_SIZE ? 1 : 0;
+        const dcz = lz < 0 ? -1 : lz >= CHUNK_SIZE ? 1 : 0;
+        const nc2 = nbChunks ? nbChunks[(dcz + 1) * 3 + (dcx + 1)] : null;
+        if (!nc2 || !nc2.isGenerated) return 240;
+        const nlx = lx2 - dcx * CHUNK_SIZE;
+        const nlz = lz - dcz * CHUNK_SIZE;
+        return nc2.light[y * slice + nlz * CHUNK_SIZE + nlx];
       };
       const aoValues = [3, 3, 3, 3];
       const startY = Math.max(0, chunk.minY);
       const endY = Math.min(WORLD_HEIGHT - 1, chunk.maxY);
       for (let y = startY; y <= endY; y++) {
-        const yBase = y * CHUNK_SIZE * CHUNK_SIZE;
+        const yBase = y * slice;
         for (let z = 0; z < CHUNK_SIZE; z++) {
           const zBase = yBase + z * CHUNK_SIZE;
-          const wz = baseZ + z;
           for (let x = 0; x < CHUNK_SIZE; x++) {
             const id2 = blocks[zBase + x];
             if (id2 === BLOCK_IDS.AIR) continue;
             const def = BlockRegistry.get(id2);
             const biomeId = biomes[z * CHUNK_SIZE + x];
-            const wx2 = baseX + x;
+            if (def.isTorch) {
+              const meta = chunk.getMeta(x, y, z);
+              this._emitTorchGeometry(cutoutBuf, x, y, z, meta);
+              continue;
+            }
+            if (def.isBed) {
+              const meta = chunk.getMeta(x, y, z);
+              const lb = sampleLightByte(x, y, z);
+              this._emitBedGeometry(cutoutBuf, x, y, z, id2 === BLOCK_IDS.BED_HEAD, meta & 3, (lb >> 4) / 15, (lb & 15) / 15);
+              continue;
+            }
             if (def.isCross) {
               const uv2 = this.atlas.getUV(def.faces.top);
               const tint = BiomeManager.getTintForBlock(biomeId, def.tintType);
               const tr2 = tint ? tint[0] : 1;
               const tg = tint ? tint[1] : 1;
               const tb = tint ? tint[2] : 1;
+              const lb = sampleLightByte(x, y, z);
+              const skyNorm = (lb >> 4 & 15) / 15;
+              const blkNorm = (lb & 15) / 15;
               for (let p = 0; p < 2; p++) {
                 cutoutBuf.ensureQuadCapacity();
                 const plane = CROSS_PLANES[p];
@@ -21513,6 +22728,8 @@ void main() {
                   cutoutBuf.colors[pOff] = vertLum * tr2;
                   cutoutBuf.colors[pOff + 1] = vertLum * tg;
                   cutoutBuf.colors[pOff + 2] = vertLum * tb;
+                  cutoutBuf.lights[uOff] = skyNorm;
+                  cutoutBuf.lights[uOff + 1] = blkNorm;
                   pOff += 3;
                   uOff += 2;
                 }
@@ -21530,28 +22747,32 @@ void main() {
             }
             const isTranslucent = def.isLiquid || def.isTransparent;
             const buf = isTranslucent ? waterBuf : def.isCutout ? cutoutBuf : opaqueBuf;
-            const waterTopDrop = def.isLiquid && getBlockAtWorld(wx2, y + 1, wz) !== BLOCK_IDS.WATER ? 0.12 : 0;
+            const waterTopDrop = def.isLiquid && sampleBlock(x, y + 1, z) !== BLOCK_IDS.WATER ? 0.12 : 0;
             const inset = def.inset || 0;
+            const selfEmitNorm = def.lightEmission > 0 ? def.lightEmission / 15 : 0;
+            const facingDir = def.directional ? chunk.getMeta(x, y, z) & 3 : 2;
             for (let f = 0; f < 6; f++) {
               const face = FACES[f];
               if (y === 0 && face.ny === -1) continue;
-              const nbx = wx2 + face.nx;
+              const nbx = x + face.nx;
               const nby = y + face.ny;
-              const nbz = wz + face.nz;
-              const neighborId = getBlockAtWorld(nbx, nby, nbz);
+              const nbz = z + face.nz;
+              const neighborId = sampleBlock(nbx, nby, nbz);
               if (def.isOpaque) {
-                if (BlockRegistry.isOpaque(neighborId)) continue;
+                if (opaqueTable[neighborId] === 1) continue;
+              } else if (inset > 0) {
+                if (face.ny !== 0 && (neighborId === id2 || opaqueTable[neighborId] === 1)) continue;
+              } else if (def.isLiquid) {
+                if (neighborId === id2 || neighborId === BLOCK_IDS.ICE || opaqueTable[neighborId] === 1) continue;
               } else {
-                if (inset > 0) {
-                  if (face.ny !== 0 && (neighborId === id2 || BlockRegistry.isOpaque(neighborId))) continue;
-                } else if (def.isLiquid) {
-                  if (neighborId === id2 || neighborId === BLOCK_IDS.ICE || BlockRegistry.isOpaque(neighborId)) continue;
-                } else {
-                  if (neighborId === id2 || BlockRegistry.isOpaque(neighborId)) continue;
-                }
+                if (neighborId === id2 || opaqueTable[neighborId] === 1) continue;
               }
               buf.ensureQuadCapacity();
-              const uv2 = this.atlas.getUV(def.faces[face.key]);
+              let faceKey = face.key;
+              if (def.directional && face.ny === 0) {
+                faceKey = DIR_FACE_KEYS[facingDir] === face.key ? "south" : "north";
+              }
+              const uv2 = this.atlas.getUV(def.faces[faceKey]);
               const u02 = uv2.u0;
               const u1 = uv2.u1;
               const v02 = uv2.vBottom;
@@ -21561,6 +22782,9 @@ void main() {
               const tr2 = (tint ? tint[0] : 1) * face.hemi[0];
               const tg = (tint ? tint[1] : 1) * face.hemi[1];
               const tb = (tint ? tint[2] : 1) * face.hemi[2];
+              const centerLightByte = sampleLightByte(nbx, nby, nbz);
+              const centerSky = centerLightByte >> 4 & 15;
+              const centerBlk = centerLightByte & 15;
               const baseVert = buf.vertexCount;
               let pOff = baseVert * 3;
               let uOff = baseVert * 2;
@@ -21569,20 +22793,10 @@ void main() {
                 let dx2 = corner[0];
                 let dy2 = corner[1];
                 let dz = corner[2];
-                if (waterTopDrop > 0 && dy2 === 1) {
-                  dy2 -= waterTopDrop;
-                }
+                if (waterTopDrop > 0 && dy2 === 1) dy2 -= waterTopDrop;
                 if (inset > 0) {
-                  if (face.nx === 0) {
-                    dx2 = dx2 === 0 ? inset : 1 - inset;
-                  } else {
-                    dx2 = face.nx > 0 ? 1 - inset : inset;
-                  }
-                  if (face.nz === 0) {
-                    dz = dz === 0 ? inset : 1 - inset;
-                  } else {
-                    dz = face.nz > 0 ? 1 - inset : inset;
-                  }
+                  dx2 = face.nx === 0 ? dx2 === 0 ? inset : 1 - inset : face.nx > 0 ? 1 - inset : inset;
+                  dz = face.nz === 0 ? dz === 0 ? inset : 1 - inset : face.nz > 0 ? 1 - inset : inset;
                 }
                 buf.positions[pOff] = x + dx2;
                 buf.positions[pOff + 1] = y + dy2;
@@ -21592,16 +22806,85 @@ void main() {
                 buf.normals[pOff + 2] = face.nz;
                 buf.uvs[uOff] = corner[6] === 0 ? u02 : u1;
                 buf.uvs[uOff + 1] = corner[7] === 0 ? v02 : v1;
-                const ao2 = isTranslucent || inset > 0 ? 3 : computeVertexAO(nbx, nby, nbz, face.nx, face.ny, face.nz, corner[3], corner[4], corner[5]);
+                let ao2 = 3;
+                let skySum = centerSky;
+                let blkSum = centerBlk;
+                let lightCount = 1;
+                if (!isTranslucent && inset === 0) {
+                  const ox2 = corner[3];
+                  const oy2 = corner[4];
+                  const oz = corner[5];
+                  let b1x, b1y, b1z, b2x, b2y, b2z, cxp, cyp, czp;
+                  if (face.nx !== 0) {
+                    b1x = nbx;
+                    b1y = nby + oy2;
+                    b1z = nbz;
+                    b2x = nbx;
+                    b2y = nby;
+                    b2z = nbz + oz;
+                    cxp = nbx;
+                    cyp = nby + oy2;
+                    czp = nbz + oz;
+                  } else if (face.ny !== 0) {
+                    b1x = nbx + ox2;
+                    b1y = nby;
+                    b1z = nbz;
+                    b2x = nbx;
+                    b2y = nby;
+                    b2z = nbz + oz;
+                    cxp = nbx + ox2;
+                    cyp = nby;
+                    czp = nbz + oz;
+                  } else {
+                    b1x = nbx + ox2;
+                    b1y = nby;
+                    b1z = nbz;
+                    b2x = nbx;
+                    b2y = nby + oy2;
+                    b2z = nbz;
+                    cxp = nbx + ox2;
+                    cyp = nby + oy2;
+                    czp = nbz + oz;
+                  }
+                  const id1 = sampleBlock(b1x, b1y, b1z);
+                  const id22 = sampleBlock(b2x, b2y, b2z);
+                  const idc = sampleBlock(cxp, cyp, czp);
+                  const s1 = aoTable[id1];
+                  const s210 = aoTable[id22];
+                  const sc2 = aoTable[idc];
+                  ao2 = s1 && s210 ? 0 : 3 - (s1 + s210 + sc2);
+                  if (!opaqueTable[id1]) {
+                    const lb1 = sampleLightByte(b1x, b1y, b1z);
+                    skySum += lb1 >> 4 & 15;
+                    blkSum += lb1 & 15;
+                    lightCount++;
+                  }
+                  if (!opaqueTable[id22]) {
+                    const lb2 = sampleLightByte(b2x, b2y, b2z);
+                    skySum += lb2 >> 4 & 15;
+                    blkSum += lb2 & 15;
+                    lightCount++;
+                  }
+                  if ((!opaqueTable[id1] || !opaqueTable[id22]) && !opaqueTable[idc]) {
+                    const lbc = sampleLightByte(cxp, cyp, czp);
+                    skySum += lbc >> 4 & 15;
+                    blkSum += lbc & 15;
+                    lightCount++;
+                  }
+                }
                 aoValues[i] = ao2;
                 const lum = lut[f * 4 + ao2];
                 buf.colors[pOff] = lum * tr2;
                 buf.colors[pOff + 1] = lum * tg;
                 buf.colors[pOff + 2] = lum * tb;
+                const avgSky = skySum / (15 * lightCount);
+                const avgBlk = Math.max(selfEmitNorm, blkSum / (15 * lightCount));
+                buf.lights[uOff] = avgSky;
+                buf.lights[uOff + 1] = avgBlk;
                 pOff += 3;
                 uOff += 2;
               }
-              let idxOff = buf.indexCount;
+              const idxOff = buf.indexCount;
               if (aoValues[0] + aoValues[2] > aoValues[1] + aoValues[3]) {
                 buf.indices[idxOff] = baseVert;
                 buf.indices[idxOff + 1] = baseVert + 1;
@@ -21628,6 +22911,597 @@ void main() {
         cutoutGeometry: cutoutBuf.toGeometry(),
         waterGeometry: waterBuf.toGeometry()
       };
+    }
+    /**
+     * Emits a 2x10x2 pixel 3D torch standing upright (meta=0) or tilted 22.5 deg on a wall (meta=1..4).
+     */
+    _emitTorchGeometry(buf, x, y, z, meta) {
+      const uv2 = this.atlas.getUV("torch");
+      const du = uv2.u1 - uv2.u0;
+      const dv2 = uv2.vTop - uv2.vBottom;
+      const uS0 = uv2.u0 + du * (7 / 16);
+      const uS1 = uv2.u0 + du * (9 / 16);
+      const vSideBot = uv2.vBottom;
+      const vSideTop = uv2.vBottom + dv2 * (10 / 16);
+      const vTop0 = uv2.vBottom + dv2 * (8 / 16);
+      const vTop1 = uv2.vBottom + dv2 * (10 / 16);
+      const hw = 1 / 16;
+      const h = 10 / 16;
+      let cx2 = x + 0.5;
+      let cy2 = y;
+      let cz = z + 0.5;
+      let tiltX = 0;
+      let tiltZ = 0;
+      if (meta === 1) {
+        cx2 = x + 0.08;
+        cy2 = y + 0.19;
+        tiltX = 0.25;
+      } else if (meta === 2) {
+        cx2 = x + 0.92;
+        cy2 = y + 0.19;
+        tiltX = -0.25;
+      } else if (meta === 3) {
+        cz = z + 0.08;
+        cy2 = y + 0.19;
+        tiltZ = 0.25;
+      } else if (meta === 4) {
+        cz = z + 0.92;
+        cy2 = y + 0.19;
+        tiltZ = -0.25;
+      }
+      const p = (lx2, ly2, lz) => {
+        const f = ly2 / h;
+        return [cx2 + lx2 + tiltX * f, cy2 + ly2, cz + lz + tiltZ * f];
+      };
+      const sideUvs = [[uS0, vSideBot], [uS1, vSideBot], [uS1, vSideTop], [uS0, vSideTop]];
+      const topUvs = [[uS0, vTop0], [uS1, vTop0], [uS1, vTop1], [uS0, vTop1]];
+      const fullCol = [1, 0.98, 0.92];
+      buf.pushQuad([p(-hw, 0, hw), p(hw, 0, hw), p(hw, h, hw), p(-hw, h, hw)], [0, 0, 1], sideUvs, fullCol, 1, 1);
+      buf.pushQuad([p(hw, 0, -hw), p(-hw, 0, -hw), p(-hw, h, -hw), p(hw, h, -hw)], [0, 0, -1], sideUvs, fullCol, 1, 1);
+      buf.pushQuad([p(hw, 0, hw), p(hw, 0, -hw), p(hw, h, -hw), p(hw, h, hw)], [1, 0, 0], sideUvs, fullCol, 1, 1);
+      buf.pushQuad([p(-hw, 0, -hw), p(-hw, 0, hw), p(-hw, h, hw), p(-hw, h, -hw)], [-1, 0, 0], sideUvs, fullCol, 1, 1);
+      buf.pushQuad([p(-hw, h, hw), p(hw, h, hw), p(hw, h, -hw), p(-hw, h, -hw)], [0, 1, 0], topUvs, fullCol, 1, 1);
+    }
+    /**
+     * Emits a 3D bed half (mattress from Y=3/16..9/16 + wooden legs at outer corners),
+     * rotated cleanly according to `facing` (0:N, 1:E, 2:S, 3:W).
+     */
+    _emitBedGeometry(buf, x, y, z, isHead, facing, skyL, blkL) {
+      const topUv = this.atlas.getUV(isHead ? "bed_head_top" : "bed_foot_top");
+      const woodUv = this.atlas.getUV("oak_planks");
+      const yBot = y + 3 / 16;
+      const yTop = y + 9 / 16;
+      const rot = (lx2, lz) => {
+        if (facing === 0) return [x + lx2, z + lz];
+        if (facing === 1) return [x + (1 - lz), z + lx2];
+        if (facing === 2) return [x + (1 - lx2), z + (1 - lz)];
+        return [x + lz, z + (1 - lx2)];
+      };
+      const p = (lx2, py2, lz) => {
+        const [wx2, wz] = rot(lx2, lz);
+        return [wx2, py2, wz];
+      };
+      const topCol = [1, 1, 1];
+      const sideCol = [0.68, 0.68, 0.68];
+      const darkCol = [0.42, 0.42, 0.42];
+      buf.pushQuad(
+        [p(0, yTop, 1), p(1, yTop, 1), p(1, yTop, 0), p(0, yTop, 0)],
+        [0, 1, 0],
+        [[topUv.u0, topUv.vBottom], [topUv.u1, topUv.vBottom], [topUv.u1, topUv.vTop], [topUv.u0, topUv.vTop]],
+        topCol,
+        skyL,
+        blkL
+      );
+      buf.pushQuad(
+        [p(0, yBot, 0), p(1, yBot, 0), p(1, yBot, 1), p(0, yBot, 1)],
+        [0, -1, 0],
+        [[woodUv.u0, woodUv.vBottom], [woodUv.u1, woodUv.vBottom], [woodUv.u1, woodUv.vTop], [woodUv.u0, woodUv.vTop]],
+        darkCol,
+        skyL,
+        blkL
+      );
+      const sideUv = this.atlas.getUV(isHead ? "bed_side_head" : "bed_side_foot");
+      const sDv = sideUv.vTop - sideUv.vBottom;
+      const sV0 = sideUv.vBottom + sDv * (5 / 16);
+      const sV1 = sideUv.vBottom + sDv * (10 / 16);
+      const sideBandUvs = [[sideUv.u0, sV0], [sideUv.u1, sV0], [sideUv.u1, sV1], [sideUv.u0, sV1]];
+      buf.pushQuad([p(1, yBot, 1), p(1, yBot, 0), p(1, yTop, 0), p(1, yTop, 1)], [1, 0, 0], sideBandUvs, sideCol, skyL, blkL);
+      buf.pushQuad([p(0, yBot, 0), p(0, yBot, 1), p(0, yTop, 1), p(0, yTop, 0)], [-1, 0, 0], sideBandUvs, sideCol, skyL, blkL);
+      const endUv = this.atlas.getUV(isHead ? "bed_end_head" : "bed_end_foot");
+      const eDv = endUv.vTop - endUv.vBottom;
+      const eV0 = endUv.vBottom + eDv * (5 / 16);
+      const eV1 = endUv.vBottom + eDv * (10 / 16);
+      const endBandUvs = [[endUv.u0, eV0], [endUv.u1, eV0], [endUv.u1, eV1], [endUv.u0, eV1]];
+      if (isHead) {
+        buf.pushQuad([p(1, yBot, 0), p(0, yBot, 0), p(0, yTop, 0), p(1, yTop, 0)], [0, 0, -1], endBandUvs, sideCol, skyL, blkL);
+      } else {
+        buf.pushQuad([p(0, yBot, 1), p(1, yBot, 1), p(1, yTop, 1), p(0, yTop, 1)], [0, 0, 1], endBandUvs, sideCol, skyL, blkL);
+      }
+      const legMinZ = isHead ? 0 : 13 / 16;
+      const legMaxZ = isHead ? 3 / 16 : 1;
+      const wUvs = [[woodUv.u0, woodUv.vBottom], [woodUv.u1, woodUv.vBottom], [woodUv.u1, woodUv.vTop], [woodUv.u0, woodUv.vTop]];
+      const emitLeg = (x02, x1) => {
+        buf.pushQuad([p(x02, y, legMaxZ), p(x1, y, legMaxZ), p(x1, yBot, legMaxZ), p(x02, yBot, legMaxZ)], [0, 0, 1], wUvs, darkCol, skyL, blkL);
+        buf.pushQuad([p(x1, y, legMinZ), p(x02, y, legMinZ), p(x02, yBot, legMinZ), p(x1, yBot, legMinZ)], [0, 0, -1], wUvs, darkCol, skyL, blkL);
+        buf.pushQuad([p(x1, y, legMaxZ), p(x1, y, legMinZ), p(x1, yBot, legMinZ), p(x1, yBot, legMaxZ)], [1, 0, 0], wUvs, darkCol, skyL, blkL);
+        buf.pushQuad([p(x02, y, legMinZ), p(x02, y, legMaxZ), p(x02, yBot, legMaxZ), p(x02, yBot, legMinZ)], [-1, 0, 0], wUvs, darkCol, skyL, blkL);
+      };
+      emitLeg(0, 3 / 16);
+      emitLeg(13 / 16, 1);
+    }
+  };
+
+  // src/world/LightingEngine.js
+  var QUEUE_CAP = 131072;
+  var QUEUE_MASK = QUEUE_CAP - 1;
+  var DIRS = [
+    [1, 0, 0],
+    [-1, 0, 0],
+    [0, 1, 0],
+    [0, -1, 0],
+    [0, 0, 1],
+    [0, 0, -1]
+  ];
+  var FastLightQueue = class {
+    constructor(capacity = QUEUE_CAP) {
+      this.xs = new Int32Array(capacity);
+      this.ys = new Int32Array(capacity);
+      this.zs = new Int32Array(capacity);
+      this.vals = new Uint8Array(capacity);
+      this.head = 0;
+      this.tail = 0;
+    }
+    get isEmpty() {
+      return this.head === this.tail;
+    }
+    clear() {
+      this.head = 0;
+      this.tail = 0;
+    }
+    push(x, y, z, val = 0) {
+      const nextTail = this.tail + 1 & QUEUE_MASK;
+      if (nextTail === this.head) {
+        this.head = this.head + 1 & QUEUE_MASK;
+      }
+      this.xs[this.tail] = x;
+      this.ys[this.tail] = y;
+      this.zs[this.tail] = z;
+      this.vals[this.tail] = val;
+      this.tail = nextTail;
+    }
+    popInto(out) {
+      out.x = this.xs[this.head];
+      out.y = this.ys[this.head];
+      out.z = this.zs[this.head];
+      out.val = this.vals[this.head];
+      this.head = this.head + 1 & QUEUE_MASK;
+    }
+  };
+  var LightingEngine = class {
+    constructor() {
+      this.skyAddQ = new FastLightQueue();
+      this.skyRemQ = new FastLightQueue();
+      this.blkAddQ = new FastLightQueue();
+      this.blkRemQ = new FastLightQueue();
+      this._node = { x: 0, y: 0, z: 0, val: 0 };
+      this.activeRedstone = /* @__PURE__ */ new Map();
+    }
+    clear() {
+      this.skyAddQ.clear();
+      this.skyRemQ.clear();
+      this.blkAddQ.clear();
+      this.blkRemQ.clear();
+      this.activeRedstone.clear();
+    }
+    _getBlockAndChunk(world, wx2, wy2, wz) {
+      if (wy2 < 0 || wy2 >= WORLD_HEIGHT) return null;
+      const cx2 = Math.floor(wx2 / CHUNK_SIZE);
+      const cz = Math.floor(wz / CHUNK_SIZE);
+      const chunk = world.chunks.get(chunkKey(cx2, cz));
+      if (!chunk || !chunk.isGenerated) return null;
+      const lx2 = wx2 - cx2 * CHUNK_SIZE;
+      const lz = wz - cz * CHUNK_SIZE;
+      return { chunk, lx: lx2, lz, idx: (wy2 * CHUNK_SIZE + lz) * CHUNK_SIZE + lx2 };
+    }
+    /**
+     * Computes vertical sunlight columns + interior BFS for a freshly loaded/generated chunk,
+     * and seamlessly blends light borders with any already-loaded orthogonal neighbor chunks.
+     */
+    initChunkLighting(world, chunk) {
+      const blocks = chunk.blocks;
+      const light = chunk.light;
+      const opacityTable = BlockRegistry.opacityTable;
+      const emissionTable = BlockRegistry.emissionTable;
+      const baseX = chunk.cx * CHUNK_SIZE;
+      const baseZ = chunk.cz * CHUNK_SIZE;
+      const slice = CHUNK_SIZE * CHUNK_SIZE;
+      const skyAddQ = this.skyAddQ;
+      const blkAddQ = this.blkAddQ;
+      skyAddQ.clear();
+      blkAddQ.clear();
+      const startScanY = Math.min(WORLD_HEIGHT - 1, Math.max(chunk.maxY + 1, 64));
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        const wz = baseZ + z;
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+          const wx2 = baseX + x;
+          let sun = MAX_LIGHT_LEVEL;
+          for (let y = WORLD_HEIGHT - 1; y > startScanY; y--) {
+            light[y * slice + z * CHUNK_SIZE + x] = 240;
+          }
+          for (let y = startScanY; y >= 0; y--) {
+            const idx = y * slice + z * CHUNK_SIZE + x;
+            const id2 = blocks[idx];
+            const op2 = opacityTable[id2];
+            const emit = emissionTable[id2];
+            if (sun > 0) {
+              if (op2 >= 15) {
+                sun = 0;
+              } else if (op2 > 0) {
+                sun = Math.max(0, sun - op2);
+              }
+            }
+            light[idx] = (sun & 15) << 4 | emit & 15;
+            if (emit > 0) {
+              blkAddQ.push(wx2, y, wz, emit);
+            }
+          }
+        }
+      }
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        const wz = baseZ + z;
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+          const wx2 = baseX + x;
+          const isEdge = x === 0 || x === CHUNK_SIZE - 1 || z === 0 || z === CHUNK_SIZE - 1;
+          for (let y = startScanY; y >= 1; y--) {
+            const idx = y * slice + z * CHUNK_SIZE + x;
+            const sun = light[idx] >> 4 & 15;
+            if (sun <= 1) {
+              if (isEdge) continue;
+              break;
+            }
+            const op2 = opacityTable[blocks[idx]];
+            const belowOp = opacityTable[blocks[idx - slice]];
+            if (op2 > 0 || belowOp > 0) {
+              skyAddQ.push(wx2, y, wz, sun);
+              continue;
+            }
+            if (z > 0 && opacityTable[blocks[idx - CHUNK_SIZE]] < 15 && (light[idx - CHUNK_SIZE] >> 4 & 15) < sun - 1 || z < 15 && opacityTable[blocks[idx + CHUNK_SIZE]] < 15 && (light[idx + CHUNK_SIZE] >> 4 & 15) < sun - 1 || x > 0 && opacityTable[blocks[idx - 1]] < 15 && (light[idx - 1] >> 4 & 15) < sun - 1 || x < 15 && opacityTable[blocks[idx + 1]] < 15 && (light[idx + 1] >> 4 & 15) < sun - 1) {
+              skyAddQ.push(wx2, y, wz, sun);
+            }
+          }
+        }
+      }
+      const borderPairs = [
+        { ncx: chunk.cx - 1, ncz: chunk.cz, myX: 0, nbX: 15, fixedZ: false },
+        { ncx: chunk.cx + 1, ncz: chunk.cz, myX: 15, nbX: 0, fixedZ: false },
+        { ncx: chunk.cx, ncz: chunk.cz - 1, myZ: 0, nbZ: 15, fixedZ: true },
+        { ncx: chunk.cx, ncz: chunk.cz + 1, myZ: 15, nbZ: 0, fixedZ: true }
+      ];
+      const topBorderY = Math.min(WORLD_HEIGHT - 1, startScanY + 2);
+      for (let p = 0; p < 4; p++) {
+        const bp2 = borderPairs[p];
+        const neighbor = world.chunks.get(chunkKey(bp2.ncx, bp2.ncz));
+        if (!neighbor || !neighbor.isGenerated) continue;
+        const nbBaseX = bp2.ncx * CHUNK_SIZE;
+        const nbBaseZ = bp2.ncz * CHUNK_SIZE;
+        const nLight = neighbor.light;
+        const nBlocks = neighbor.blocks;
+        for (let i = 0; i < CHUNK_SIZE; i++) {
+          const lx2 = bp2.fixedZ ? i : bp2.myX;
+          const lz = bp2.fixedZ ? bp2.myZ : i;
+          const nx2 = bp2.fixedZ ? i : bp2.nbX;
+          const nz = bp2.fixedZ ? bp2.nbZ : i;
+          for (let y = 0; y <= topBorderY; y++) {
+            const myIdx = y * slice + lz * CHUNK_SIZE + lx2;
+            const nbIdx = y * slice + nz * CHUNK_SIZE + nx2;
+            const mySky = light[myIdx] >> 4 & 15;
+            const nbSky = nLight[nbIdx] >> 4 & 15;
+            const myBlk = light[myIdx] & 15;
+            const nbBlk = nLight[nbIdx] & 15;
+            if (nbSky > mySky + 1 && opacityTable[blocks[myIdx]] < 15) {
+              skyAddQ.push(nbBaseX + nx2, y, nbBaseZ + nz, nbSky);
+            } else if (mySky > nbSky + 1 && opacityTable[nBlocks[nbIdx]] < 15) {
+              skyAddQ.push(baseX + lx2, y, baseZ + lz, mySky);
+            }
+            if (nbBlk > myBlk + 1 && opacityTable[blocks[myIdx]] < 15) {
+              blkAddQ.push(nbBaseX + nx2, y, nbBaseZ + nz, nbBlk);
+            } else if (myBlk > nbBlk + 1 && opacityTable[nBlocks[nbIdx]] < 15) {
+              blkAddQ.push(baseX + lx2, y, baseZ + lz, myBlk);
+            }
+          }
+        }
+      }
+      const touchedChunks = /* @__PURE__ */ new Set();
+      this._runSkyPropagate(world, touchedChunks);
+      this._runBlockPropagate(world, touchedChunks);
+      chunk.lightCalculated = true;
+      for (const tc2 of touchedChunks) {
+        if (tc2 !== chunk) tc2.dirty = true;
+      }
+    }
+    /**
+     * Incremental dual-channel BFS update when a block at (wx, wy, wz) changes from oldId -> newId.
+     * Returns a Set of affected Chunks (excluding none) that need remeshing.
+     */
+    onBlockChanged(world, wx2, wy2, wz, oldId, newId) {
+      const touched = /* @__PURE__ */ new Set();
+      const ref = this._getBlockAndChunk(world, wx2, wy2, wz);
+      if (!ref) return touched;
+      touched.add(ref.chunk);
+      const oldOp = BlockRegistry.getLightOpacity(oldId);
+      const newOp = BlockRegistry.getLightOpacity(newId);
+      const oldEmit = BlockRegistry.getLightEmission(oldId);
+      const newEmit = BlockRegistry.getLightEmission(newId);
+      this.activeRedstone.delete(`${wx2},${wy2},${wz}`);
+      if (newOp !== oldOp) {
+        const skyRemQ = this.skyRemQ;
+        const skyAddQ = this.skyAddQ;
+        skyRemQ.clear();
+        skyAddQ.clear();
+        if (newOp > oldOp) {
+          const oldSky = ref.chunk.light[ref.idx] >> 4 & 15;
+          if (oldSky > 0) {
+            ref.chunk.setSkyLight(ref.lx, wy2, ref.lz, 0);
+            skyRemQ.push(wx2, wy2, wz, oldSky);
+            const aboveRef = this._getBlockAndChunk(world, wx2, wy2 + 1, wz);
+            const aboveSky = wy2 + 1 >= WORLD_HEIGHT ? MAX_LIGHT_LEVEL : aboveRef ? aboveRef.chunk.light[aboveRef.idx] >> 4 & 15 : 0;
+            if (aboveSky === MAX_LIGHT_LEVEL && newOp >= 15) {
+              for (let dy2 = wy2 - 1; dy2 >= 0; dy2--) {
+                const dRef = this._getBlockAndChunk(world, wx2, dy2, wz);
+                if (!dRef) break;
+                const dOp = BlockRegistry.getLightOpacity(dRef.chunk.blocks[dRef.idx]);
+                if (dOp >= 15) break;
+                const dSky = dRef.chunk.light[dRef.idx] >> 4 & 15;
+                if (dSky === 0) break;
+                dRef.chunk.setSkyLight(dRef.lx, dy2, dRef.lz, 0);
+                skyRemQ.push(wx2, dy2, wz, dSky);
+                touched.add(dRef.chunk);
+              }
+            }
+            this._runSkyRemove(world, touched);
+            this._runSkyPropagate(world, touched);
+          }
+        } else {
+          const aboveRef = this._getBlockAndChunk(world, wx2, wy2 + 1, wz);
+          let topSky = wy2 + 1 >= WORLD_HEIGHT ? MAX_LIGHT_LEVEL : aboveRef ? aboveRef.chunk.light[aboveRef.idx] >> 4 & 15 : MAX_LIGHT_LEVEL;
+          if (topSky > 0) {
+            let curSun = newOp === 0 ? topSky : Math.max(0, topSky - newOp);
+            if (topSky < MAX_LIGHT_LEVEL && newOp === 0) {
+              curSun = Math.max(0, topSky - 1);
+            }
+            if (curSun > 0) {
+              ref.chunk.setSkyLight(ref.lx, wy2, ref.lz, curSun);
+              skyAddQ.push(wx2, wy2, wz, curSun);
+              if (curSun === MAX_LIGHT_LEVEL) {
+                for (let dy2 = wy2 - 1; dy2 >= 0; dy2--) {
+                  const dRef = this._getBlockAndChunk(world, wx2, dy2, wz);
+                  if (!dRef) break;
+                  const dOp = BlockRegistry.getLightOpacity(dRef.chunk.blocks[dRef.idx]);
+                  if (dOp >= 15) break;
+                  const nextVal = dOp > 0 ? Math.max(0, MAX_LIGHT_LEVEL - dOp) : MAX_LIGHT_LEVEL;
+                  const prevVal = dRef.chunk.light[dRef.idx] >> 4 & 15;
+                  if (nextVal > prevVal) {
+                    dRef.chunk.setSkyLight(dRef.lx, dy2, dRef.lz, nextVal);
+                    skyAddQ.push(wx2, dy2, wz, nextVal);
+                    touched.add(dRef.chunk);
+                  }
+                  if (nextVal < MAX_LIGHT_LEVEL) break;
+                }
+              }
+            }
+          }
+          for (let d = 0; d < 6; d++) {
+            const dir = DIRS[d];
+            const nRef = this._getBlockAndChunk(world, wx2 + dir[0], wy2 + dir[1], wz + dir[2]);
+            if (!nRef) continue;
+            const nSky = nRef.chunk.light[nRef.idx] >> 4 & 15;
+            if (nSky > 1) {
+              skyAddQ.push(wx2 + dir[0], wy2 + dir[1], wz + dir[2], nSky);
+            }
+          }
+          this._runSkyPropagate(world, touched);
+        }
+      }
+      const blkRemQ = this.blkRemQ;
+      const blkAddQ = this.blkAddQ;
+      blkRemQ.clear();
+      blkAddQ.clear();
+      const curBlk = ref.chunk.light[ref.idx] & 15;
+      if (oldEmit > 0 || newOp >= 15 && curBlk > 0 || curBlk > newEmit && newOp > oldOp) {
+        if (curBlk > 0) {
+          ref.chunk.setBlockLight(ref.lx, wy2, ref.lz, 0);
+          blkRemQ.push(wx2, wy2, wz, curBlk);
+          this._runBlockRemove(world, touched);
+        }
+      }
+      if (newEmit > 0) {
+        const existing = ref.chunk.light[ref.idx] & 15;
+        if (newEmit > existing) {
+          ref.chunk.setBlockLight(ref.lx, wy2, ref.lz, newEmit);
+          blkAddQ.push(wx2, wy2, wz, newEmit);
+        }
+      } else if (newOp < 15) {
+        for (let d = 0; d < 6; d++) {
+          const dir = DIRS[d];
+          const nRef = this._getBlockAndChunk(world, wx2 + dir[0], wy2 + dir[1], wz + dir[2]);
+          if (!nRef) continue;
+          const nBlk = nRef.chunk.light[nRef.idx] & 15;
+          if (nBlk > 1) {
+            blkAddQ.push(wx2 + dir[0], wy2 + dir[1], wz + dir[2], nBlk);
+          }
+        }
+      }
+      if (!blkAddQ.isEmpty) {
+        this._runBlockPropagate(world, touched);
+      }
+      for (const c of touched) {
+        c.dirty = true;
+      }
+      return touched;
+    }
+    /**
+     * Temporarily illuminates Redstone Ore at (wx, wy, wz) at blockLight = 9 for ~4.5 seconds.
+     */
+    triggerRedstoneGlow(world, wx2, wy2, wz) {
+      const fx2 = Math.floor(wx2);
+      const fy2 = Math.floor(wy2);
+      const fz = Math.floor(wz);
+      const ref = this._getBlockAndChunk(world, fx2, fy2, fz);
+      if (!ref) return;
+      const key = `${fx2},${fy2},${fz}`;
+      this.activeRedstone.set(key, { wx: fx2, wy: fy2, wz: fz, ttl: 4.5 });
+      const cur = ref.chunk.light[ref.idx] & 15;
+      if (cur < REDSTONE_GLOW_LEVEL) {
+        ref.chunk.setBlockLight(ref.lx, fy2, ref.lz, REDSTONE_GLOW_LEVEL);
+        this.blkAddQ.clear();
+        this.blkAddQ.push(fx2, fy2, fz, REDSTONE_GLOW_LEVEL);
+        const touched = /* @__PURE__ */ new Set([ref.chunk]);
+        this._runBlockPropagate(world, touched);
+        for (const c of touched) c.dirty = true;
+      }
+    }
+    update(dt, world) {
+      if (this.activeRedstone.size === 0 || !world) return;
+      for (const [key, entry] of this.activeRedstone) {
+        entry.ttl -= dt;
+        if (entry.ttl <= 0) {
+          this.activeRedstone.delete(key);
+          const ref = this._getBlockAndChunk(world, entry.wx, entry.wy, entry.wz);
+          if (!ref) continue;
+          const cur = ref.chunk.light[ref.idx] & 15;
+          if (cur > 0) {
+            ref.chunk.setBlockLight(ref.lx, entry.wy, ref.lz, 0);
+            this.blkRemQ.clear();
+            this.blkAddQ.clear();
+            this.blkRemQ.push(entry.wx, entry.wy, entry.wz, cur);
+            const touched = /* @__PURE__ */ new Set([ref.chunk]);
+            this._runBlockRemove(world, touched);
+            this._runBlockPropagate(world, touched);
+            for (const c of touched) c.dirty = true;
+          }
+        }
+      }
+    }
+    _runSkyPropagate(world, touched) {
+      const q = this.skyAddQ;
+      const node = this._node;
+      const opacityTable = BlockRegistry.opacityTable;
+      while (!q.isEmpty) {
+        q.popInto(node);
+        const val = node.val;
+        if (val <= 1) continue;
+        for (let d = 0; d < 6; d++) {
+          const dir = DIRS[d];
+          const nx2 = node.x + dir[0];
+          const ny2 = node.y + dir[1];
+          const nz = node.z + dir[2];
+          const ref = this._getBlockAndChunk(world, nx2, ny2, nz);
+          if (!ref) continue;
+          const op2 = opacityTable[ref.chunk.blocks[ref.idx]];
+          if (op2 >= 15) continue;
+          let nextLight;
+          if (dir[1] === -1 && val === MAX_LIGHT_LEVEL) {
+            nextLight = op2 > 0 ? Math.max(0, MAX_LIGHT_LEVEL - op2) : MAX_LIGHT_LEVEL;
+          } else {
+            const step = op2 > 0 ? op2 : 1;
+            nextLight = val - step;
+          }
+          if (nextLight <= 0) continue;
+          const curSky = ref.chunk.light[ref.idx] >> 4 & 15;
+          if (curSky < nextLight) {
+            ref.chunk.setSkyLight(ref.lx, ny2, ref.lz, nextLight);
+            touched.add(ref.chunk);
+            if (nextLight > 1 || dir[1] === -1 && nextLight === MAX_LIGHT_LEVEL) {
+              q.push(nx2, ny2, nz, nextLight);
+            }
+          }
+        }
+      }
+    }
+    _runSkyRemove(world, touched) {
+      const remQ = this.skyRemQ;
+      const addQ = this.skyAddQ;
+      const node = this._node;
+      while (!remQ.isEmpty) {
+        remQ.popInto(node);
+        const oldVal = node.val;
+        for (let d = 0; d < 6; d++) {
+          const dir = DIRS[d];
+          const nx2 = node.x + dir[0];
+          const ny2 = node.y + dir[1];
+          const nz = node.z + dir[2];
+          const ref = this._getBlockAndChunk(world, nx2, ny2, nz);
+          if (!ref) continue;
+          const nSky = ref.chunk.light[ref.idx] >> 4 & 15;
+          if (nSky === 0) continue;
+          if (nSky < oldVal || dir[1] === -1 && oldVal === MAX_LIGHT_LEVEL && nSky === MAX_LIGHT_LEVEL) {
+            ref.chunk.setSkyLight(ref.lx, ny2, ref.lz, 0);
+            touched.add(ref.chunk);
+            remQ.push(nx2, ny2, nz, nSky);
+          } else if (nSky >= oldVal) {
+            addQ.push(nx2, ny2, nz, nSky);
+          }
+        }
+      }
+    }
+    _runBlockPropagate(world, touched) {
+      const q = this.blkAddQ;
+      const node = this._node;
+      const opacityTable = BlockRegistry.opacityTable;
+      while (!q.isEmpty) {
+        q.popInto(node);
+        const val = node.val;
+        if (val <= 1) continue;
+        for (let d = 0; d < 6; d++) {
+          const dir = DIRS[d];
+          const nx2 = node.x + dir[0];
+          const ny2 = node.y + dir[1];
+          const nz = node.z + dir[2];
+          const ref = this._getBlockAndChunk(world, nx2, ny2, nz);
+          if (!ref) continue;
+          const op2 = opacityTable[ref.chunk.blocks[ref.idx]];
+          if (op2 >= 15) continue;
+          const step = op2 > 0 ? op2 : 1;
+          const nextLight = val - step;
+          if (nextLight <= 0) continue;
+          const curBlk = ref.chunk.light[ref.idx] & 15;
+          if (curBlk < nextLight) {
+            ref.chunk.setBlockLight(ref.lx, ny2, ref.lz, nextLight);
+            touched.add(ref.chunk);
+            if (nextLight > 1) {
+              q.push(nx2, ny2, nz, nextLight);
+            }
+          }
+        }
+      }
+    }
+    _runBlockRemove(world, touched) {
+      const remQ = this.blkRemQ;
+      const addQ = this.blkAddQ;
+      const node = this._node;
+      const emissionTable = BlockRegistry.emissionTable;
+      while (!remQ.isEmpty) {
+        remQ.popInto(node);
+        const oldVal = node.val;
+        for (let d = 0; d < 6; d++) {
+          const dir = DIRS[d];
+          const nx2 = node.x + dir[0];
+          const ny2 = node.y + dir[1];
+          const nz = node.z + dir[2];
+          const ref = this._getBlockAndChunk(world, nx2, ny2, nz);
+          if (!ref) continue;
+          const nBlk = ref.chunk.light[ref.idx] & 15;
+          if (nBlk === 0) continue;
+          const emit = emissionTable[ref.chunk.blocks[ref.idx]];
+          if (nBlk < oldVal && emit === 0) {
+            ref.chunk.setBlockLight(ref.lx, ny2, ref.lz, 0);
+            touched.add(ref.chunk);
+            remQ.push(nx2, ny2, nz, nBlk);
+          } else if (nBlk >= oldVal || emit > 0) {
+            addQ.push(nx2, ny2, nz, Math.max(nBlk, emit));
+          }
+        }
+      }
     }
   };
 
@@ -21726,6 +23600,7 @@ void main() {
       this.onBlockChanged = options.onBlockChanged || null;
       this.worldGen = new WorldGen(seed);
       this.mesher = new ChunkMesher(atlas);
+      this.lighting = new LightingEngine();
       this.chunks = /* @__PURE__ */ new Map();
       this.chunkDataCache = /* @__PURE__ */ new Map();
       this.modifiedBlocks = /* @__PURE__ */ new Map();
@@ -21733,6 +23608,7 @@ void main() {
       this.lastPlayerChunkX = null;
       this.lastPlayerChunkZ = null;
       this.pendingCoords = [];
+      this._neighborScratch = new Array(9);
       this.workers = [];
       this.workerUrl = null;
       this.inFlightKeys = /* @__PURE__ */ new Set();
@@ -21741,7 +23617,7 @@ void main() {
       if (options.useWorkers !== false && typeof Worker !== "undefined") {
         this._initWorkers();
       }
-      this.skyColor = new bt("#8ec5ff");
+      this.skyColor = new bt("#a4d4ff");
       this.scene.background = this.skyColor;
       this._updateFog();
     }
@@ -21795,8 +23671,11 @@ void main() {
             this.chunkDataCache.set(key, {
               blocks: new Uint8Array(blocks),
               biomes: new Uint8Array(biomes),
+              light: null,
+              meta: null,
               minY,
-              maxY
+              maxY,
+              lightCalculated: false
             });
           }
           return;
@@ -21810,16 +23689,23 @@ void main() {
       chunk.isGenerated = true;
       chunk.dirty = true;
       this._applyModifiedBlocksToChunk(chunk);
-      if (this.unlimitedMemory) {
-        this.chunkDataCache.set(key, {
-          blocks: chunk.blocks,
-          biomes: chunk.biomes,
-          minY: chunk.minY,
-          maxY: chunk.maxY
-        });
-      }
       this.chunks.set(key, chunk);
-      this._markNeighborsDirty(cx2, cz);
+      this.lighting.initChunkLighting(this, chunk);
+      if (this.unlimitedMemory) {
+        this._saveToCache(chunk);
+      }
+      this._markOrthogonalNeighborsDirty(cx2, cz);
+    }
+    _saveToCache(chunk) {
+      this.chunkDataCache.set(chunk.key, {
+        blocks: chunk.blocks,
+        biomes: chunk.biomes,
+        light: chunk.light,
+        meta: chunk.meta,
+        minY: chunk.minY,
+        maxY: chunk.maxY,
+        lightCalculated: chunk.lightCalculated
+      });
     }
     setRenderDistance(distance) {
       this.renderDistance = distance;
@@ -21830,6 +23716,12 @@ void main() {
     setFogEnabled(enabled) {
       this.fogEnabled = Boolean(enabled);
       this._updateFog();
+    }
+    setSkyColor(color) {
+      this.skyColor.copy(color);
+      if (this.scene.fog) {
+        this.scene.fog.color.copy(this.skyColor);
+      }
     }
     setUnlimitedMemory(enabled) {
       this.unlimitedMemory = Boolean(enabled);
@@ -21847,8 +23739,12 @@ void main() {
       if (!Array.isArray(entries)) return;
       for (const item of entries) {
         if (!Array.isArray(item) || item.length < 4) continue;
-        const [wx2, wy2, wz, id2] = item;
-        this.modifiedBlocks.set(`${wx2},${wy2},${wz}`, id2);
+        const wx2 = item[0];
+        const wy2 = item[1];
+        const wz = item[2];
+        const id2 = item[3];
+        const meta = item.length >= 5 ? item[4] | 0 : 0;
+        this.modifiedBlocks.set(`${wx2},${wy2},${wz}`, { id: id2, meta });
         const cx2 = Math.floor(wx2 / CHUNK_SIZE);
         const cz = Math.floor(wz / CHUNK_SIZE);
         const lx2 = wx2 - cx2 * CHUNK_SIZE;
@@ -21859,18 +23755,23 @@ void main() {
           list = [];
           this.modifiedByChunk.set(cKey, list);
         }
-        list.push([lx2, wy2, lz, id2]);
+        list.push([lx2, wy2, lz, id2, meta]);
         const chunk = this.chunks.get(cKey);
         if (chunk && chunk.isGenerated) {
-          chunk.setBlock(lx2, wy2, lz, id2);
+          chunk.setBlock(lx2, wy2, lz, id2, meta);
+          chunk.lightCalculated = false;
         }
       }
     }
     exportModifiedBlocks() {
       const out = [];
-      for (const [coordKey, id2] of this.modifiedBlocks) {
+      for (const [coordKey, entry] of this.modifiedBlocks) {
         const parts = coordKey.split(",");
-        out.push([Number(parts[0]), Number(parts[1]), Number(parts[2]), id2]);
+        if (entry.meta) {
+          out.push([Number(parts[0]), Number(parts[1]), Number(parts[2]), entry.id, entry.meta]);
+        } else {
+          out.push([Number(parts[0]), Number(parts[1]), Number(parts[2]), entry.id]);
+        }
       }
       return out;
     }
@@ -21905,6 +23806,34 @@ void main() {
       const lz = fz - cz * CHUNK_SIZE;
       return chunk.getBlock(lx2, fy2, lz);
     }
+    getBlockMeta(wx2, wy2, wz) {
+      if (wy2 < 0 || wy2 >= WORLD_HEIGHT) return 0;
+      const fx2 = Math.floor(wx2);
+      const fy2 = Math.floor(wy2);
+      const fz = Math.floor(wz);
+      const cx2 = Math.floor(fx2 / CHUNK_SIZE);
+      const cz = Math.floor(fz / CHUNK_SIZE);
+      const chunk = this.chunks.get(chunkKey(cx2, cz));
+      if (!chunk || !chunk.isGenerated) return 0;
+      return chunk.getMeta(fx2 - cx2 * CHUNK_SIZE, fy2, fz - cz * CHUNK_SIZE);
+    }
+    getLightAt(wx2, wy2, wz) {
+      if (wy2 >= WORLD_HEIGHT) return { sky: 15, block: 0 };
+      if (wy2 < 0) return { sky: 0, block: 0 };
+      const fx2 = Math.floor(wx2);
+      const fy2 = Math.floor(wy2);
+      const fz = Math.floor(wz);
+      const cx2 = Math.floor(fx2 / CHUNK_SIZE);
+      const cz = Math.floor(fz / CHUNK_SIZE);
+      const chunk = this.chunks.get(chunkKey(cx2, cz));
+      if (!chunk || !chunk.isGenerated) return { sky: 15, block: 0 };
+      const lx2 = fx2 - cx2 * CHUNK_SIZE;
+      const lz = fz - cz * CHUNK_SIZE;
+      return {
+        sky: chunk.getSkyLight(lx2, fy2, lz),
+        block: chunk.getBlockLight(lx2, fy2, lz)
+      };
+    }
     getBiomeAt(wx2, wz) {
       const fx2 = Math.floor(wx2);
       const fz = Math.floor(wz);
@@ -21921,10 +23850,10 @@ void main() {
       return BIOME_NAMES[id2] || BIOME_NAMES[0];
     }
     /**
-     * Sets a block at world coordinates, records offline delta, optionally rebuilds bordering
-     * neighbor chunks immediately, and triggers gravity checks for sand/gravel when edited.
+     * Sets a block at world coordinates with optional metadata, updates BFS dual lighting,
+     * rebuilds bordering & light-touched chunks immediately, and triggers neighbor/gravity hooks.
      */
-    setBlock(wx2, wy2, wz, id2, rebuildImmediate = true, triggerGravity = true) {
+    setBlock(wx2, wy2, wz, id2, rebuildImmediate = true, triggerGravity = true, meta = 0) {
       if (wy2 < 0 || wy2 >= WORLD_HEIGHT) return false;
       const fx2 = Math.floor(wx2);
       const fy2 = Math.floor(wy2);
@@ -21935,30 +23864,34 @@ void main() {
       if (!chunk || !chunk.isGenerated) return false;
       const lx2 = fx2 - cx2 * CHUNK_SIZE;
       const lz = fz - cz * CHUNK_SIZE;
-      if (!chunk.setBlock(lx2, fy2, lz, id2)) return false;
-      this.modifiedBlocks.set(`${fx2},${fy2},${fz}`, id2);
+      const oldId = chunk.getBlock(lx2, fy2, lz);
+      const oldMeta = chunk.getMeta(lx2, fy2, lz);
+      if (oldId === id2 && oldMeta === meta) return false;
+      if (!chunk.setBlock(lx2, fy2, lz, id2, meta)) return false;
+      this.modifiedBlocks.set(`${fx2},${fy2},${fz}`, { id: id2, meta });
       let cMods = this.modifiedByChunk.get(chunk.key);
       if (!cMods) {
         cMods = [];
         this.modifiedByChunk.set(chunk.key, cMods);
       }
       const existingMod = cMods.find((m) => m[0] === lx2 && m[1] === fy2 && m[2] === lz);
-      if (existingMod) existingMod[3] = id2;
-      else cMods.push([lx2, fy2, lz, id2]);
-      if (this.unlimitedMemory) {
-        this.chunkDataCache.set(chunk.key, {
-          blocks: chunk.blocks,
-          biomes: chunk.biomes,
-          minY: chunk.minY,
-          maxY: chunk.maxY
-        });
+      if (existingMod) {
+        existingMod[3] = id2;
+        existingMod[4] = meta;
+      } else {
+        cMods.push([lx2, fy2, lz, id2, meta]);
       }
-      const rebuildTargets = [chunk];
+      const touchedChunks = this.lighting.onBlockChanged(this, fx2, fy2, fz, oldId, id2);
+      if (this.unlimitedMemory) {
+        this._saveToCache(chunk);
+      }
+      const rebuildTargets = new Set(touchedChunks);
+      rebuildTargets.add(chunk);
       const pushNeighborIfPresent = (ncx, ncz) => {
         const n = this.chunks.get(chunkKey(ncx, ncz));
         if (n && n.isGenerated) {
           n.dirty = true;
-          rebuildTargets.push(n);
+          rebuildTargets.add(n);
         }
       };
       if (lx2 === 0) pushNeighborIfPresent(cx2 - 1, cz);
@@ -21969,15 +23902,21 @@ void main() {
       if (lx2 === CHUNK_SIZE - 1 && lz === 0) pushNeighborIfPresent(cx2 + 1, cz - 1);
       if (lx2 === 0 && lz === CHUNK_SIZE - 1) pushNeighborIfPresent(cx2 - 1, cz + 1);
       if (lx2 === CHUNK_SIZE - 1 && lz === CHUNK_SIZE - 1) pushNeighborIfPresent(cx2 + 1, cz + 1);
+      for (const target of rebuildTargets) {
+        target.dirty = true;
+      }
       if (rebuildImmediate) {
         for (const target of rebuildTargets) {
           this._rebuildChunkMesh(target);
         }
       }
       if (triggerGravity && this.onBlockChanged) {
-        this.onBlockChanged(fx2, fy2, fz, id2);
+        this.onBlockChanged(fx2, fy2, fz, id2, oldId, oldMeta);
       }
       return true;
+    }
+    triggerRedstoneGlow(wx2, wy2, wz) {
+      this.lighting.triggerRedstoneGlow(this, wx2, wy2, wz);
     }
     getSurfaceHeightAt(wx2, wz) {
       const fx2 = Math.floor(wx2);
@@ -22003,15 +23942,11 @@ void main() {
         chunk.dirty = true;
       }
     }
-    _markNeighborsDirty(cx2, cz) {
+    _markOrthogonalNeighborsDirty(cx2, cz) {
       this._markDirty(cx2 - 1, cz);
       this._markDirty(cx2 + 1, cz);
       this._markDirty(cx2, cz - 1);
       this._markDirty(cx2, cz + 1);
-      this._markDirty(cx2 - 1, cz - 1);
-      this._markDirty(cx2 + 1, cz - 1);
-      this._markDirty(cx2 - 1, cz + 1);
-      this._markDirty(cx2 + 1, cz + 1);
     }
     preloadSpawnArea(playerX, playerZ, radius = 2) {
       const pcx = Math.floor(playerX / CHUNK_SIZE);
@@ -22043,9 +23978,9 @@ void main() {
       const mods = this.modifiedByChunk.get(chunk.key);
       if (!mods || mods.length === 0) return;
       for (let i = 0; i < mods.length; i++) {
-        const [lx2, wy2, lz, id2] = mods[i];
+        const [lx2, wy2, lz, id2, meta] = mods[i];
         if (wy2 >= 0 && wy2 < WORLD_HEIGHT) {
-          chunk.setBlock(lx2, wy2, lz, id2);
+          chunk.setBlock(lx2, wy2, lz, id2, meta || 0);
         }
       }
     }
@@ -22058,25 +23993,26 @@ void main() {
         if (cached) {
           chunk.blocks = cached.blocks;
           chunk.biomes = cached.biomes;
+          if (cached.light) chunk.light = cached.light;
+          if (cached.meta) chunk.meta = cached.meta;
           chunk.minY = cached.minY;
           chunk.maxY = cached.maxY;
           chunk.isGenerated = true;
+          chunk.lightCalculated = Boolean(cached.lightCalculated);
           chunk.dirty = true;
           this._applyModifiedBlocksToChunk(chunk);
         } else {
           this.worldGen.generateChunk(chunk);
           this._applyModifiedBlocksToChunk(chunk);
-          if (this.unlimitedMemory) {
-            this.chunkDataCache.set(key, {
-              blocks: chunk.blocks,
-              biomes: chunk.biomes,
-              minY: chunk.minY,
-              maxY: chunk.maxY
-            });
-          }
         }
         this.chunks.set(key, chunk);
-        this._markNeighborsDirty(cx2, cz);
+        if (!chunk.lightCalculated) {
+          this.lighting.initChunkLighting(this, chunk);
+        }
+        if (this.unlimitedMemory) {
+          this._saveToCache(chunk);
+        }
+        this._markOrthogonalNeighborsDirty(cx2, cz);
       }
       return chunk;
     }
@@ -22103,10 +24039,14 @@ void main() {
       const oldOpaque = chunk.opaqueMesh;
       const oldCutout = chunk.cutoutMesh;
       const oldWater = chunk.waterMesh;
-      const { opaqueGeometry, cutoutGeometry, waterGeometry } = this.mesher.buildChunkGeometries(
-        chunk,
-        (wx2, wy2, wz) => this.getBlock(wx2, wy2, wz)
-      );
+      const nb = this._neighborScratch;
+      let ni2 = 0;
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx2 = -1; dx2 <= 1; dx2++) {
+          nb[ni2++] = dx2 === 0 && dz === 0 ? chunk : this.chunks.get(chunkKey(chunk.cx + dx2, chunk.cz + dz)) || null;
+        }
+      }
+      const { opaqueGeometry, cutoutGeometry, waterGeometry } = this.mesher.buildChunkGeometries(chunk, nb);
       const worldX = chunk.cx * CHUNK_SIZE;
       const worldZ = chunk.cz * CHUNK_SIZE;
       if (oldOpaque) {
@@ -22155,7 +24095,8 @@ void main() {
       chunk.dirty = false;
       chunk.hasMeshed = true;
     }
-    update(playerX, playerZ) {
+    update(playerX, playerZ, dt = 0.016) {
+      this.lighting.update(dt, this);
       const pcx = Math.floor(playerX / CHUNK_SIZE);
       const pcz = Math.floor(playerZ / CHUNK_SIZE);
       if (pcx !== this.lastPlayerChunkX || pcz !== this.lastPlayerChunkZ) {
@@ -22167,12 +24108,7 @@ void main() {
           const dz = chunk.cz - pcz;
           if (dx2 * dx2 + dz * dz > unloadDistSq) {
             if (this.unlimitedMemory) {
-              this.chunkDataCache.set(key, {
-                blocks: chunk.blocks,
-                biomes: chunk.biomes,
-                minY: chunk.minY,
-                maxY: chunk.maxY
-              });
+              this._saveToCache(chunk);
             } else {
               this.chunkDataCache.delete(key);
             }
@@ -22213,6 +24149,7 @@ void main() {
     dispose() {
       this.disposed = true;
       this._terminateWorkers();
+      this.lighting.clear();
       for (const chunk of this.chunks.values()) {
         chunk.disposeMeshes(this.scene);
       }
@@ -22228,6 +24165,16 @@ void main() {
   function randomWorldSeed() {
     return Math.floor(Math.random() * 2147483647) + 1 | 0;
   }
+  var DIR_OFFSETS = [
+    [0, -1],
+    // 0: North (-Z)
+    [1, 0],
+    // 1: East (+X)
+    [0, 1],
+    // 2: South (+Z)
+    [-1, 0]
+    // 3: West (-X)
+  ];
   var MinecraftGame = class {
     constructor() {
       this.canvas = document.getElementById("game-canvas");
@@ -22243,11 +24190,12 @@ void main() {
         0.08,
         720
       );
-      const entityAmbient = new dl(16777215, 0.78);
-      const entitySun = new ul(16774885, 0.78);
+      const entityAmbient = new dl(16777215, 0.85);
+      const entitySun = new ul(16774885, 0.72);
       entitySun.position.set(1.2, 2.2, 1);
       this.scene.add(entityAmbient, entitySun);
-      this.skyEnv = new SkyEnvironment(this.scene);
+      this.skyRenderer = new SkyRenderer(this.scene, DEFAULT_WORLD_TIME, 1);
+      this.menuPanorama = new MenuPanorama();
       const isTouchDevice = MobileControls.detectTouchDevice();
       this.settings = {
         touchMode: isTouchDevice,
@@ -22283,9 +24231,11 @@ void main() {
       this.activeWorldId = null;
       this.activeWorldName = "\u041C\u043E\u0439 \u043C\u0438\u0440";
       this.worldSeed = randomWorldSeed();
+      this.spawnPoint = null;
       this.currentTargetHit = null;
       this.creativeBreakTimer = 0;
       this.wasMiningHeld = false;
+      this.isSleeping = false;
       this.lastFrameTime = performance.now();
       this.tickAccumulator = 0;
       this.tickCount = 0;
@@ -22305,14 +24255,14 @@ void main() {
       if (this.mobileControls) this.mobileControls.touchSensitivity = 52e-4 * mult;
     }
     async init() {
-      this._setLoadingText("\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A \u0438 \u043C\u0438\u0440\u043E\u0432...");
+      this._setLoadingText("\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A \u0438 \u0441\u043F\u0438\u0441\u043A\u0430 \u043C\u0438\u0440\u043E\u0432...");
       await this.saveManager.init();
       const savedSettings = await this.saveManager.loadSettings();
       if (savedSettings) {
         Object.assign(this.settings, savedSettings);
       }
       this._applyPixelRatio();
-      this.skyEnv.setCloudsEnabled(this.settings.cloudsEnabled);
+      this.skyRenderer.setCloudsEnabled(this.settings.cloudsEnabled);
       this.hotbar = new Hotbar(this.atlas, {
         creativeMode: this.gameMode === "creative",
         onChange: (slot, shouldSave) => {
@@ -22360,9 +24310,15 @@ void main() {
         },
         onExitToMenu: async () => {
           await this.saveNow();
+          this._unloadWorldFromEngine();
           this.hud.showMainMenu(true);
           const list = await this.saveManager.listWorlds();
           this.hud.renderWorldsList(list, this.activeWorldId);
+        },
+        onSetWorldTime: (ticks) => {
+          this.skyRenderer.setTime(ticks);
+          this.hud.showToast(`\u0412\u0440\u0435\u043C\u044F: ${this.skyRenderer.getFormattedClock()}`);
+          this._scheduleSave();
         },
         onToggleControlMode: () => {
           this.setTouchMode(!this.settings.touchMode);
@@ -22391,7 +24347,7 @@ void main() {
         },
         onToggleCloudsMode: () => {
           this.settings.cloudsEnabled = !this.settings.cloudsEnabled;
-          this.skyEnv.setCloudsEnabled(this.settings.cloudsEnabled);
+          this.skyRenderer.setCloudsEnabled(this.settings.cloudsEnabled);
           this.hud.setCloudsEnabledLabel(this.settings.cloudsEnabled);
           this.saveSettingsOnly();
         },
@@ -22415,8 +24371,7 @@ void main() {
         const first = await this.saveManager.createWorld({ name: "\u041D\u043E\u0432\u044B\u0439 \u043C\u0438\u0440", seed: randomWorldSeed() });
         worlds = [first];
       }
-      await this.loadWorldIntoEngine(worlds[0].id);
-      this.mobileControls = new MobileControls(this.player, {
+      this.mobileControls = new MobileControls(null, {
         onStatusToast: (msg) => this.hud.showToast(msg)
       });
       this.setTouchMode(this.settings.touchMode, false);
@@ -22443,11 +24398,13 @@ void main() {
       this.hud.setRenderDistanceUI(this.settings.renderDistance);
       this.hud.setSensitivityUI(this.settings.sensitivity);
     }
-    async loadWorldIntoEngine(worldId) {
+    _unloadWorldFromEngine() {
       this.itemManager.clear();
       this.fallingManager.clear();
+      this.selectionBox.update(null);
       this.currentTargetHit = null;
       this.creativeBreakTimer = 0;
+      this.isSleeping = false;
       if (this.world) {
         this.world.dispose();
         this.world = null;
@@ -22456,19 +24413,58 @@ void main() {
         this.player.dispose();
         this.player = null;
       }
+      if (this.mobileControls) {
+        this.mobileControls.player = null;
+      }
+    }
+    _handleBlockSideEffects(wx2, wy2, wz, newId, oldId, oldMeta) {
+      if (!this.world) return;
+      if (BlockRegistry.fallsWithGravity(newId)) {
+        this.fallingManager.scheduleStabilityCheck(wx2, wy2, wz);
+      } else {
+        this.fallingManager.scheduleStabilityCheck(wx2, wy2 + 1, wz);
+      }
+      if (newId === 0 && oldId !== 0) {
+        const checkSupportTorch = (tx2, ty2, tz, expectedMeta) => {
+          if (this.world.getBlock(tx2, ty2, tz) === BLOCK_IDS.TORCH && this.world.getBlockMeta(tx2, ty2, tz) === expectedMeta) {
+            this.world.setBlock(tx2, ty2, tz, 0, true, false);
+            this.itemManager.spawnDrop(BLOCK_IDS.TORCH, tx2 + 0.5, ty2 + 0.3, tz + 0.5, 1);
+          }
+        };
+        checkSupportTorch(wx2, wy2 + 1, wz, 0);
+        checkSupportTorch(wx2 + 1, wy2, wz, 1);
+        checkSupportTorch(wx2 - 1, wy2, wz, 2);
+        checkSupportTorch(wx2, wy2, wz + 1, 3);
+        checkSupportTorch(wx2, wy2, wz - 1, 4);
+      }
+      if (newId === 0 && (oldId === BLOCK_IDS.BED_FOOT || oldId === BLOCK_IDS.BED_HEAD)) {
+        const dir = oldMeta & 3;
+        const [dx2, dz] = DIR_OFFSETS[dir] || DIR_OFFSETS[0];
+        if (oldId === BLOCK_IDS.BED_FOOT) {
+          if (this.world.getBlock(wx2 + dx2, wy2, wz + dz) === BLOCK_IDS.BED_HEAD) {
+            this.world.setBlock(wx2 + dx2, wy2, wz + dz, 0, true, false);
+          }
+        } else if (this.world.getBlock(wx2 - dx2, wy2, wz - dz) === BLOCK_IDS.BED_FOOT) {
+          this.world.setBlock(wx2 - dx2, wy2, wz - dz, 0, true, false);
+        }
+      }
+    }
+    async loadWorldIntoEngine(worldId) {
+      this._unloadWorldFromEngine();
       const saved = await this.saveManager.loadWorld(worldId);
       this.activeWorldId = worldId;
       this.activeWorldName = saved?.name || "\u041C\u043E\u0439 \u043C\u0438\u0440";
       this.worldSeed = Number.isFinite(saved?.worldSeed) ? saved.worldSeed : randomWorldSeed();
+      this.spawnPoint = saved?.spawnPoint || null;
+      this.skyRenderer.setTime(
+        Number.isFinite(saved?.worldTime) ? saved.worldTime : DEFAULT_WORLD_TIME,
+        Number.isFinite(saved?.dayCount) ? saved.dayCount : 1
+      );
       this.world = new World(this.scene, this.atlas, this.worldSeed, this.settings.renderDistance, {
         unlimitedMemory: this.settings.unlimitedMemory,
         fogEnabled: this.settings.fogEnabled,
-        onBlockChanged: (wx2, wy2, wz, id2) => {
-          if (BlockRegistry.fallsWithGravity(id2)) {
-            this.fallingManager.scheduleStabilityCheck(wx2, wy2, wz);
-          } else {
-            this.fallingManager.scheduleStabilityCheck(wx2, wy2 + 1, wz);
-          }
+        onBlockChanged: (wx2, wy2, wz, id2, oldId, oldMeta) => {
+          this._handleBlockSideEffects(wx2, wy2, wz, id2, oldId, oldMeta);
         }
       });
       if (saved?.modifiedBlocks) {
@@ -22499,6 +24495,9 @@ void main() {
         while (this.player.y < WORLD_HEIGHT - 3 && collidesWithWorld(this.world, this.player.x, this.player.y, this.player.z, PLAYER_HALF_WIDTH, 1.8)) {
           this.player.y += 1;
         }
+        if (!this.spawnPoint) {
+          this.spawnPoint = { x: this.player.x, y: this.player.y, z: this.player.z };
+        }
       }
       if (saved?.hotbar) {
         this.hotbar.loadState(saved.hotbar);
@@ -22507,11 +24506,12 @@ void main() {
       }
       const initSlot = this.hotbar.getSelectedSlot();
       this.firstPersonHand.setHeldBlock(initSlot ? initSlot.id : 0);
+      this.skyRenderer.update(1e-3, this.player.x, this.player.y, this.player.z, this.world);
       this.player.update(1e-3);
     }
     async enterWorld(worldId) {
       this.loadingOverlay?.classList.remove("hidden");
-      this._setLoadingText("\u0413\u0435\u043D\u0435\u0440\u0430\u0446\u0438\u044F \u0431\u0438\u043E\u043C\u043E\u0432, \u043F\u0435\u0449\u0435\u0440 \u0438 \u0440\u0443\u0434...");
+      this._setLoadingText("\u0413\u0435\u043D\u0435\u0440\u0430\u0446\u0438\u044F \u0431\u0438\u043E\u043C\u043E\u0432, \u043F\u0435\u0449\u0435\u0440 \u0438 \u0432\u043E\u043A\u0441\u0435\u043B\u044C\u043D\u043E\u0433\u043E \u0441\u0432\u0435\u0442\u0430...");
       await this.loadWorldIntoEngine(worldId);
       await this.saveNow();
       this._syncSettingsUI();
@@ -22538,23 +24538,58 @@ void main() {
         this.saveSettingsOnly();
       }
     }
+    _getPlayerHorizontalDir() {
+      const lookX = -Math.sin(this.player.yaw);
+      const lookZ = -Math.cos(this.player.yaw);
+      if (Math.abs(lookZ) >= Math.abs(lookX)) {
+        return lookZ < 0 ? 0 : 2;
+      }
+      return lookX > 0 ? 1 : 3;
+    }
     _handlePickBlock() {
       const hit = this.currentTargetHit;
       if (!hit || hit.blockId <= 0) return;
-      const def = BlockRegistry.get(hit.blockId);
+      let pickId = hit.blockId;
+      if (pickId === BLOCK_IDS.BED_HEAD) pickId = BLOCK_IDS.BED_FOOT;
+      const def = BlockRegistry.get(pickId);
       if (!def || def.isLiquid) return;
       this.hotbar.pickBlock(def.id);
       this.hud.showToast(`\u0412\u044B\u0431\u0440\u0430\u043D \u0431\u043B\u043E\u043A: ${def.name}`);
     }
+    _interactWithBed(hit) {
+      if (this.isSleeping) return true;
+      this.spawnPoint = { x: hit.x + 0.5, y: hit.y + 0.6, z: hit.z + 0.5 };
+      const t = this.skyRenderer.worldTime;
+      if (t >= SLEEP_START_TICK && t <= SLEEP_END_TICK) {
+        this.isSleeping = true;
+        this.hud.playSleepTransition(() => {
+          this.skyRenderer.sleepToMorning();
+          this.skyRenderer.update(1e-3, this.player.x, this.player.y, this.player.z, this.world);
+          this.isSleeping = false;
+          this.hud.showToast("\u0422\u043E\u0447\u043A\u0430 \u0432\u043E\u0437\u0440\u043E\u0436\u0434\u0435\u043D\u0438\u044F \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430");
+          this._scheduleSave();
+        });
+      } else {
+        this.hud.showToast("\u0421\u043F\u0430\u0442\u044C \u043C\u043E\u0436\u043D\u043E \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u043E\u0447\u044C\u044E");
+        this._scheduleSave();
+      }
+      return true;
+    }
     _handlePlaceBlock() {
       const hit = this.currentTargetHit;
-      if (!hit) return false;
+      if (!hit || !this.world || !this.player) return false;
+      const targetDef = BlockRegistry.get(hit.blockId);
+      if (targetDef.isBed && !this.player.isCrouching) {
+        return this._interactWithBed(hit);
+      }
+      if (targetDef.redstoneGlow) {
+        this.world.triggerRedstoneGlow(hit.x, hit.y, hit.z);
+      }
       if (!hit.normal || hit.normal.x === 0 && hit.normal.y === 0 && hit.normal.z === 0) {
         return false;
       }
       const slot = this.hotbar.getSelectedSlot();
       if (!slot || slot.id <= 0) return false;
-      const targetDef = BlockRegistry.get(hit.blockId);
       const px2 = targetDef.isCross ? hit.x : hit.x + hit.normal.x;
       const py2 = targetDef.isCross ? hit.y : hit.y + hit.normal.y;
       const pz = targetDef.isCross ? hit.z : hit.z + hit.normal.z;
@@ -22563,6 +24598,44 @@ void main() {
       const existingDef = BlockRegistry.get(existing);
       if (existing !== 0 && !existingDef.isLiquid && !existingDef.isCross) return false;
       const placedDef = BlockRegistry.get(slot.id);
+      if (placedDef.isTorch) {
+        if (hit.normal.y === -1) return false;
+        let torchMeta = 0;
+        if (targetDef.isCross) {
+          if (!BlockRegistry.isSolid(this.world.getBlock(px2, py2 - 1, pz))) return false;
+        } else if (hit.normal.y === 1) {
+          if (!BlockRegistry.isSolid(this.world.getBlock(hit.x, hit.y, hit.z))) return false;
+          torchMeta = 0;
+        } else {
+          if (!BlockRegistry.isSolid(this.world.getBlock(hit.x, hit.y, hit.z))) return false;
+          if (hit.normal.x === 1) torchMeta = 1;
+          else if (hit.normal.x === -1) torchMeta = 2;
+          else if (hit.normal.z === 1) torchMeta = 3;
+          else if (hit.normal.z === -1) torchMeta = 4;
+        }
+        if (!this.world.setBlock(px2, py2, pz, BLOCK_IDS.TORCH, true, true, torchMeta)) return false;
+        if (this.gameMode !== "creative") this.hotbar.consumeSelected(1);
+        this._scheduleSave();
+        return true;
+      }
+      if (placedDef.isBed) {
+        const dir = this._getPlayerHorizontalDir();
+        const [dx2, dz] = DIR_OFFSETS[dir];
+        const hx2 = px2 + dx2;
+        const hz = pz + dz;
+        const headExisting = this.world.getBlock(hx2, py2, hz);
+        const headDef = BlockRegistry.get(headExisting);
+        if (headExisting !== 0 && !headDef.isLiquid && !headDef.isCross) return false;
+        const playerH = this.player.getCurrentHitboxHeight();
+        if (aabbIntersectsBlock(this.player.x, this.player.y, this.player.z, PLAYER_HALF_WIDTH, playerH, px2, py2, pz) || aabbIntersectsBlock(this.player.x, this.player.y, this.player.z, PLAYER_HALF_WIDTH, playerH, hx2, py2, hz)) {
+          return false;
+        }
+        this.world.setBlock(px2, py2, pz, BLOCK_IDS.BED_FOOT, false, false, dir);
+        this.world.setBlock(hx2, py2, hz, BLOCK_IDS.BED_HEAD, true, true, dir);
+        if (this.gameMode !== "creative") this.hotbar.consumeSelected(1);
+        this._scheduleSave();
+        return true;
+      }
       if (placedDef.isSolid && aabbIntersectsBlock(
         this.player.x,
         this.player.y,
@@ -22575,7 +24648,11 @@ void main() {
       )) {
         return false;
       }
-      if (!this.world.setBlock(px2, py2, pz, slot.id, true, true)) return false;
+      let placeMeta = 0;
+      if (placedDef.directional) {
+        placeMeta = this._getPlayerHorizontalDir() + 2 & 3;
+      }
+      if (!this.world.setBlock(px2, py2, pz, slot.id, true, true, placeMeta)) return false;
       if (this.gameMode !== "creative") {
         this.hotbar.consumeSelected(1);
       }
@@ -22591,7 +24668,7 @@ void main() {
       const dir = this.player.getLookDirection();
       const hit = raycastVoxel(this.world, origin, dir);
       this.currentTargetHit = hit;
-      this.selectionBox.update(this.player.cameraMode === 0 ? hit : hit);
+      this.selectionBox.update(hit, this.world);
       const miningHeld = this.player.isMiningHeld();
       if (!miningHeld) {
         this.wasMiningHeld = false;
@@ -22606,6 +24683,7 @@ void main() {
       if (justPressed || this.creativeBreakTimer <= 0) {
         const brokenDef = BlockRegistry.get(hit.blockId);
         if (brokenDef.redstoneGlow) {
+          this.world.triggerRedstoneGlow(hit.x, hit.y, hit.z);
           this.hud.showToast("\u0420\u0435\u0434\u0441\u0442\u043E\u0443\u043D\u043E\u0432\u0430\u044F \u0440\u0443\u0434\u0430 \u0441\u0432\u0435\u0442\u0438\u0442\u0441\u044F!");
         }
         this.world.setBlock(hit.x, hit.y, hit.z, 0, true, true);
@@ -22651,6 +24729,7 @@ void main() {
         const h = Math.max(1, window.innerHeight);
         this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
+        this.menuPanorama.resize(w, h);
         this.firstPersonHand.resize(w, h);
         this._applyPixelRatio();
         this.renderer.setSize(w, h, false);
@@ -22687,6 +24766,9 @@ void main() {
       return this.saveManager.saveWorld(this.activeWorldId, {
         worldName: this.activeWorldName,
         worldSeed: this.worldSeed,
+        worldTime: this.skyRenderer.worldTime,
+        dayCount: this.skyRenderer.dayCount,
+        spawnPoint: this.spawnPoint,
         biomeName: this.world.getBiomeNameAt(this.player.x, this.player.z),
         player: this.player.getPose(),
         hotbar: this.hotbar.exportState(),
@@ -22696,6 +24778,9 @@ void main() {
     }
     fixedTick() {
       this.tickCount++;
+      if (!this.hud.inMainMenu && !this.hud.isPaused && !this.isSleeping) {
+        this.skyRenderer.advanceTicks(1);
+      }
     }
     _loop(now) {
       if (!this.isRunning) return;
@@ -22703,14 +24788,7 @@ void main() {
       const dt = Math.min(0.05, Math.max(1e-4, (now - this.lastFrameTime) / 1e3));
       this.lastFrameTime = now;
       if (this.hud.inMainMenu) {
-        if (this.player && this.world) {
-          this.player.yaw += dt * 0.08;
-          this.player._updateCamera();
-          this.world.update(this.player.x, this.player.z);
-          this.skyEnv.update(dt, this.player.x, this.player.y, this.player.z);
-        }
-        this.renderer.clear();
-        this.renderer.render(this.scene, this.camera);
+        this.menuPanorama.render(this.renderer, dt);
         return;
       }
       if (!this.hud.isPaused && this.player && this.world) {
@@ -22719,12 +24797,29 @@ void main() {
           this.fixedTick();
           this.tickAccumulator -= TICK_MS;
         }
-        this.player.update(dt);
-        this._updateInteraction(dt);
+        if (!this.isSleeping) {
+          this.player.update(dt);
+          this._updateInteraction(dt);
+        }
         this.fallingManager.update(dt, this.world, this.itemManager, this.gameMode !== "creative");
         this.itemManager.update(dt, this.world, this.player, this.hotbar);
-        this.world.update(this.player.x, this.player.z);
-        this.skyEnv.update(dt, this.player.x, this.player.y, this.player.z);
+        this.world.update(this.player.x, this.player.z, dt);
+        this.skyRenderer.update(dt, this.player.x, this.player.y, this.player.z, this.world);
+        const pLight = this.world.getLightAt(this.player.x, this.player.y + 1, this.player.z);
+        this.firstPersonHand.setEnvironmentLight(
+          pLight.sky,
+          pLight.block,
+          this.skyRenderer.sunIntensity,
+          this.skyRenderer.skyTint,
+          this.skyRenderer.torchTint
+        );
+        this.playerModel.setEnvironmentLight(
+          pLight.sky,
+          pLight.block,
+          this.skyRenderer.sunIntensity,
+          this.skyRenderer.skyTint,
+          this.skyRenderer.torchTint
+        );
       }
       this.renderer.clear();
       this.renderer.render(this.scene, this.camera);
@@ -22734,6 +24829,7 @@ void main() {
       this.hud.updateDebug({
         player: this.player,
         world: this.world,
+        sky: this.skyRenderer,
         targetHit: this.currentTargetHit
       });
     }

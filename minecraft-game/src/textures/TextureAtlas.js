@@ -168,7 +168,7 @@ export class TextureAtlas {
     const sideLeftRec = this.getUV(blockDef.faces.west);
     const sideRightRec = this.getUV(blockDef.faces.south);
 
-    if (blockDef.isCross) {
+    if (blockDef.isCross || blockDef.isTorch) {
       g.drawImage(
         this.canvas,
         topRec.cx * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
@@ -180,6 +180,24 @@ export class TextureAtlas {
         28,
         28
       );
+      const url = c.toDataURL();
+      this.previewCache.set(cacheKey, url);
+      return url;
+    }
+
+    if (blockDef.isBed) {
+      // Crisp 2D side-angled bed preview icon
+      g.fillStyle = '#7b532f';
+      g.fillRect(3, 21, 3, 6);
+      g.fillRect(26, 21, 3, 6);
+      g.fillStyle = '#9c6e44';
+      g.fillRect(3, 18, 26, 4);
+      g.fillStyle = '#f2f2f2';
+      g.fillRect(4, 12, 9, 6);
+      g.fillStyle = '#c82424';
+      g.fillRect(13, 12, 16, 6);
+      g.fillStyle = '#9e1919';
+      g.fillRect(13, 16, 16, 2);
       const url = c.toDataURL();
       this.previewCache.set(cacheKey, url);
       return url;
@@ -929,6 +947,135 @@ export class TextureAtlas {
     ], {
       g: [66, 132, 46],
       l: [94, 164, 64],
+    });
+
+    // 48. Torch (16x16 sprite: y=6..15 is the authentic 10px 3D shaft+ember tip, y=2..5 adds 2D hotbar flame aura)
+    drawSpriteTile('torch', [
+      '................',
+      '................',
+      '.......yy.......',
+      '......yYYy......',
+      '......oYYo......',
+      '.......oo.......',
+      '.......WW.......',
+      '......oYYo......',
+      '......oYYo......',
+      '.......cc.......',
+      '.......ww.......',
+      '.......dd.......',
+      '.......ww.......',
+      '.......dd.......',
+      '.......ww.......',
+      '.......dd.......',
+    ], {
+      y: [255, 198, 42],
+      Y: [255, 242, 108],
+      W: [255, 252, 224],
+      o: [248, 128, 28],
+      c: [76, 52, 30],
+      w: [154, 114, 64],
+      d: [112, 78, 40],
+    });
+
+    // 49. Glowstone (crystalline amber/gold luminous lattice)
+    const glowBright = [255, 238, 162];
+    const glowMid = [228, 174, 72];
+    const glowDark = [128, 84, 34];
+    this.addTile('glowstone', (x, y) => {
+      const cell = pxHash(2301, x >> 1, y >> 1);
+      const px = pxHash(2302, x, y);
+      if (x === 0 || x === 15 || y === 0 || y === 15) return shadeRgb(glowDark, (px - 0.5) * 18);
+      if (cell > 0.65) return shadeRgb(glowBright, (px - 0.5) * 20);
+      if (cell < 0.25) return shadeRgb(glowDark, (px - 0.5) * 20);
+      return shadeRgb(glowMid, (px - 0.5) * 24);
+    });
+
+    // 50-52. Pumpkin & Jack o'Lantern
+    const pumpOrange = [214, 122, 24];
+    const pumpDark = [166, 84, 12];
+    this.addTile('pumpkin_side', (x, y) => {
+      const rib = x % 4 === 0 ? -24 : (x % 4 === 2 ? 12 : 0);
+      const border = y === 0 || y === 15 ? -20 : 0;
+      return shadeRgb(pumpOrange, rib + border + (pxHash(2401, x, y) - 0.5) * 14);
+    });
+    this.addTile('pumpkin_top', (x, y) => {
+      if (x >= 7 && x <= 8 && y >= 7 && y <= 8) return [124, 106, 56];
+      const dx = Math.abs(x - 7.5);
+      const dy = Math.abs(y - 7.5);
+      const ring = Math.floor(Math.max(dx, dy)) % 2 === 0 ? 8 : -12;
+      return shadeRgb(pumpOrange, ring + (pxHash(2402, x, y) - 0.5) * 14);
+    });
+    const carvedFace = [
+      '................',
+      '................',
+      '................',
+      '................',
+      '...LL......LL...',
+      '..LLLL....LLLL..',
+      '..LLLL....LLLL..',
+      '................',
+      '.......LL.......',
+      '.......LL.......',
+      '................',
+      '..L..........L..',
+      '..LL..LLLL..LL..',
+      '...LLLLLLLLLL...',
+      '................',
+      '................',
+    ];
+    this.addTile('jack_o_lantern_face', (x, y) => {
+      if (carvedFace[y][x] === 'L') {
+        return y % 2 === 0 ? [255, 232, 96] : [255, 198, 42];
+      }
+      const rib = x % 4 === 0 ? -22 : (x % 4 === 2 ? 10 : 0);
+      return shadeRgb(pumpDark, rib + (pxHash(2403, x, y) - 0.5) * 14);
+    });
+
+    // 53-58. Red Bed textures (top pillow/blanket, sides, ends)
+    const bedRed = [188, 34, 34];
+    const bedRedDark = [148, 22, 22];
+    const bedWhite = [238, 240, 244];
+    const bedWood = [146, 104, 62];
+    this.addTile('bed_foot_top', (x, y) => {
+      if (x === 0 || x === 15 || y === 15) return bedRedDark;
+      return shadeRgb(bedRed, (pxHash(2501, x, y) - 0.5) * 14);
+    });
+    this.addTile('bed_head_top', (x, y) => {
+      if (y <= 7) {
+        if (x === 0 || x === 15 || y === 0) return [198, 200, 208];
+        return shadeRgb(bedWhite, (pxHash(2502, x, y) - 0.5) * 10);
+      }
+      if (y === 8) return [218, 218, 222];
+      if (x === 0 || x === 15) return bedRedDark;
+      return shadeRgb(bedRed, (pxHash(2503, x, y) - 0.5) * 14);
+    });
+    this.addTile('bed_side_foot', (x, y) => {
+      if (y <= 6) return [0, 0, 0, 0];
+      if (y <= 10) return shadeRgb(bedRed, (pxHash(2504, x, y) - 0.5) * 14);
+      if (y <= 12) return shadeRgb(bedWood, (pxHash(2505, x, y) - 0.5) * 14);
+      if (x <= 2) return shadeRgb(bedWood, -18);
+      return [0, 0, 0, 0];
+    });
+    this.addTile('bed_side_head', (x, y) => {
+      if (y <= 6) return [0, 0, 0, 0];
+      if (y <= 10) return x <= 7 ? shadeRgb(bedWhite, -8) : shadeRgb(bedRed, (pxHash(2506, x, y) - 0.5) * 14);
+      if (y <= 12) return shadeRgb(bedWood, (pxHash(2507, x, y) - 0.5) * 14);
+      if (x >= 13) return shadeRgb(bedWood, -18);
+      return [0, 0, 0, 0];
+    });
+    this.addTile('bed_end_foot', (x, y) => {
+      if (y <= 6) return [0, 0, 0, 0];
+      if (y <= 10) return shadeRgb(bedRedDark, (pxHash(2508, x, y) - 0.5) * 12);
+      if (y <= 12) return shadeRgb(bedWood, (pxHash(2509, x, y) - 0.5) * 14);
+      if (x <= 2 || x >= 13) return shadeRgb(bedWood, -18);
+      return [0, 0, 0, 0];
+    });
+    this.addTile('bed_end_head', (x, y) => {
+      if (y <= 6) return [0, 0, 0, 0];
+      if (y <= 10) return shadeRgb(bedWhite, -12);
+      if (y <= 12) return shadeRgb(bedWood, (pxHash(2510, x, y) - 0.5) * 14);
+      if (x <= 2 || x >= 13) return shadeRgb(bedWood, -18);
+      return [0, 0, 0, 0];
     });
   }
 }

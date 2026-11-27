@@ -22,19 +22,114 @@ const CUBE_FACES = [
 ];
 
 /**
- * Builds and caches a crisp 3D unit-centered textured block BufferGeometry (half-size = 0.5)
- * usable both for dropped ItemEntities and the 1st-person held block.
+ * Builds and caches a crisp 3D textured BufferGeometry for dropped ItemEntities
+ * and the 1st-person held item:
+ * - Cross plants (dandelion, poppy, tall grass, etc.) render as flat upright sprites (NOT cubes!)
+ * - Torches render as 2x10x2 3D voxel torches
+ * - Beds render as miniature 3D beds with pillow, blanket & legs
+ * - Standard blocks render as cubes (respecting inset for Cactus)
  */
 export function buildBlockItemGeometry(atlas, blockId, scale = 1.0) {
   const def = BlockRegistry.get(blockId);
   if (!def || !def.faces) return null;
 
-  const h = 0.5 * scale;
   const positions = [];
   const normals = [];
   const uvs = [];
   const colors = [];
   const indices = [];
+
+  const addQuad = (p0, p1, p2, p3, nx, ny, nz, u0, u1, vBot, vTop, shade) => {
+    const base = positions.length / 3;
+    const b = Math.pow(shade, 2.2);
+    positions.push(...p0, ...p1, ...p2, ...p3);
+    for (let i = 0; i < 4; i++) {
+      normals.push(nx, ny, nz);
+      colors.push(b, b, b);
+    }
+    uvs.push(u0, vBot, u1, vBot, u1, vTop, u0, vTop);
+    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+
+  // 1. Flat sprite item for Cross Plants (flowers, tall grass, mushrooms, dead bush, vines)
+  if (def.isCross) {
+    const uv = atlas.getUV(def.faces.top);
+    const h = 0.54 * scale;
+    const zOff = 0.015 * scale;
+    addQuad([-h, -h, zOff], [h, -h, zOff], [h, h, zOff], [-h, h, zOff], 0, 0, 1, uv.u0, uv.u1, uv.vBottom, uv.vTop, 1.0);
+    addQuad([h, -h, -zOff], [-h, -h, -zOff], [-h, h, -zOff], [h, h, -zOff], 0, 0, -1, uv.u0, uv.u1, uv.vBottom, uv.vTop, 0.94);
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geom.setIndex(indices);
+    return geom;
+  }
+
+  // 2. 3D Torch model (2x10x2 pixels)
+  if (def.isTorch) {
+    const uv = atlas.getUV('torch');
+    const du = uv.u1 - uv.u0;
+    const dv = uv.vTop - uv.vBottom;
+    const u0 = uv.u0 + du * (7 / 16);
+    const u1 = uv.u0 + du * (9 / 16);
+    const vBot = uv.vBottom;
+    const vTop = uv.vBottom + dv * (10 / 16);
+    const vTip0 = uv.vBottom + dv * (8 / 16);
+
+    const hw = (1 / 16) * scale * 1.65;
+    const hh = (5 / 16) * scale * 1.65;
+
+    addQuad([-hw, -hh, hw], [hw, -hh, hw], [hw, hh, hw], [-hw, hh, hw], 0, 0, 1, u0, u1, vBot, vTop, 1.0);
+    addQuad([hw, -hh, -hw], [-hw, -hh, -hw], [-hw, hh, -hw], [hw, hh, -hw], 0, 0, -1, u0, u1, vBot, vTop, 0.95);
+    addQuad([hw, -hh, hw], [hw, -hh, -hw], [hw, hh, -hw], [hw, hh, hw], 1, 0, 0, u0, u1, vBot, vTop, 0.92);
+    addQuad([-hw, -hh, -hw], [-hw, -hh, hw], [-hw, hh, hw], [-hw, hh, -hw], -1, 0, 0, u0, u1, vBot, vTop, 0.92);
+    addQuad([-hw, hh, hw], [hw, hh, hw], [hw, hh, -hw], [-hw, hh, -hw], 0, 1, 0, u0, u1, vTip0, vTop, 1.0);
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geom.setIndex(indices);
+    return geom;
+  }
+
+  // 3. Miniature 3D Bed model
+  if (def.isBed) {
+    const headUv = atlas.getUV('bed_head_top');
+    const footUv = atlas.getUV('bed_foot_top');
+    const woodUv = atlas.getUV('oak_planks');
+    const sideUv = atlas.getUV('bed_side_foot');
+    const hw = 0.36 * scale;
+    const hl = 0.68 * scale;
+    const yBot = -0.14 * scale;
+    const yTop = 0.16 * scale;
+
+    // Top pillow + blanket halves
+    addQuad([-hw, yTop, 0], [hw, yTop, 0], [hw, yTop, -hl], [-hw, yTop, -hl], 0, 1, 0, headUv.u0, headUv.u1, headUv.vBottom, headUv.vTop, 1.0);
+    addQuad([-hw, yTop, hl], [hw, yTop, hl], [hw, yTop, 0], [-hw, yTop, 0], 0, 1, 0, footUv.u0, footUv.u1, footUv.vBottom, footUv.vTop, 1.0);
+    // Underside & sides
+    addQuad([-hw, yBot, -hl], [hw, yBot, -hl], [hw, yBot, hl], [-hw, yBot, hl], 0, -1, 0, woodUv.u0, woodUv.u1, woodUv.vBottom, woodUv.vTop, 0.6);
+    addQuad([-hw, yBot, hl], [hw, yBot, hl], [hw, yTop, hl], [-hw, yTop, hl], 0, 0, 1, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.35, sideUv.vTop, 0.85);
+    addQuad([hw, yBot, -hl], [-hw, yBot, -hl], [-hw, yTop, -hl], [hw, yTop, -hl], 0, 0, -1, woodUv.u0, woodUv.u1, woodUv.vBottom, woodUv.vTop, 0.8);
+    addQuad([hw, yBot, hl], [hw, yBot, -hl], [hw, yTop, -hl], [hw, yTop, hl], 1, 0, 0, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.35, sideUv.vTop, 0.72);
+    addQuad([-hw, yBot, -hl], [-hw, yBot, hl], [-hw, yTop, hl], [-hw, yTop, -hl], -1, 0, 0, sideUv.u0, sideUv.u1, sideUv.vBottom + (sideUv.vTop - sideUv.vBottom) * 0.35, sideUv.vTop, 0.70);
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geom.setIndex(indices);
+    return geom;
+  }
+
+  // 4. Standard cubic block (respecting Cactus inset)
+  const hY = 0.5 * scale;
+  const hXZ = (0.5 - (def.inset || 0)) * scale;
 
   for (let f = 0; f < 6; f++) {
     const face = CUBE_FACES[f];
@@ -44,7 +139,7 @@ export function buildBlockItemGeometry(atlas, blockId, scale = 1.0) {
 
     for (let i = 0; i < 4; i++) {
       const v = face.verts[i];
-      positions.push(v[0] * h, v[1] * h, v[2] * h);
+      positions.push(v[0] * hXZ, v[1] * hY, v[2] * hXZ);
       normals.push(face.nx, face.ny, face.nz);
       colors.push(b, b, b);
     }
@@ -93,7 +188,7 @@ export class ItemEntityManager {
       vertexColors: true,
       fog: true,
       alphaTest: 0.5,
-      side: THREE.FrontSide,
+      side: THREE.DoubleSide,
     });
   }
 

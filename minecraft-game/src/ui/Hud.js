@@ -12,7 +12,10 @@ export class Hud {
     this.callbacks = callbacks;
 
     this.crosshairEl = document.getElementById('crosshair');
+    this.debugContainer = document.getElementById('debug-container');
     this.debugPanel = document.getElementById('debug-panel');
+    this.timePillButtons = Array.from(document.querySelectorAll('.time-pill-btn'));
+    this.sleepOverlay = document.getElementById('sleep-overlay');
     this.pauseOverlay = document.getElementById('pause-overlay');
     this.mainMenuOverlay = document.getElementById('main-menu-overlay');
     this.menuHome = document.getElementById('menu-home');
@@ -86,6 +89,16 @@ export class Hud {
       e.stopPropagation();
       this.toggleDebug();
     });
+
+    for (const btn of this.timePillButtons) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const ticks = parseInt(btn.dataset.time, 10);
+        if (Number.isFinite(ticks)) {
+          this.callbacks.onSetWorldTime?.(ticks);
+        }
+      });
+    }
 
     this.btnFullscreen?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -389,9 +402,27 @@ export class Hud {
 
   toggleDebug() {
     this.debugVisible = !this.debugVisible;
-    this.debugPanel?.classList.toggle('hidden', !this.debugVisible);
+    this.debugContainer?.classList.toggle('hidden', !this.debugVisible);
     this.btnDebug?.classList.toggle('active', this.debugVisible);
     return this.debugVisible;
+  }
+
+  playSleepTransition(onWakeCallback) {
+    if (!this.sleepOverlay) {
+      onWakeCallback?.();
+      return;
+    }
+    this.sleepOverlay.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      this.sleepOverlay?.classList.add('active');
+    });
+    setTimeout(() => {
+      onWakeCallback?.();
+      this.sleepOverlay?.classList.remove('active');
+      setTimeout(() => {
+        this.sleepOverlay?.classList.add('hidden');
+      }, 450);
+    }, 1050);
   }
 
   setPaused(paused) {
@@ -503,7 +534,7 @@ export class Hud {
     }, durationMs);
   }
 
-  updateDebug({ player, world, targetHit }) {
+  updateDebug({ player, world, sky, targetHit }) {
     this.fpsFrames++;
     const now = performance.now();
     const elapsed = now - this.fpsLastTime;
@@ -518,6 +549,8 @@ export class Hud {
     const cx = Math.floor(player.x / CHUNK_SIZE);
     const cz = Math.floor(player.z / CHUNK_SIZE);
     const biomeName = world.getBiomeNameAt(player.x, player.z);
+    const light = world.getLightAt(player.x, player.y + 0.5, player.z);
+    const timePart = sky ? `Day ${sky.dayCount} (${sky.getFormattedClock()})` : 'Day 1';
     const modeLabel = player.flyMode
       ? 'Полёт'
       : player.isSwimming
@@ -531,9 +564,9 @@ export class Hud {
       ? `${BlockRegistry.get(targetHit.blockId).name} (${targetHit.x}, ${targetHit.y}, ${targetHit.z})`
       : '—';
 
-    // Compact clean F3 panel with essential info
     this.debugPanel.textContent = [
       `FPS: ${this.currentFps} | XYZ: ${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}`,
+      `${timePart} | Light: Sky ${light.sky} / Block ${light.block}`,
       `Biome: ${biomeName}`,
       `Chunk: ${cx}, ${cz} | ${player.getFacingCardinal()} | ${modeLabel} | Chunks: ${world.chunks.size}`,
       `Target: ${hitDesc}`,

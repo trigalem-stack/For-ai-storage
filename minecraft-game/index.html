@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#2d63b8">
-  <title>Minecraft Web Edition — Stage 3</title>
+  <title>Minecraft Web Edition — Stage 4</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -17,8 +17,21 @@
   <!-- Crisp White Crosshair (hidden in F5 3rd-person camera modes) -->
   <div id="crosshair" aria-hidden="true"></div>
 
-  <!-- Compact Top-Left F3 Debug Panel -->
-  <pre id="debug-panel" class="hidden" aria-live="polite"></pre>
+  <!-- Sleep Fade Animation Overlay -->
+  <div id="sleep-overlay" class="hidden" aria-hidden="true">
+    <div class="sleep-msg">Спокойной ночи...</div>
+  </div>
+
+  <!-- Compact Top-Left F3 Debug Panel + Quick Day/Night Test Switcher -->
+  <div id="debug-container" class="hidden">
+    <pre id="debug-panel" aria-live="polite"></pre>
+    <div id="time-test-bar" role="group" aria-label="Быстрая смена времени суток">
+      <button type="button" class="time-pill-btn" data-time="0">🌅 Утро</button>
+      <button type="button" class="time-pill-btn" data-time="6000">☀️ Полдень</button>
+      <button type="button" class="time-pill-btn" data-time="12100">🌇 Закат</button>
+      <button type="button" class="time-pill-btn" data-time="18000">🌙 Полночь</button>
+    </div>
+  </div>
 
   <!-- Top-Right Utility HUD -->
   <div id="hud-top-right">
@@ -96,7 +109,7 @@
       <div class="mc-logo-badge">
         <div class="mc-cube-badge"></div>
         <h1 id="main-title">MINECRAFT WEB</h1>
-        <p class="mc-modal-sub">Этап 3 · Биомы · 3D-пещеры · Каньоны · Руды · Креатив</p>
+        <p class="mc-modal-sub">Этап 4 · День/Ночь · Солнце и Луна · Воксельный свет · Факелы · Кровать</p>
       </div>
       <div class="mc-modal-actions">
         <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">▶ Играть (Миры)</button>

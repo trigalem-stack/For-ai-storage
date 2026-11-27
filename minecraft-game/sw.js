@@ -1,4 +1,4 @@
-const CACHE_NAME = 'minecraft-web-stage3-v1';
+const CACHE_NAME = 'minecraft-web-stage4-v1';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -15,8 +15,11 @@ const CORE_ASSETS = [
   './src/world/BiomeManager.js',
   './src/world/WorldGen.js',
   './src/world/Chunk.js',
+  './src/world/LightingEngine.js',
   './src/world/ChunkMesher.js',
   './src/world/Raycast.js',
+  './src/world/SkyRenderer.js',
+  './src/world/MenuPanorama.js',
   './src/world/SkyEnvironment.js',
   './src/world/World.js',
   './src/entities/ItemEntity.js',

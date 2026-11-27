@@ -1,12 +1,15 @@
 import * as THREE from '../vendor/three.module.min.js';
-import { BlockRegistry } from './blocks/BlockRegistry.js';
+import { BLOCK_IDS, BlockRegistry } from './blocks/BlockRegistry.js';
 import {
   AUTOSAVE_INTERVAL_MS,
   CAMERA_MODES,
   CREATIVE_BREAK_COOLDOWN,
   DEFAULT_RENDER_DISTANCE_MOBILE,
   DEFAULT_RENDER_DISTANCE_PC,
+  DEFAULT_WORLD_TIME,
   PLAYER_HALF_WIDTH,
+  SLEEP_END_TICK,
+  SLEEP_START_TICK,
   TICK_MS,
   WORLD_HEIGHT,
 } from './constants.js';
@@ -21,13 +24,21 @@ import { TextureAtlas } from './textures/TextureAtlas.js';
 import { Hotbar } from './ui/Hotbar.js';
 import { Hud } from './ui/Hud.js';
 import { MobileControls } from './ui/MobileControls.js';
+import { MenuPanorama } from './world/MenuPanorama.js';
 import { SelectionBox, raycastVoxel } from './world/Raycast.js';
-import { SkyEnvironment } from './world/SkyEnvironment.js';
+import { SkyRenderer } from './world/SkyRenderer.js';
 import { World } from './world/World.js';
 
 function randomWorldSeed() {
   return (Math.floor(Math.random() * 0x7fffffff) + 1) | 0;
 }
+
+const DIR_OFFSETS = [
+  [0, -1], // 0: North (-Z)
+  [1, 0],  // 1: East (+X)
+  [0, 1],  // 2: South (+Z)
+  [-1, 0], // 3: West (-X)
+];
 
 class MinecraftGame {
   constructor() {
@@ -47,12 +58,13 @@ class MinecraftGame {
       720
     );
 
-    const entityAmbient = new THREE.AmbientLight(0xffffff, 0.78);
-    const entitySun = new THREE.DirectionalLight(0xfff6e5, 0.78);
+    const entityAmbient = new THREE.AmbientLight(0xffffff, 0.85);
+    const entitySun = new THREE.DirectionalLight(0xfff6e5, 0.72);
     entitySun.position.set(1.2, 2.2, 1.0);
     this.scene.add(entityAmbient, entitySun);
 
-    this.skyEnv = new SkyEnvironment(this.scene);
+    this.skyRenderer = new SkyRenderer(this.scene, DEFAULT_WORLD_TIME, 1);
+    this.menuPanorama = new MenuPanorama();
 
     const isTouchDevice = MobileControls.detectTouchDevice();
     this.settings = {
@@ -95,10 +107,12 @@ class MinecraftGame {
     this.activeWorldId = null;
     this.activeWorldName = 'Мой мир';
     this.worldSeed = randomWorldSeed();
+    this.spawnPoint = null;
 
     this.currentTargetHit = null;
     this.creativeBreakTimer = 0;
     this.wasMiningHeld = false;
+    this.isSleeping = false;
 
     this.lastFrameTime = performance.now();
     this.tickAccumulator = 0;
@@ -123,7 +137,7 @@ class MinecraftGame {
   }
 
   async init() {
-    this._setLoadingText('Загрузка настроек и миров...');
+    this._setLoadingText('Загрузка настроек и списка миров...');
     await this.saveManager.init();
     const savedSettings = await this.saveManager.loadSettings();
     if (savedSettings) {
@@ -131,7 +145,7 @@ class MinecraftGame {
     }
 
     this._applyPixelRatio();
-    this.skyEnv.setCloudsEnabled(this.settings.cloudsEnabled);
+    this.skyRenderer.setCloudsEnabled(this.settings.cloudsEnabled);
 
     this.hotbar = new Hotbar(this.atlas, {
       creativeMode: this.gameMode === 'creative',
@@ -181,9 +195,15 @@ class MinecraftGame {
       },
       onExitToMenu: async () => {
         await this.saveNow();
+        this._unloadWorldFromEngine();
         this.hud.showMainMenu(true);
         const list = await this.saveManager.listWorlds();
         this.hud.renderWorldsList(list, this.activeWorldId);
+      },
+      onSetWorldTime: (ticks) => {
+        this.skyRenderer.setTime(ticks);
+        this.hud.showToast(`Время: ${this.skyRenderer.getFormattedClock()}`);
+        this._scheduleSave();
       },
       onToggleControlMode: () => {
         this.setTouchMode(!this.settings.touchMode);
@@ -212,7 +232,7 @@ class MinecraftGame {
       },
       onToggleCloudsMode: () => {
         this.settings.cloudsEnabled = !this.settings.cloudsEnabled;
-        this.skyEnv.setCloudsEnabled(this.settings.cloudsEnabled);
+        this.skyRenderer.setCloudsEnabled(this.settings.cloudsEnabled);
         this.hud.setCloudsEnabledLabel(this.settings.cloudsEnabled);
         this.saveSettingsOnly();
       },
@@ -232,20 +252,17 @@ class MinecraftGame {
       },
     });
 
-    // Ensure at least one starter backdrop world or load saved list for Main Menu
     let worlds = await this.saveManager.listWorlds();
     if (worlds.length === 0) {
       const first = await this.saveManager.createWorld({ name: 'Новый мир', seed: randomWorldSeed() });
       worlds = [first];
     }
 
-    // Load the latest world into background scene so Main Menu has a rich live 3D backdrop!
-    await this.loadWorldIntoEngine(worlds[0].id);
-
-    this.mobileControls = new MobileControls(this.player, {
+    this.mobileControls = new MobileControls(null, {
       onStatusToast: (msg) => this.hud.showToast(msg),
     });
 
+    // Show Main Menu immediately over smooth lightweight MenuPanorama (zero world lag in menu!)
     this.setTouchMode(this.settings.touchMode, false);
     this._syncSettingsUI();
     this._applySensitivity();
@@ -274,11 +291,13 @@ class MinecraftGame {
     this.hud.setSensitivityUI(this.settings.sensitivity);
   }
 
-  async loadWorldIntoEngine(worldId) {
+  _unloadWorldFromEngine() {
     this.itemManager.clear();
     this.fallingManager.clear();
+    this.selectionBox.update(null);
     this.currentTargetHit = null;
     this.creativeBreakTimer = 0;
+    this.isSleeping = false;
 
     if (this.world) {
       this.world.dispose();
@@ -288,21 +307,70 @@ class MinecraftGame {
       this.player.dispose();
       this.player = null;
     }
+    if (this.mobileControls) {
+      this.mobileControls.player = null;
+    }
+  }
+
+  _handleBlockSideEffects(wx, wy, wz, newId, oldId, oldMeta) {
+    if (!this.world) return;
+
+    // 1. Falling sand/gravel stability cascade
+    if (BlockRegistry.fallsWithGravity(newId)) {
+      this.fallingManager.scheduleStabilityCheck(wx, wy, wz);
+    } else {
+      this.fallingManager.scheduleStabilityCheck(wx, wy + 1, wz);
+    }
+
+    // 2. If block was removed, detach any torches supported by this block!
+    if (newId === 0 && oldId !== 0) {
+      const checkSupportTorch = (tx, ty, tz, expectedMeta) => {
+        if (this.world.getBlock(tx, ty, tz) === BLOCK_IDS.TORCH &&
+            this.world.getBlockMeta(tx, ty, tz) === expectedMeta) {
+          this.world.setBlock(tx, ty, tz, 0, true, false);
+          this.itemManager.spawnDrop(BLOCK_IDS.TORCH, tx + 0.5, ty + 0.3, tz + 0.5, 1);
+        }
+      };
+      checkSupportTorch(wx, wy + 1, wz, 0); // Floor torch resting on top
+      checkSupportTorch(wx + 1, wy, wz, 1); // Torch attached to +X side
+      checkSupportTorch(wx - 1, wy, wz, 2); // Torch attached to -X side
+      checkSupportTorch(wx, wy, wz + 1, 3); // Torch attached to +Z side
+      checkSupportTorch(wx, wy, wz - 1, 4); // Torch attached to -Z side
+    }
+
+    // 3. Paired 2-block Bed cleanup when either half is broken
+    if (newId === 0 && (oldId === BLOCK_IDS.BED_FOOT || oldId === BLOCK_IDS.BED_HEAD)) {
+      const dir = oldMeta & 3;
+      const [dx, dz] = DIR_OFFSETS[dir] || DIR_OFFSETS[0];
+      if (oldId === BLOCK_IDS.BED_FOOT) {
+        if (this.world.getBlock(wx + dx, wy, wz + dz) === BLOCK_IDS.BED_HEAD) {
+          this.world.setBlock(wx + dx, wy, wz + dz, 0, true, false);
+        }
+      } else if (this.world.getBlock(wx - dx, wy, wz - dz) === BLOCK_IDS.BED_FOOT) {
+        this.world.setBlock(wx - dx, wy, wz - dz, 0, true, false);
+      }
+    }
+  }
+
+  async loadWorldIntoEngine(worldId) {
+    this._unloadWorldFromEngine();
 
     const saved = await this.saveManager.loadWorld(worldId);
     this.activeWorldId = worldId;
     this.activeWorldName = saved?.name || 'Мой мир';
     this.worldSeed = Number.isFinite(saved?.worldSeed) ? saved.worldSeed : randomWorldSeed();
+    this.spawnPoint = saved?.spawnPoint || null;
+
+    this.skyRenderer.setTime(
+      Number.isFinite(saved?.worldTime) ? saved.worldTime : DEFAULT_WORLD_TIME,
+      Number.isFinite(saved?.dayCount) ? saved.dayCount : 1
+    );
 
     this.world = new World(this.scene, this.atlas, this.worldSeed, this.settings.renderDistance, {
       unlimitedMemory: this.settings.unlimitedMemory,
       fogEnabled: this.settings.fogEnabled,
-      onBlockChanged: (wx, wy, wz, id) => {
-        if (BlockRegistry.fallsWithGravity(id)) {
-          this.fallingManager.scheduleStabilityCheck(wx, wy, wz);
-        } else {
-          this.fallingManager.scheduleStabilityCheck(wx, wy + 1, wz);
-        }
+      onBlockChanged: (wx, wy, wz, id, oldId, oldMeta) => {
+        this._handleBlockSideEffects(wx, wy, wz, id, oldId, oldMeta);
       },
     });
 
@@ -342,6 +410,9 @@ class MinecraftGame {
       ) {
         this.player.y += 1;
       }
+      if (!this.spawnPoint) {
+        this.spawnPoint = { x: this.player.x, y: this.player.y, z: this.player.z };
+      }
     }
 
     if (saved?.hotbar) {
@@ -351,12 +422,13 @@ class MinecraftGame {
     }
     const initSlot = this.hotbar.getSelectedSlot();
     this.firstPersonHand.setHeldBlock(initSlot ? initSlot.id : 0);
+    this.skyRenderer.update(0.001, this.player.x, this.player.y, this.player.z, this.world);
     this.player.update(0.001);
   }
 
   async enterWorld(worldId) {
     this.loadingOverlay?.classList.remove('hidden');
-    this._setLoadingText('Генерация биомов, пещер и руд...');
+    this._setLoadingText('Генерация биомов, пещер и воксельного света...');
     await this.loadWorldIntoEngine(worldId);
     await this.saveNow();
     this._syncSettingsUI();
@@ -386,18 +458,63 @@ class MinecraftGame {
     }
   }
 
+  _getPlayerHorizontalDir() {
+    const lookX = -Math.sin(this.player.yaw);
+    const lookZ = -Math.cos(this.player.yaw);
+    if (Math.abs(lookZ) >= Math.abs(lookX)) {
+      return lookZ < 0 ? 0 : 2; // 0: North (-Z), 2: South (+Z)
+    }
+    return lookX > 0 ? 1 : 3; // 1: East (+X), 3: West (-X)
+  }
+
   _handlePickBlock() {
     const hit = this.currentTargetHit;
     if (!hit || hit.blockId <= 0) return;
-    const def = BlockRegistry.get(hit.blockId);
+    let pickId = hit.blockId;
+    if (pickId === BLOCK_IDS.BED_HEAD) pickId = BLOCK_IDS.BED_FOOT;
+    const def = BlockRegistry.get(pickId);
     if (!def || def.isLiquid) return;
     this.hotbar.pickBlock(def.id);
     this.hud.showToast(`Выбран блок: ${def.name}`);
   }
 
+  _interactWithBed(hit) {
+    if (this.isSleeping) return true;
+    this.spawnPoint = { x: hit.x + 0.5, y: hit.y + 0.6, z: hit.z + 0.5 };
+    const t = this.skyRenderer.worldTime;
+
+    if (t >= SLEEP_START_TICK && t <= SLEEP_END_TICK) {
+      this.isSleeping = true;
+      this.hud.playSleepTransition(() => {
+        this.skyRenderer.sleepToMorning();
+        this.skyRenderer.update(0.001, this.player.x, this.player.y, this.player.z, this.world);
+        this.isSleeping = false;
+        this.hud.showToast('Точка возрождения установлена');
+        this._scheduleSave();
+      });
+    } else {
+      this.hud.showToast('Спать можно только ночью');
+      this._scheduleSave();
+    }
+    return true;
+  }
+
   _handlePlaceBlock() {
     const hit = this.currentTargetHit;
-    if (!hit) return false;
+    if (!hit || !this.world || !this.player) return false;
+
+    const targetDef = BlockRegistry.get(hit.blockId);
+
+    // 1. Clicking Bed triggers sleep / spawn point interaction (unless sneaking to place next to it)
+    if (targetDef.isBed && !this.player.isCrouching) {
+      return this._interactWithBed(hit);
+    }
+
+    // 2. Touching Redstone Ore activates its glow
+    if (targetDef.redstoneGlow) {
+      this.world.triggerRedstoneGlow(hit.x, hit.y, hit.z);
+    }
+
     if (!hit.normal || (hit.normal.x === 0 && hit.normal.y === 0 && hit.normal.z === 0)) {
       return false;
     }
@@ -405,12 +522,9 @@ class MinecraftGame {
     const slot = this.hotbar.getSelectedSlot();
     if (!slot || slot.id <= 0) return false;
 
-    const targetDef = BlockRegistry.get(hit.blockId);
-    // Clicking on replaceable tall grass replaces it in-place
     const px = targetDef.isCross ? hit.x : hit.x + hit.normal.x;
     const py = targetDef.isCross ? hit.y : hit.y + hit.normal.y;
     const pz = targetDef.isCross ? hit.z : hit.z + hit.normal.z;
-
     if (py < 0 || py >= WORLD_HEIGHT) return false;
 
     const existing = this.world.getBlock(px, py, pz);
@@ -418,6 +532,55 @@ class MinecraftGame {
     if (existing !== 0 && !existingDef.isLiquid && !existingDef.isCross) return false;
 
     const placedDef = BlockRegistry.get(slot.id);
+
+    // 3. Torch placement validation & orientation (floor meta=0, wall meta=1..4, ceiling forbidden!)
+    if (placedDef.isTorch) {
+      if (hit.normal.y === -1) return false; // Never attach to ceiling underside
+      let torchMeta = 0;
+      if (targetDef.isCross) {
+        if (!BlockRegistry.isSolid(this.world.getBlock(px, py - 1, pz))) return false;
+      } else if (hit.normal.y === 1) {
+        if (!BlockRegistry.isSolid(this.world.getBlock(hit.x, hit.y, hit.z))) return false;
+        torchMeta = 0;
+      } else {
+        if (!BlockRegistry.isSolid(this.world.getBlock(hit.x, hit.y, hit.z))) return false;
+        if (hit.normal.x === 1) torchMeta = 1;
+        else if (hit.normal.x === -1) torchMeta = 2;
+        else if (hit.normal.z === 1) torchMeta = 3;
+        else if (hit.normal.z === -1) torchMeta = 4;
+      }
+      if (!this.world.setBlock(px, py, pz, BLOCK_IDS.TORCH, true, true, torchMeta)) return false;
+      if (this.gameMode !== 'creative') this.hotbar.consumeSelected(1);
+      this._scheduleSave();
+      return true;
+    }
+
+    // 4. Two-block Bed placement (BED_FOOT + BED_HEAD along player horizontal look)
+    if (placedDef.isBed) {
+      const dir = this._getPlayerHorizontalDir();
+      const [dx, dz] = DIR_OFFSETS[dir];
+      const hx = px + dx;
+      const hz = pz + dz;
+      const headExisting = this.world.getBlock(hx, py, hz);
+      const headDef = BlockRegistry.get(headExisting);
+      if (headExisting !== 0 && !headDef.isLiquid && !headDef.isCross) return false;
+
+      const playerH = this.player.getCurrentHitboxHeight();
+      if (
+        aabbIntersectsBlock(this.player.x, this.player.y, this.player.z, PLAYER_HALF_WIDTH, playerH, px, py, pz) ||
+        aabbIntersectsBlock(this.player.x, this.player.y, this.player.z, PLAYER_HALF_WIDTH, playerH, hx, py, hz)
+      ) {
+        return false;
+      }
+
+      this.world.setBlock(px, py, pz, BLOCK_IDS.BED_FOOT, false, false, dir);
+      this.world.setBlock(hx, py, hz, BLOCK_IDS.BED_HEAD, true, true, dir);
+      if (this.gameMode !== 'creative') this.hotbar.consumeSelected(1);
+      this._scheduleSave();
+      return true;
+    }
+
+    // 5. Standard & directional blocks
     if (
       placedDef.isSolid &&
       aabbIntersectsBlock(
@@ -434,9 +597,12 @@ class MinecraftGame {
       return false;
     }
 
-    if (!this.world.setBlock(px, py, pz, slot.id, true, true)) return false;
+    let placeMeta = 0;
+    if (placedDef.directional) {
+      placeMeta = (this._getPlayerHorizontalDir() + 2) & 3;
+    }
 
-    // Creative mode does NOT consume blocks
+    if (!this.world.setBlock(px, py, pz, slot.id, true, true, placeMeta)) return false;
     if (this.gameMode !== 'creative') {
       this.hotbar.consumeSelected(1);
     }
@@ -455,7 +621,7 @@ class MinecraftGame {
     const dir = this.player.getLookDirection();
     const hit = raycastVoxel(this.world, origin, dir);
     this.currentTargetHit = hit;
-    this.selectionBox.update(this.player.cameraMode === 0 ? hit : hit);
+    this.selectionBox.update(hit, this.world);
 
     const miningHeld = this.player.isMiningHeld();
     if (!miningHeld) {
@@ -468,13 +634,13 @@ class MinecraftGame {
     this.firstPersonHand.setMiningActive(true);
     if (!hit) return;
 
-    // Creative Mode: instant break on first click, anti-spam repeat cooldown while held
     const justPressed = !this.wasMiningHeld;
     this.wasMiningHeld = true;
 
     if (justPressed || this.creativeBreakTimer <= 0) {
       const brokenDef = BlockRegistry.get(hit.blockId);
       if (brokenDef.redstoneGlow) {
+        this.world.triggerRedstoneGlow(hit.x, hit.y, hit.z);
         this.hud.showToast('Редстоуновая руда светится!');
       }
       this.world.setBlock(hit.x, hit.y, hit.z, 0, true, true);
@@ -526,6 +692,7 @@ class MinecraftGame {
       const h = Math.max(1, window.innerHeight);
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
+      this.menuPanorama.resize(w, h);
       this.firstPersonHand.resize(w, h);
       this._applyPixelRatio();
       this.renderer.setSize(w, h, false);
@@ -568,6 +735,9 @@ class MinecraftGame {
     return this.saveManager.saveWorld(this.activeWorldId, {
       worldName: this.activeWorldName,
       worldSeed: this.worldSeed,
+      worldTime: this.skyRenderer.worldTime,
+      dayCount: this.skyRenderer.dayCount,
+      spawnPoint: this.spawnPoint,
       biomeName: this.world.getBiomeNameAt(this.player.x, this.player.z),
       player: this.player.getPose(),
       hotbar: this.hotbar.exportState(),
@@ -578,6 +748,9 @@ class MinecraftGame {
 
   fixedTick() {
     this.tickCount++;
+    if (!this.hud.inMainMenu && !this.hud.isPaused && !this.isSleeping) {
+      this.skyRenderer.advanceTicks(1);
+    }
   }
 
   _loop(now) {
@@ -588,15 +761,7 @@ class MinecraftGame {
     this.lastFrameTime = now;
 
     if (this.hud.inMainMenu) {
-      // Gentle scenic camera orbit while in Main Menu
-      if (this.player && this.world) {
-        this.player.yaw += dt * 0.08;
-        this.player._updateCamera();
-        this.world.update(this.player.x, this.player.z);
-        this.skyEnv.update(dt, this.player.x, this.player.y, this.player.z);
-      }
-      this.renderer.clear();
-      this.renderer.render(this.scene, this.camera);
+      this.menuPanorama.render(this.renderer, dt);
       return;
     }
 
@@ -607,12 +772,30 @@ class MinecraftGame {
         this.tickAccumulator -= TICK_MS;
       }
 
-      this.player.update(dt);
-      this._updateInteraction(dt);
+      if (!this.isSleeping) {
+        this.player.update(dt);
+        this._updateInteraction(dt);
+      }
       this.fallingManager.update(dt, this.world, this.itemManager, this.gameMode !== 'creative');
       this.itemManager.update(dt, this.world, this.player, this.hotbar);
-      this.world.update(this.player.x, this.player.z);
-      this.skyEnv.update(dt, this.player.x, this.player.y, this.player.z);
+      this.world.update(this.player.x, this.player.z, dt);
+      this.skyRenderer.update(dt, this.player.x, this.player.y, this.player.z, this.world);
+
+      const pLight = this.world.getLightAt(this.player.x, this.player.y + 1.0, this.player.z);
+      this.firstPersonHand.setEnvironmentLight(
+        pLight.sky,
+        pLight.block,
+        this.skyRenderer.sunIntensity,
+        this.skyRenderer.skyTint,
+        this.skyRenderer.torchTint
+      );
+      this.playerModel.setEnvironmentLight(
+        pLight.sky,
+        pLight.block,
+        this.skyRenderer.sunIntensity,
+        this.skyRenderer.skyTint,
+        this.skyRenderer.torchTint
+      );
     }
 
     this.renderer.clear();
@@ -625,6 +808,7 @@ class MinecraftGame {
     this.hud.updateDebug({
       player: this.player,
       world: this.world,
+      sky: this.skyRenderer,
       targetHit: this.currentTargetHit,
     });
   }

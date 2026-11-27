@@ -53,16 +53,19 @@ body.pseudo-fullscreen {
   touch-action: none;
 }
 
-/* Crisp Non-Blurry Solid White Crosshair */
+/* Crisp Non-Blurry Pure White Crosshair (zero dark outline/shadow) */
 #crosshair {
   position: fixed;
   left: 50%;
   top: 50%;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 15;
+  mix-blend-mode: normal;
+  filter: none;
+  opacity: 1;
 }
 
 #crosshair::before,
@@ -70,39 +73,98 @@ body.pseudo-fullscreen {
   content: '';
   position: absolute;
   background: #ffffff;
-  outline: 1px solid rgba(0, 0, 0, 0.55);
+  background-color: #ffffff;
+  border: none;
+  outline: none;
+  box-shadow: none;
 }
 
 #crosshair::before {
-  left: 7px;
+  left: 8px;
   top: 0;
   width: 2px;
-  height: 16px;
+  height: 18px;
 }
 
 #crosshair::after {
   left: 0;
-  top: 7px;
-  width: 16px;
+  top: 8px;
+  width: 18px;
   height: 2px;
 }
 
-/* Compact Top-Left F3 Debug Panel */
-#debug-panel {
+/* Sleep Fade Overlay */
+#sleep-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 8, 20, 0.92);
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+  z-index: 48;
+}
+
+#sleep-overlay.active {
+  opacity: 1;
+}
+
+.sleep-msg {
+  font-size: 20px;
+  font-weight: 700;
+  color: #e8f0ff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+/* Compact Top-Left F3 Debug Panel + Time Switcher */
+#debug-container {
   position: fixed;
   top: var(--safe-top);
   left: var(--safe-left);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: min(92vw, 520px);
+  pointer-events: none;
+  z-index: 25;
+}
+
+#debug-panel {
   margin: 0;
   padding: 7px 10px;
-  max-width: min(90vw, 500px);
-  background: rgba(10, 14, 20, 0.72);
+  background: rgba(10, 14, 20, 0.76);
   border: 2px solid rgba(255, 255, 255, 0.16);
   color: #f4f8fc;
   font-size: 12px;
   line-height: 1.4;
   white-space: pre-wrap;
   pointer-events: none;
-  z-index: 25;
+}
+
+#time-test-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.time-pill-btn {
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(20, 26, 36, 0.84);
+  color: #f4f8fc;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.time-pill-btn:hover,
+.time-pill-btn:active {
+  background: rgba(74, 148, 42, 0.88);
+  border-color: rgba(255, 255, 255, 0.65);
 }
 
 /* Top-Right HUD Toolbar */

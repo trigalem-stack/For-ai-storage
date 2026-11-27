@@ -32,13 +32,13 @@ export class Hotbar {
     this.slots = [
       { id: BLOCK_IDS.COBBLESTONE, count: 64 },
       { id: BLOCK_IDS.OAK_PLANKS, count: 64 },
+      { id: BLOCK_IDS.TORCH, count: 64 },
+      { id: BLOCK_IDS.GLOWSTONE, count: 64 },
+      { id: BLOCK_IDS.JACK_O_LANTERN, count: 64 },
+      { id: BLOCK_IDS.BED_FOOT, count: 64 },
       { id: BLOCK_IDS.SAND, count: 64 },
-      { id: BLOCK_IDS.GRAVEL, count: 64 },
-      { id: BLOCK_IDS.OAK_LOG, count: 64 },
-      { id: BLOCK_IDS.BIRCH_LOG, count: 64 },
-      { id: BLOCK_IDS.ICE, count: 64 },
-      { id: BLOCK_IDS.POPPY, count: 64 },
-      { id: BLOCK_IDS.DIAMOND_ORE, count: 64 },
+      { id: BLOCK_IDS.DANDELION, count: 64 },
+      { id: BLOCK_IDS.REDSTONE_ORE, count: 64 },
     ];
     this.selectedIndex = 0;
   }

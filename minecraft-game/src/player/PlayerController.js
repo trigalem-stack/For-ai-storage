@@ -337,16 +337,22 @@ export class PlayerController {
     const inWater = feetInWater || waistInWater;
 
     // 1-block-tall swim mode activates ONLY when fully submerged in water & sprinting!
-    // Never activates by sprinting on dry land, and safely stays crouched/swimming under 1-block ceilings until clear.
+    // Exits immediately back to upright posture when surfacing (!headInWater) or exiting water,
+    // UNLESS a solid 1-block ceiling prevents standing up.
+    const ceilingBlocksStand = !this.flyMode && this.isSwimming
+      ? collidesWithWorld(this.world, this.x, this.y, this.z, PLAYER_HALF_WIDTH, PLAYER_HEIGHT)
+      : false;
+
     let nextSwim = false;
-    if (!this.flyMode && headInWater && wantSprint && forward > 0.25) {
-      nextSwim = true;
-    } else if (!this.flyMode && this.isSwimming) {
-      if (inWater && forward > 0.1 && wantSprint) {
+    if (!this.flyMode) {
+      if (headInWater && wantSprint && forward > 0.25 && !wantJump) {
         nextSwim = true;
-      } else if (collidesWithWorld(this.world, this.x, this.y, this.z, PLAYER_HALF_WIDTH, PLAYER_HEIGHT)) {
-        // Keep low profile until clearing 1-block overhead tunnel
-        nextSwim = true;
+      } else if (this.isSwimming) {
+        if (ceilingBlocksStand) {
+          nextSwim = true;
+        } else if (headInWater && wantSprint && forward > 0.25 && !wantJump) {
+          nextSwim = true;
+        }
       }
     }
     this.isSwimming = nextSwim;
@@ -444,21 +450,25 @@ export class PlayerController {
         let dy;
 
         if (subInWater) {
-          // 3D pitch swim + jump ascent + clean shore hop onto 1-block bank!
+          // 3D pitch swim + reliable upward surfacing + clean shore hop onto 1-block bank!
           if (wantJump) {
             const nearShoreWall = len > 0.05 && collidesWithWorld(
               this.world,
-              this.x + moveDirX * 0.36,
-              this.y + 0.32,
-              this.z + moveDirZ * 0.36,
+              this.x + moveDirX * 0.42,
+              this.y + 0.35,
+              this.z + moveDirZ * 0.42,
               PLAYER_HALF_WIDTH,
-              0.8
+              0.85
             );
             if (!subHeadWater && (nearShoreWall || !subWaistWater)) {
               // Strong hop onto dry shore block from water!
-              this.vy = Math.max(this.vy, 7.15);
+              this.vy = Math.max(this.vy, 7.25);
+            } else if (!subHeadWater && subWaistWater) {
+              // Buoyant bob at surface so holding Jump stays afloat smoothly
+              this.vy = Math.max(this.vy, 3.6);
             } else {
-              this.vy = Math.min(4.8, this.vy + 26.0 * subDt);
+              // Deep underwater: swim briskly upward toward surface
+              this.vy = Math.min(5.2, Math.max(this.vy + 28.0 * subDt, 3.8));
             }
           } else if (wantCrouch) {
             this.vy = Math.max(-5.2, this.vy - 24.0 * subDt);

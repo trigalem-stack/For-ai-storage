@@ -32,6 +32,8 @@ export class MobileControls {
     this.maxRadius = 48;
     this.lastForwardStartTime = 0;
     this.forwardTapReleased = false;
+    this.inCenterSincePush = false;
+    this.lastForwardPeakTime = 0;
     this.sprintLocked = false;
 
     // Camera look state
@@ -344,20 +346,37 @@ export class MobileControls {
     const normZ = -dy / this.maxRadius;
     const mag = Math.min(1, dist / this.maxRadius);
 
-    if (mag < 0.14) {
+    if (mag < 0.16) {
       this.player.touchInput.moveX = 0;
       this.player.touchInput.moveZ = 0;
       this.player.touchInput.sprint = false;
+      this.inCenterSincePush = true;
+      this.sprintLocked = false;
       this.joystickBase?.classList.remove('sprinting');
       return;
     }
 
     this.player.touchInput.moveX = normX;
     this.player.touchInput.moveZ = normZ;
-    const isForwardPush = normZ > 0.45;
-    const autoSprint = isForwardPush && (this.sprintLocked || (mag > 0.90 && normZ > 0.72));
-    this.player.touchInput.sprint = autoSprint;
-    this.joystickBase?.classList.toggle('sprinting', autoSprint);
+
+    // Detect double-push forward without lifting finger (forward -> neutral -> forward within 380ms)
+    const now = performance.now();
+    if (normZ > 0.52) {
+      if (this.inCenterSincePush && now - this.lastForwardPeakTime < 380) {
+        this.sprintLocked = true;
+      }
+      this.inCenterSincePush = false;
+      this.lastForwardPeakTime = now;
+    } else if (normZ < 0.22) {
+      this.inCenterSincePush = true;
+      this.sprintLocked = false;
+    }
+
+    // Never auto-sprint on single push; require explicit double-tap/double-push forward!
+    const isForwardPush = normZ > 0.42;
+    const activeSprint = isForwardPush && this.sprintLocked;
+    this.player.touchInput.sprint = activeSprint;
+    this.joystickBase?.classList.toggle('sprinting', activeSprint);
   }
 
   dispose() {

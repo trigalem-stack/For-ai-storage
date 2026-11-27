@@ -1,4 +1,4 @@
-// Core world, chunk, player, physics, biome, and loop constants shared across stages (1-12).
+// Core world, chunk, player, physics, biome, lighting, and loop constants shared across stages (1-12).
 
 export const CHUNK_SIZE = 16;
 export const WORLD_HEIGHT = 128;
@@ -8,6 +8,21 @@ export const SEA_LEVEL = 62;
 // Fixed simulation tick rate (20 TPS = 50 ms per tick)
 export const TICK_RATE = 20;
 export const TICK_MS = 1000 / TICK_RATE;
+
+// Day/Night cycle constants (24000 ticks = 20 real minutes at 20 TPS)
+export const DAY_LENGTH_TICKS = 24000;
+export const DEFAULT_WORLD_TIME = 1000;
+export const SLEEP_START_TICK = 12541;
+export const SLEEP_END_TICK = 23458;
+export const CLOUD_HEIGHT_MIN = 108;
+export const CLOUD_HEIGHT_MAX = 112;
+
+// Lighting constants (Minecraft 0..15 channels)
+export const MAX_LIGHT_LEVEL = 15;
+export const TORCH_LIGHT_LEVEL = 14;
+export const GLOWSTONE_LIGHT_LEVEL = 15;
+export const JACK_O_LANTERN_LIGHT_LEVEL = 15;
+export const REDSTONE_GLOW_LEVEL = 9;
 
 // Player AABB hitbox & eye dimensions (authentic Minecraft Java proportions)
 export const PLAYER_WIDTH = 0.6;
@@ -24,9 +39,9 @@ export const WALK_SPEED = 4.317;
 export const SPRINT_SPEED = 5.612;
 export const CROUCH_SPEED = 1.295;
 export const SWIM_SPEED = 3.85;
-export const SWIM_SPRINT_SPEED = 6.2;
-export const FLY_SPEED = 11.5;
-export const FLY_SPRINT_SPEED = 23.0;
+export const SWIM_SPRINT_SPEED = 6.0;
+export const FLY_SPEED = 9.5;
+export const FLY_SPRINT_SPEED = 15.0;
 
 // Physics tuned to exact Minecraft jump apex (~1.252 blocks: v0^2 / (2g) = 8.952^2 / 64 = 1.2522)
 export const GRAVITY = 32.0;
@@ -54,7 +69,7 @@ export const MIN_RENDER_DISTANCE = 2;
 export const MAX_RENDER_DISTANCE = 16;
 
 // Chunk meshing frame budget (ms)
-export const CHUNK_FRAME_BUDGET_MS = 3.5;
+export const CHUNK_FRAME_BUDGET_MS = 3.0;
 
 // Texture atlas layout: 16x16 grid of 32x32 padded cells (inner 16x16 + 8px edge padding)
 export const ATLAS_GRID_SIZE = 16;

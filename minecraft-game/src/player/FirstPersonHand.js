@@ -1,4 +1,5 @@
 import * as THREE from '../../vendor/three.module.min.js';
+import { BlockRegistry } from '../blocks/BlockRegistry.js';
 import { buildBlockItemGeometry } from '../entities/ItemEntity.js';
 import { createRightArmGeometry } from './PlayerSkin.js';
 
@@ -26,7 +27,7 @@ export class FirstPersonHand {
       map: atlas.texture,
       vertexColors: true,
       alphaTest: 0.5,
-      side: THREE.FrontSide,
+      side: THREE.DoubleSide,
     });
 
     this.pivot = new THREE.Group();
@@ -88,13 +89,56 @@ export class FirstPersonHand {
         return;
       }
       mesh = new THREE.Mesh(geom, this.blockMaterial);
-      mesh.rotation.set(0.18, Math.PI * 0.25, 0.08);
+      const def = BlockRegistry.get(id);
+      if (def.isCross) {
+        mesh.rotation.set(0.06, -0.22, -0.06);
+      } else if (def.isTorch) {
+        mesh.rotation.set(-0.22, 0.12, -0.14);
+      } else if (def.isBed) {
+        mesh.rotation.set(0.28, Math.PI * 0.35, 0.08);
+      } else {
+        mesh.rotation.set(0.18, Math.PI * 0.25, 0.08);
+      }
       this.heldBlockCache.set(id, mesh);
     }
 
     this.heldItemMount.add(mesh);
     this.armHolder.visible = false;
     this.heldItemMount.visible = true;
+  }
+
+  /**
+   * Dynamically tints the 1st-person arm & held item from surrounding voxel sky/block light.
+   * Emissive held items (torch, glowstone, jack o'lantern) stay bright even inside dark caves.
+   */
+  setEnvironmentLight(skyLevel, blockLevel, sunIntensity, skyTint, torchTint) {
+    const def = BlockRegistry.get(this.currentHeldBlockId);
+    const heldEmit = def?.lightEmission || 0;
+
+    const skyEff = Math.min(1, Math.max(0, (skyLevel / 15) * sunIntensity));
+    const blkEff = Math.min(1, Math.max(0, Math.max(blockLevel, heldEmit * 0.6) / 15));
+    const skyCurve = Math.pow(0.8, (1 - skyEff) * 15);
+    const blkCurve = Math.pow(0.8, (1 - blkEff) * 15);
+
+    const sr = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.r : 1);
+    const sg = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.g : 1);
+    const sb = Math.pow(skyCurve, 2.2) * (skyTint ? skyTint.b : 1);
+
+    const br = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.r : 1);
+    const bg = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.g : 0.78);
+    const bb = Math.pow(blkCurve, 2.2) * (torchTint ? torchTint.b : 0.48);
+
+    const minL = 0.06;
+    const ar = Math.min(1, Math.max(minL, sr, br));
+    const ag = Math.min(1, Math.max(minL, sg, bg));
+    const ab = Math.min(1, Math.max(minL, sb, bb));
+
+    this.armMaterial.color.setRGB(ar, ag, ab);
+    if (heldEmit > 0) {
+      this.blockMaterial.color.setRGB(1, 0.96, 0.90);
+    } else {
+      this.blockMaterial.color.setRGB(ar, ag, ab);
+    }
   }
 
   setMiningActive(active) {
