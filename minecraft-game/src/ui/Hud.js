@@ -1,3 +1,4 @@
+import { BlockRegistry } from '../blocks/BlockRegistry.js';
 import { CAMERA_MODES, CHUNK_SIZE } from '../constants.js';
 
 const CAMERA_MODE_NAMES = [
@@ -14,6 +15,8 @@ export class Hud {
     this.pauseOverlay = document.getElementById('pause-overlay');
     this.pcHint = document.getElementById('pc-lock-hint');
     this.toastEl = document.getElementById('hud-toast');
+    this.breakRing = document.getElementById('break-progress-ring');
+    this.breakRingCircle = document.getElementById('break-progress-circle');
 
     this.btnCamera = document.getElementById('btn-camera');
     this.btnDebug = document.getElementById('btn-debug');
@@ -23,6 +26,8 @@ export class Hud {
     this.btnResume = document.getElementById('btn-resume');
     this.btnControlMode = document.getElementById('btn-control-mode');
     this.btnFlyMode = document.getElementById('btn-fly-mode');
+    this.btnMemoryMode = document.getElementById('btn-memory-mode');
+    this.btnGraphicsMode = document.getElementById('btn-graphics-mode');
     this.btnNewWorld = document.getElementById('btn-new-world');
     this.rangeRenderDist = document.getElementById('range-render-dist');
     this.labelRenderDist = document.getElementById('label-render-dist');
@@ -32,7 +37,6 @@ export class Hud {
     this.iosPseudoFullscreen = false;
     this.toastTimer = null;
 
-    // FPS tracking
     this.fpsFrames = 0;
     this.fpsLastTime = performance.now();
     this.currentFps = 60;
@@ -76,6 +80,16 @@ export class Hud {
     this.btnFlyMode?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.callbacks.onToggleFlyMode?.();
+    });
+
+    this.btnMemoryMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onToggleMemoryMode?.();
+    });
+
+    this.btnGraphicsMode?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.callbacks.onToggleGraphicsMode?.();
     });
 
     this.btnNewWorld?.addEventListener('click', (e) => {
@@ -148,7 +162,6 @@ export class Hud {
       }
     }
 
-    // iOS Safari / restricted WebView full-viewport fallback
     this.iosPseudoFullscreen = true;
     window.scrollTo(0, 1);
     this._updateFsState?.();
@@ -183,7 +196,23 @@ export class Hud {
 
   setFlyModeLabel(isFly) {
     if (this.btnFlyMode) {
-      this.btnFlyMode.textContent = isFly ? 'Полёт (F): ВКЛ' : 'Полёт (F): ВЫКЛ';
+      this.btnFlyMode.textContent = isFly ? 'Полёт (2×Space / F): ВКЛ' : 'Полёт (2×Space / F): ВЫКЛ';
+    }
+  }
+
+  setMemoryModeLabel(unlimited) {
+    if (this.btnMemoryMode) {
+      this.btnMemoryMode.textContent = unlimited
+        ? 'Память мира: Бесконечная (∞)'
+        : 'Память мира: Экономная';
+    }
+  }
+
+  setGraphicsModeLabel(highQuality) {
+    if (this.btnGraphicsMode) {
+      this.btnGraphicsMode.textContent = highQuality
+        ? 'Графика: Высокая (чёткий PixelRatio)'
+        : 'Графика: Производительная (60 FPS)';
     }
   }
 
@@ -196,6 +225,18 @@ export class Hud {
     if (this.pcHint) {
       this.pcHint.classList.toggle('hidden', locked || this.isPaused);
     }
+  }
+
+  setBreakProgress(progress) {
+    if (!this.breakRing || !this.breakRingCircle) return;
+    if (progress <= 0) {
+      this.breakRing.classList.add('hidden');
+      return;
+    }
+    this.breakRing.classList.remove('hidden');
+    const circumference = 100.53; // 2 * PI * 16
+    const offset = circumference * (1 - Math.min(1, progress));
+    this.breakRingCircle.style.strokeDashoffset = String(offset.toFixed(2));
   }
 
   onCameraModeChanged(mode) {
@@ -213,7 +254,7 @@ export class Hud {
     }, durationMs);
   }
 
-  updateDebug({ player, world, renderer }) {
+  updateDebug({ player, world, renderer, targetHit, itemCount }) {
     this.fpsFrames++;
     const now = performance.now();
     const elapsed = now - this.fpsLastTime;
@@ -231,16 +272,19 @@ export class Hud {
     const lz = ((Math.floor(player.z) % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
     const info = renderer.info;
     const mem = performance.memory
-      ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)} / ${Math.round(performance.memory.jsHeapSizeLimit / 1048576)} MB`
-      : 'n/a';
+      ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)} MB (лимит: ∞)`
+      : '∞ (без ограничений)';
+    const hitDesc = targetHit
+      ? `${targetHit.x}, ${targetHit.y}, ${targetHit.z} [${BlockRegistry.get(targetHit.blockId).name}]`
+      : 'нет';
 
     this.debugPanel.textContent = [
-      `Minecraft Clone Stage 1 | FPS: ${this.currentFps}`,
-      `XYZ: ${player.x.toFixed(2)} / ${player.y.toFixed(2)} / ${player.z.toFixed(2)}`,
-      `Chunk: ${cx}, ${cz} (local ${lx}, ${Math.floor(player.y)}, ${lz})`,
-      `Facing: ${player.getFacingCardinal()} (${((player.yaw * 180 / Math.PI) % 360).toFixed(1)}° / ${(player.pitch * 180 / Math.PI).toFixed(1)}°)`,
-      `Chunks: ${world.chunks.size} (R=${world.renderDistance}) | Triangles: ${info.render.triangles} | Calls: ${info.render.calls}`,
-      `Memory: ${mem} | Seed: ${world.seed} | Mode: ${player.flyMode ? 'Fly' : 'Walk'}`,
+      `Minecraft Web Edition (Этап 2) | FPS: ${this.currentFps}`,
+      `XYZ: ${player.x.toFixed(2)} / ${player.y.toFixed(2)} / ${player.z.toFixed(2)} | ${player.isCrouching ? 'Присед' : player.isSprinting ? 'Бег' : player.flyMode ? 'Полёт' : 'Ходьба'}`,
+      `Chunk: ${cx}, ${cz} (local ${lx}, ${Math.floor(player.y)}, ${lz}) | Facing: ${player.getFacingCardinal()}`,
+      `Target: ${hitDesc} | Drops: ${itemCount ?? 0}`,
+      `Chunks: ${world.chunks.size} active / ${world.unlimitedMemory ? `∞ (${world.chunkDataCache.size} cached)` : 'Economy'} | Edits: ${world.modifiedBlocks.size}`,
+      `Triangles: ${info.render.triangles} | Calls: ${info.render.calls} | Mem: ${mem} | Seed: ${world.seed}`,
     ].join('\n');
   }
 }

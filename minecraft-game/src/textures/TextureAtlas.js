@@ -41,6 +41,8 @@ export class TextureAtlas {
 
     this.tiles = new Map(); // tileName -> { cx, cy, uv: { u0, u1, vBottom, vTop } }
     this.nextIndex = 0;
+    this.previewCache = new Map();
+    this.crackTextures = null;
 
     this._generateAllStage1Tiles();
 
@@ -120,6 +122,9 @@ export class TextureAtlas {
    * Extracts a standalone 16x16 DataURL preview for hotbar/inventory icons (Stage 2+).
    */
   getTilePreviewDataURL(name) {
+    if (this.previewCache.has(name)) {
+      return this.previewCache.get(name);
+    }
     const rec = this.getUV(name);
     const temp = document.createElement('canvas');
     temp.width = ATLAS_TILE_INNER;
@@ -137,7 +142,128 @@ export class TextureAtlas {
       ATLAS_TILE_INNER,
       ATLAS_TILE_INNER
     );
-    return temp.toDataURL();
+    const url = temp.toDataURL();
+    this.previewCache.set(name, url);
+    return url;
+  }
+
+  /**
+   * Generates isometric-style 2D block icon DataURL for Hotbar slots.
+   */
+  getBlockIconDataURL(blockDef) {
+    if (!blockDef || !blockDef.faces) return '';
+    const cacheKey = `block:${blockDef.id}`;
+    if (this.previewCache.has(cacheKey)) {
+      return this.previewCache.get(cacheKey);
+    }
+
+    const size = 32;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+
+    const topRec = this.getUV(blockDef.faces.top);
+    const sideLeftRec = this.getUV(blockDef.faces.west);
+    const sideRightRec = this.getUV(blockDef.faces.south);
+
+    const drawIsoFace = (rec, a, b, cc, d, e, f, brightness) => {
+      g.save();
+      g.transform(a, b, cc, d, e, f);
+      g.drawImage(
+        this.canvas,
+        rec.cx * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
+        rec.cy * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
+        ATLAS_TILE_INNER,
+        ATLAS_TILE_INNER,
+        0,
+        0,
+        16,
+        16
+      );
+      if (brightness < 1) {
+        g.fillStyle = `rgba(0,0,0,${(1 - brightness).toFixed(2)})`;
+        g.fillRect(0, 0, 16, 16);
+      }
+      g.restore();
+    };
+
+    // Isometric cube projection centered in 32x32 icon
+    drawIsoFace(topRec, 0.85, 0.42, -0.85, 0.42, 16, 2, 1.0);
+    drawIsoFace(sideLeftRec, 0.85, 0.42, 0, 0.92, 2.4, 8.7, 0.82);
+    drawIsoFace(sideRightRec, 0.85, -0.42, 0, 0.92, 16, 15.4, 0.64);
+
+    const url = c.toDataURL();
+    this.previewCache.set(cacheKey, url);
+    return url;
+  }
+
+  /**
+   * Procedurally generates 10 Minecraft destroy_stage_0..9 crack textures (16x16).
+   */
+  getCrackTextures() {
+    if (this.crackTextures) return this.crackTextures;
+    this.crackTextures = [];
+
+    // Deterministic branching fracture paths radiating from tile center
+    const crackPaths = [
+      [[8, 8], [7, 7], [6, 6], [5, 4], [4, 2], [3, 1]],
+      [[8, 8], [9, 7], [11, 6], [13, 5], [14, 3], [15, 2]],
+      [[8, 8], [7, 9], [6, 11], [4, 12], [2, 14], [1, 15]],
+      [[8, 8], [9, 9], [10, 11], [12, 12], [13, 14], [14, 15]],
+      [[8, 8], [8, 6], [7, 4], [8, 2], [7, 0]],
+      [[8, 8], [10, 8], [12, 9], [14, 8], [15, 9]],
+      [[8, 8], [6, 8], [4, 7], [2, 8], [0, 7]],
+      [[8, 8], [8, 10], [9, 12], [8, 14], [9, 15]],
+      [[6, 6], [4, 7], [3, 9], [2, 11]],
+      [[11, 6], [12, 8], [13, 10], [14, 12]],
+      [[6, 11], [8, 12], [10, 12], [11, 13]],
+      [[5, 4], [7, 3], [9, 3], [11, 2]],
+    ];
+
+    for (let stage = 0; stage < 10; stage++) {
+      const c = document.createElement('canvas');
+      c.width = ATLAS_TILE_INNER;
+      c.height = ATLAS_TILE_INNER;
+      const g = c.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.clearRect(0, 0, 16, 16);
+
+      const activeBranches = Math.min(crackPaths.length, 2 + Math.floor(stage * 1.15));
+      const depthSteps = 1 + Math.floor((stage + 1) * 0.6);
+
+      for (let b = 0; b < activeBranches; b++) {
+        const pts = crackPaths[b];
+        const limit = Math.min(pts.length, depthSteps);
+        for (let i = 0; i < limit; i++) {
+          const [px, py] = pts[i];
+          const alpha = Math.min(0.86, 0.35 + stage * 0.055);
+          g.fillStyle = `rgba(12, 12, 12, ${alpha.toFixed(2)})`;
+          g.fillRect(px, py, 1, 1);
+
+          if (stage >= 5 && i > 0) {
+            g.fillStyle = `rgba(28, 28, 28, ${(alpha * 0.55).toFixed(2)})`;
+            g.fillRect(Math.min(15, px + 1), py, 1, 1);
+          }
+        }
+      }
+
+      if (stage >= 7) {
+        g.fillStyle = `rgba(0, 0, 0, ${((stage - 6) * 0.09).toFixed(2)})`;
+        g.fillRect(6, 6, 4, 4);
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      tex.generateMipmaps = false;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      this.crackTextures.push(tex);
+    }
+
+    return this.crackTextures;
   }
 
   _generateAllStage1Tiles() {

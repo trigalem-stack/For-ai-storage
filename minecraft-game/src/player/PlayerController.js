@@ -1,18 +1,26 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import {
+  BASE_FOV,
   CAMERA_MODES,
   CROUCH_SPEED,
   FLY_SPEED,
   FLY_SPRINT_SPEED,
   GRAVITY,
+  JUMP_COOLDOWN_SEC,
   JUMP_VELOCITY,
   PLAYER_CROUCH_EYE_HEIGHT,
+  PLAYER_CROUCH_HEIGHT,
   PLAYER_EYE_HEIGHT,
+  PLAYER_HALF_WIDTH,
+  PLAYER_HEIGHT,
   SEA_LEVEL,
+  SPRINT_FOV_BOOST,
   SPRINT_SPEED,
+  TERMINAL_VELOCITY,
   WALK_SPEED,
   WORLD_HEIGHT,
 } from '../constants.js';
+import { collidesWithWorld, moveAABB } from '../physics/AABBPhysics.js';
 
 export class PlayerController {
   constructor(camera, world, playerModel, firstPersonHand, options = {}) {
@@ -24,16 +32,23 @@ export class PlayerController {
     this.x = options.x ?? 0.5;
     this.y = options.y ?? 70;
     this.z = options.z ?? 0.5;
+    this.vx = 0;
     this.vy = 0;
+    this.vz = 0;
     this.yaw = options.yaw ?? 0;
     this.pitch = options.pitch ?? -0.12;
 
     this.cameraMode = options.cameraMode ?? CAMERA_MODES.FIRST_PERSON;
     this.flyMode = Boolean(options.flyMode);
 
-    this.onGround = true;
+    this.onGround = false;
     this.isCrouching = false;
     this.isSprinting = false;
+    this.sprintToggled = false;
+    this.jumpCooldown = 0;
+    this.currentFov = BASE_FOV;
+    this.currentEyeHeight = PLAYER_EYE_HEIGHT;
+
     this.walkPhase = 0;
     this.moveBlend = 0;
     this.time = 0;
@@ -44,6 +59,8 @@ export class PlayerController {
     this.isPaused = false;
     this.mouseSensitivity = 0.0022;
     this.lastSpaceTime = 0;
+    this.lastWTime = 0;
+    this.primaryHeld = false;
 
     // External mobile input bridge (updated by MobileControls)
     this.touchInput = {
@@ -52,14 +69,18 @@ export class PlayerController {
       jump: false,
       crouch: false,
       sprint: false,
+      breakHeld: false,
     };
 
-    // Action hooks for Stage 2+ mining / block placement
-    this.onPrimaryAction = options.onPrimaryAction || null;
+    // Action & HUD callbacks
+    this.onPlaceAction = options.onPlaceAction || null;
     this.onCameraModeChange = options.onCameraModeChange || null;
     this.onToggleDebug = options.onToggleDebug || null;
     this.onTogglePause = options.onTogglePause || null;
     this.onFlyModeChange = options.onFlyModeChange || null;
+
+    this._lookVec = new THREE.Vector3();
+    this._eyeOrigin = new THREE.Vector3();
 
     this._bindEvents();
     this._syncVisibility();
@@ -90,18 +111,28 @@ export class PlayerController {
       }
       if (e.code === 'Space' && !e.repeat) {
         const now = performance.now();
-        if (now - this.lastSpaceTime < 280) {
+        if (now - this.lastSpaceTime < 300) {
           this.toggleFlyMode();
           this.lastSpaceTime = 0;
         } else {
           this.lastSpaceTime = now;
         }
       }
+      if (e.code === 'KeyW' && !e.repeat) {
+        const now = performance.now();
+        if (now - this.lastWTime < 280) {
+          this.sprintToggled = true;
+        }
+        this.lastWTime = now;
+      }
       this.keys.add(e.code);
     };
 
     this._onKeyUp = (e) => {
       this.keys.delete(e.code);
+      if (e.code === 'KeyW') {
+        this.sprintToggled = false;
+      }
     };
 
     this._onMouseMove = (e) => {
@@ -110,20 +141,32 @@ export class PlayerController {
     };
 
     this._onMouseDown = (e) => {
-      if (this.isPaused) return;
-      if (e.button === 0 && this.pointerLocked) {
-        this.triggerPrimaryAction();
+      if (this.isPaused || !this.pointerLocked) return;
+      if (e.button === 0) {
+        this.primaryHeld = true;
+        this.firstPersonHand.triggerSwing();
+      } else if (e.button === 2) {
+        this.triggerPlaceAction();
+      }
+    };
+
+    this._onMouseUp = (e) => {
+      if (e.button === 0) {
+        this.primaryHeld = false;
       }
     };
 
     this._onBlur = () => {
       this.keys.clear();
+      this.primaryHeld = false;
+      this.sprintToggled = false;
     };
 
     window.addEventListener('keydown', this._onKeyDown);
     window.addEventListener('keyup', this._onKeyUp);
     window.addEventListener('mousemove', this._onMouseMove);
     window.addEventListener('mousedown', this._onMouseDown);
+    window.addEventListener('mouseup', this._onMouseUp);
     window.addEventListener('blur', this._onBlur);
   }
 
@@ -136,9 +179,36 @@ export class PlayerController {
     this.firstPersonHand.addLookInertia(dYaw, dPitch);
   }
 
-  triggerPrimaryAction() {
-    this.firstPersonHand.triggerSwing();
-    this.onPrimaryAction?.();
+  isMiningHeld() {
+    return (this.primaryHeld && this.pointerLocked && !this.isPaused) || (this.touchInput.breakHeld && !this.isPaused);
+  }
+
+  triggerPlaceAction() {
+    if (this.isPaused) return false;
+    const placed = this.onPlaceAction?.();
+    if (placed) {
+      this.firstPersonHand.triggerSwing();
+    }
+    return Boolean(placed);
+  }
+
+  getEyeOrigin() {
+    this._eyeOrigin.set(this.x, this.y + this.currentEyeHeight, this.z);
+    return this._eyeOrigin;
+  }
+
+  getLookDirection() {
+    const cosP = Math.cos(this.pitch);
+    this._lookVec.set(
+      -Math.sin(this.yaw) * cosP,
+      Math.sin(this.pitch),
+      -Math.cos(this.yaw) * cosP
+    );
+    return this._lookVec;
+  }
+
+  getCurrentHitboxHeight() {
+    return this.isCrouching ? PLAYER_CROUCH_HEIGHT : PLAYER_HEIGHT;
   }
 
   cycleCameraMode() {
@@ -169,6 +239,9 @@ export class PlayerController {
     this.isPaused = paused;
     if (paused) {
       this.keys.clear();
+      this.primaryHeld = false;
+      this.touchInput.breakHeld = false;
+      this.sprintToggled = false;
       if (document.pointerLockElement) {
         document.exitPointerLock?.();
       }
@@ -200,7 +273,6 @@ export class PlayerController {
   }
 
   getFacingCardinal() {
-    // yaw=0 looks along -Z (North)
     const dirX = -Math.sin(this.yaw);
     const dirZ = -Math.cos(this.yaw);
     if (Math.abs(dirZ) >= Math.abs(dirX)) {
@@ -213,7 +285,6 @@ export class PlayerController {
     this.time += dt;
     if (this.isPaused) return;
 
-    // Combine keyboard & touch inputs
     let forward = 0;
     let strafe = 0;
     if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) forward += 1;
@@ -232,12 +303,29 @@ export class PlayerController {
 
     const wantJump = this.keys.has('Space') || this.touchInput.jump;
     const wantCrouch = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchInput.crouch;
-    const wantSprint = this.keys.has('ControlLeft') || this.keys.has('ControlRight') || this.touchInput.sprint;
+    const wantSprint =
+      this.keys.has('ControlLeft') ||
+      this.keys.has('ControlRight') ||
+      this.sprintToggled ||
+      this.touchInput.sprint;
 
-    this.isCrouching = !this.flyMode && wantCrouch;
-    this.isSprinting = wantSprint && forward > 0.25 && !this.isCrouching;
+    // Crouch ceiling check: cannot uncrouch if standing height (1.8) collides overhead
+    let nextCrouch = !this.flyMode && wantCrouch;
+    if (!nextCrouch && this.isCrouching && !this.flyMode) {
+      if (collidesWithWorld(this.world, this.x, this.y, this.z, PLAYER_HALF_WIDTH, PLAYER_HEIGHT)) {
+        nextCrouch = true;
+      }
+    }
+    this.isCrouching = nextCrouch;
 
-    // Horizontal direction vectors on XZ plane (yaw=0 -> forward=(0, -1), right=(1, 0))
+    if (forward <= 0.25 || this.isCrouching) {
+      this.isSprinting = false;
+    } else if (wantSprint) {
+      this.isSprinting = true;
+    } else {
+      this.isSprinting = false;
+    }
+
     const sinY = Math.sin(this.yaw);
     const cosY = Math.cos(this.yaw);
     const moveDirX = -sinY * forward + cosY * strafe;
@@ -252,65 +340,102 @@ export class PlayerController {
       speed = SPRINT_SPEED;
     }
 
-    const nextX = this.x + moveDirX * speed * dt;
-    const nextZ = this.z + moveDirZ * speed * dt;
+    const activeHeight = this.getCurrentHitboxHeight();
+    if (this.jumpCooldown > 0) this.jumpCooldown = Math.max(0, this.jumpCooldown - dt);
 
-    if (this.flyMode) {
-      this.x = nextX;
-      this.z = nextZ;
-      let vert = 0;
-      if (wantJump) vert += 1;
-      if (wantCrouch) vert -= 1;
-      this.y = Math.max(1.5, Math.min(WORLD_HEIGHT + 24, this.y + vert * speed * dt));
-      this.onGround = false;
-    } else {
-      // Stage 1 smooth ground-following & step-up (Stage 2 upgrades to full 3D AABB collision)
-      const curSurface = this.world.getSurfaceHeightAt(this.x, this.z);
-      const targetSurfaceX = this.world.getSurfaceHeightAt(nextX, this.z);
-      if (targetSurfaceX <= this.y + 1.25 || targetSurfaceX <= curSurface + 1.1) {
-        this.x = nextX;
-      }
+    // Substep physics for tunneling immunity even during frame hiccups
+    const substeps = Math.max(1, Math.ceil(dt / 0.016));
+    const subDt = dt / substeps;
+    let anyWallHit = false;
 
-      const targetSurfaceZ = this.world.getSurfaceHeightAt(this.x, nextZ);
-      if (targetSurfaceZ <= this.y + 1.25 || targetSurfaceZ <= curSurface + 1.1) {
-        this.z = nextZ;
-      }
+    for (let s = 0; s < substeps; s++) {
+      if (this.flyMode) {
+        let vert = 0;
+        if (wantJump) vert += 1;
+        if (wantCrouch) vert -= 1;
 
-      const groundY = this.world.getSurfaceHeightAt(this.x, this.z);
-      const inWater = this.y < SEA_LEVEL + 0.35 && this.world.getBlock(this.x, this.y + 0.3, this.z) === 12;
-
-      if (inWater) {
-        if (wantJump) {
-          this.vy = 4.2;
-        } else {
-          this.vy = Math.max(-2.6, this.vy - GRAVITY * 0.25 * dt);
-        }
-      } else {
-        if (this.onGround && wantJump) {
-          this.vy = JUMP_VELOCITY;
-          this.onGround = false;
-        } else {
-          this.vy -= GRAVITY * dt;
-        }
-      }
-
-      this.y += this.vy * dt;
-
-      if (this.y <= groundY) {
-        // Smooth step-up when climbing 1-block slope
-        this.y = groundY;
-        this.vy = 0;
-        this.onGround = true;
-      } else if (this.y - groundY < 0.08 && this.vy <= 0) {
-        this.y = groundY;
-        this.vy = 0;
-        this.onGround = true;
-      } else {
+        const res = moveAABB(
+          this.world,
+          this,
+          moveDirX * speed * subDt,
+          vert * speed * subDt,
+          moveDirZ * speed * subDt,
+          PLAYER_HALF_WIDTH,
+          PLAYER_HEIGHT,
+          false
+        );
+        this.x = res.x;
+        this.y = Math.max(1.0, Math.min(WORLD_HEIGHT + 32, res.y));
+        this.z = res.z;
         this.onGround = false;
+        this.vy = 0;
+        if (res.hitWall) anyWallHit = true;
+      } else {
+        const inWater = this.y < SEA_LEVEL + 0.4 && this.world.getBlock(this.x, this.y + 0.35, this.z) === 12;
+        let dy;
+
+        if (inWater) {
+          speed = this.isSprinting ? WALK_SPEED * 0.85 : WALK_SPEED * 0.62;
+          if (wantJump) {
+            this.vy = 4.4;
+          } else {
+            this.vy = Math.max(-3.2, this.vy - GRAVITY * 0.25 * subDt);
+          }
+          dy = this.vy * subDt;
+        } else {
+          let prevVy = this.vy;
+          if (this.onGround && wantJump && this.jumpCooldown <= 0) {
+            prevVy = JUMP_VELOCITY;
+            this.onGround = false;
+            this.jumpCooldown = JUMP_COOLDOWN_SEC;
+          }
+          this.vy = Math.max(-TERMINAL_VELOCITY, prevVy - GRAVITY * subDt);
+          dy = 0.5 * (prevVy + this.vy) * subDt;
+        }
+
+        const res = moveAABB(
+          this.world,
+          this,
+          moveDirX * speed * subDt,
+          dy,
+          moveDirZ * speed * subDt,
+          PLAYER_HALF_WIDTH,
+          activeHeight,
+          this.isCrouching
+        );
+
+        this.x = res.x;
+        this.y = res.y;
+        this.z = res.z;
+        this.onGround = res.onGround;
+        if (res.onGround && this.vy < 0) this.vy = 0;
+        if (res.hitCeiling && this.vy > 0) this.vy = 0;
+        if (res.hitWall) anyWallHit = true;
       }
     }
 
-    // Update animation phase
+    if (anyWallHit && !this.flyMode) {
+      this.isSprinting = false;
+      this.sprintToggled = false;
+    }
+
+    // Smooth camera eye-height transition on crouch/uncrouch
+    const targetEye = this.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
+    this.currentEyeHeight += (targetEye - this.currentEyeHeight) * Math.min(1, dt * 16);
+
+    // Smooth sprint FOV boost (+10 deg)
+    const targetFov = this.isSprinting ? BASE_FOV + SPRINT_FOV_BOOST : BASE_FOV;
+    if (Math.abs(this.currentFov - targetFov) > 0.05) {
+      this.currentFov += (targetFov - this.currentFov) * Math.min(1, dt * 10);
+      this.camera.fov = this.currentFov;
+      this.camera.updateProjectionMatrix();
+    } else if (this.currentFov !== targetFov) {
+      this.currentFov = targetFov;
+      this.camera.fov = targetFov;
+      this.camera.updateProjectionMatrix();
+    }
+
+    // Walk animation phase
     const horizontalSpeed = Math.hypot(moveDirX, moveDirZ) * speed;
     const isMoving = len > 0.05;
     const targetBlend = isMoving && (this.onGround || this.flyMode) ? Math.min(1, len) : 0;
@@ -319,7 +444,6 @@ export class PlayerController {
       this.walkPhase += dt * (4.2 + horizontalSpeed * 1.15);
     }
 
-    // Update 1st-person hand & 3rd-person Steve model
     this.firstPersonHand.update(dt, this.walkPhase, this.moveBlend, this.isCrouching);
     this.playerModel.updatePose({
       x: this.x,
@@ -338,9 +462,8 @@ export class PlayerController {
   }
 
   _updateCamera() {
-    const eyeH = this.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
     const eyeX = this.x;
-    const eyeY = this.y + eyeH;
+    const eyeY = this.y + this.currentEyeHeight;
     const eyeZ = this.z;
 
     if (this.cameraMode === CAMERA_MODES.FIRST_PERSON) {
@@ -352,13 +475,11 @@ export class PlayerController {
       return;
     }
 
-    // Third-person camera orbit vector
     const cosP = Math.cos(this.pitch);
     const sinP = Math.sin(this.pitch);
     const sinY = Math.sin(this.yaw);
     const cosY = Math.cos(this.yaw);
 
-    // Forward look vector of player
     const lookX = -sinY * cosP;
     const lookY = sinP;
     const lookZ = -cosY * cosP;
@@ -367,24 +488,23 @@ export class PlayerController {
     const maxDist = 3.8;
     let dist = maxDist;
 
-    // Simple ray step to avoid camera going inside terrain blocks
-    for (let step = 0.4; step <= maxDist; step += 0.25) {
+    for (let step = 0.35; step <= maxDist; step += 0.2) {
       const cx = eyeX + lookX * sign * step;
       const cy = eyeY + lookY * sign * step;
       const cz = eyeZ + lookZ * sign * step;
       const b = this.world.getBlock(cx, cy, cz);
       if (b !== 0 && b !== 12) {
-        dist = Math.max(0.6, step - 0.3);
+        dist = Math.max(0.5, step - 0.25);
         break;
       }
     }
 
     const camX = eyeX + lookX * sign * dist;
-    const camY = Math.max(this.world.getSurfaceHeightAt(eyeX + lookX * sign * dist, eyeZ + lookZ * sign * dist) + 0.35, eyeY + lookY * sign * dist);
+    const camY = eyeY + lookY * sign * dist;
     const camZ = eyeZ + lookZ * sign * dist;
 
     this.camera.position.set(camX, camY, camZ);
-    this.camera.lookAt(eyeX, eyeY - 0.1, eyeZ);
+    this.camera.lookAt(eyeX, eyeY - 0.08, eyeZ);
   }
 
   dispose() {
@@ -392,6 +512,7 @@ export class PlayerController {
     window.removeEventListener('keyup', this._onKeyUp);
     window.removeEventListener('mousemove', this._onMouseMove);
     window.removeEventListener('mousedown', this._onMouseDown);
+    window.removeEventListener('mouseup', this._onMouseUp);
     window.removeEventListener('blur', this._onBlur);
   }
 }

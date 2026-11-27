@@ -4,7 +4,6 @@ import { AO_CURVE, CHUNK_SIZE, FACE_SHADE, WORLD_HEIGHT } from '../constants.js'
 
 // Each face defines:
 // key, normal [nx, ny, nz], shade, and 4 CCW vertices [dx, dy, dz, ox, oy, oz, uIdx, vIdx]
-// uIdx: 0->u0, 1->u1; vIdx: 0->vBottom, 1->vTop
 const FACES = [
   {
     key: 'top',
@@ -74,34 +73,73 @@ const FACES = [
   },
 ];
 
-function createBufferAccumulator() {
-  return {
-    positions: [],
-    normals: [],
-    uvs: [],
-    colors: [],
-    indices: [],
-    vertexCount: 0,
-  };
-}
+// Reusable typed-array scratch buffer to eliminate dynamic JS array growth & GC pressure
+class ScratchMeshBuffer {
+  constructor(initialQuads = 2048) {
+    this.capacityQuads = initialQuads;
+    this.positions = new Float32Array(initialQuads * 12);
+    this.normals = new Float32Array(initialQuads * 12);
+    this.uvs = new Float32Array(initialQuads * 8);
+    this.colors = new Float32Array(initialQuads * 12);
+    this.indices = new Uint32Array(initialQuads * 6);
+    this.vertexCount = 0;
+    this.indexCount = 0;
+  }
 
-function finalizeGeometry(acc) {
-  if (acc.vertexCount === 0) return null;
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(acc.normals, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(acc.uvs, 2));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(acc.colors, 3));
+  reset() {
+    this.vertexCount = 0;
+    this.indexCount = 0;
+  }
 
-  const IndexArray = acc.vertexCount > 65535 ? Uint32Array : Uint16Array;
-  geometry.setIndex(new THREE.BufferAttribute(new IndexArray(acc.indices), 1));
-  geometry.computeBoundingSphere();
-  return geometry;
+  ensureQuadCapacity() {
+    const neededQuads = (this.vertexCount >> 2) + 1;
+    if (neededQuads <= this.capacityQuads) return;
+    this.capacityQuads *= 2;
+
+    const growFloat = (arr, stride) => {
+      const next = new Float32Array(this.capacityQuads * stride);
+      next.set(arr);
+      return next;
+    };
+    this.positions = growFloat(this.positions, 12);
+    this.normals = growFloat(this.normals, 12);
+    this.uvs = growFloat(this.uvs, 8);
+    this.colors = growFloat(this.colors, 12);
+
+    const nextIdx = new Uint32Array(this.capacityQuads * 6);
+    nextIdx.set(this.indices);
+    this.indices = nextIdx;
+  }
+
+  toGeometry() {
+    if (this.vertexCount === 0) return null;
+    const vCount = this.vertexCount;
+    const iCount = this.indexCount;
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.positions.slice(0, vCount * 3), 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(this.normals.slice(0, vCount * 3), 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(this.uvs.slice(0, vCount * 2), 2));
+    geometry.setAttribute('color', new THREE.BufferAttribute(this.colors.slice(0, vCount * 3), 3));
+
+    if (vCount <= 65535) {
+      const idx16 = new Uint16Array(iCount);
+      for (let i = 0; i < iCount; i++) idx16[i] = this.indices[i];
+      geometry.setIndex(new THREE.BufferAttribute(idx16, 1));
+    } else {
+      geometry.setIndex(new THREE.BufferAttribute(this.indices.slice(0, iCount), 1));
+    }
+    geometry.computeBoundingSphere();
+    return geometry;
+  }
 }
 
 export class ChunkMesher {
   constructor(atlas) {
     this.atlas = atlas;
+
+    // Pre-cache linear brightness lookup table for all (faceShade * AO_CURVE) combinations
+    this.aoLinearLUT = AO_CURVE.map((v) => v);
 
     this.opaqueMaterial = new THREE.MeshBasicMaterial({
       map: atlas.texture,
@@ -127,16 +165,24 @@ export class ChunkMesher {
       depthWrite: false,
       side: THREE.DoubleSide,
     });
+
+    // Reusable scratch buffers shared across builds (single-threaded main-thread safe)
+    this._opaqueBuf = new ScratchMeshBuffer(4096);
+    this._cutoutBuf = new ScratchMeshBuffer(1024);
+    this._waterBuf = new ScratchMeshBuffer(1024);
   }
 
   /**
    * Builds opaque, cutout (leaves), and water BufferGeometries for a single chunk.
-   * Queries neighbor blocks across chunk boundaries seamlessly via worldSampler.
+   * Skips empty sky layers via chunk.minY..chunk.maxY and reuses preallocated TypedArrays.
    */
   buildChunkGeometries(chunk, getWorldBlock) {
-    const opaqueAcc = createBufferAccumulator();
-    const cutoutAcc = createBufferAccumulator();
-    const waterAcc = createBufferAccumulator();
+    const opaqueBuf = this._opaqueBuf;
+    const cutoutBuf = this._cutoutBuf;
+    const waterBuf = this._waterBuf;
+    opaqueBuf.reset();
+    cutoutBuf.reset();
+    waterBuf.reset();
 
     const baseX = chunk.cx * CHUNK_SIZE;
     const baseZ = chunk.cz * CHUNK_SIZE;
@@ -152,10 +198,7 @@ export class ChunkMesher {
       return getWorldBlock(wx, wy, wz);
     };
 
-    const isOccludingAO = (wx, wy, wz) => {
-      const id = getBlockAtWorld(wx, wy, wz);
-      return BlockRegistry.occludesAO(id) ? 1 : 0;
-    };
+    const isOccludingAO = (wx, wy, wz) => (BlockRegistry.occludesAO(getBlockAtWorld(wx, wy, wz)) ? 1 : 0);
 
     const computeVertexAO = (bx, by, bz, nx, ny, nz, ox, oy, oz) => {
       let s1 = 0;
@@ -179,8 +222,10 @@ export class ChunkMesher {
     };
 
     const aoValues = [3, 3, 3, 3];
+    const startY = Math.max(0, chunk.minY);
+    const endY = Math.min(WORLD_HEIGHT - 1, chunk.maxY);
 
-    for (let y = 0; y < WORLD_HEIGHT; y++) {
+    for (let y = startY; y <= endY; y++) {
       const yBase = y * CHUNK_SIZE * CHUNK_SIZE;
       for (let z = 0; z < CHUNK_SIZE; z++) {
         const zBase = yBase + z * CHUNK_SIZE;
@@ -192,15 +237,12 @@ export class ChunkMesher {
           const def = BlockRegistry.get(id);
           const wx = baseX + x;
           const isWater = def.isLiquid;
-          const isCutout = def.isCutout;
-          const acc = isWater ? waterAcc : (isCutout ? cutoutAcc : opaqueAcc);
+          const buf = isWater ? waterBuf : (def.isCutout ? cutoutBuf : opaqueBuf);
 
-          // Lower water top surface slightly when air/non-water is above it
           const waterTopDrop = isWater && getBlockAtWorld(wx, y + 1, wz) !== BLOCK_IDS.WATER ? 0.12 : 0;
 
           for (let f = 0; f < 6; f++) {
             const face = FACES[f];
-            // Skip bottom of bedrock at y = 0 looking into void
             if (y === 0 && face.ny === -1) continue;
 
             const nbx = wx + face.nx;
@@ -214,12 +256,17 @@ export class ChunkMesher {
               if (neighborId === id || BlockRegistry.isOpaque(neighborId)) continue;
             }
 
-            const tileName = def.faces[face.key];
-            const uv = this.atlas.getUV(tileName);
-            const uArr = [uv.u0, uv.u1];
-            const vArr = [uv.vBottom, uv.vTop];
+            buf.ensureQuadCapacity();
 
-            const baseVert = acc.vertexCount;
+            const uv = this.atlas.getUV(def.faces[face.key]);
+            const u0 = uv.u0;
+            const u1 = uv.u1;
+            const v0 = uv.vBottom;
+            const v1 = uv.vTop;
+
+            const baseVert = buf.vertexCount;
+            let pOff = baseVert * 3;
+            let uOff = baseVert * 2;
             const shade = face.shade;
 
             for (let i = 0; i < 4; i++) {
@@ -229,9 +276,16 @@ export class ChunkMesher {
                 dy -= waterTopDrop;
               }
 
-              acc.positions.push(x + corner[0], y + dy, z + corner[2]);
-              acc.normals.push(face.nx, face.ny, face.nz);
-              acc.uvs.push(uArr[corner[6]], vArr[corner[7]]);
+              buf.positions[pOff] = x + corner[0];
+              buf.positions[pOff + 1] = y + dy;
+              buf.positions[pOff + 2] = z + corner[2];
+
+              buf.normals[pOff] = face.nx;
+              buf.normals[pOff + 1] = face.ny;
+              buf.normals[pOff + 2] = face.nz;
+
+              buf.uvs[uOff] = corner[6] === 0 ? u0 : u1;
+              buf.uvs[uOff + 1] = corner[7] === 0 ? v0 : v1;
 
               const ao = isWater
                 ? 3
@@ -239,34 +293,43 @@ export class ChunkMesher {
               aoValues[i] = ao;
 
               const brightness = shade * AO_CURVE[ao];
-              // Convert perceptual sRGB brightness to linear space so MeshBasicMaterial
-              // outputs authentic Minecraft directional contrast & smooth AO after gamma encoding.
               const linearBrightness = Math.pow(brightness, 2.2);
-              acc.colors.push(linearBrightness, linearBrightness, linearBrightness);
+              buf.colors[pOff] = linearBrightness;
+              buf.colors[pOff + 1] = linearBrightness;
+              buf.colors[pOff + 2] = linearBrightness;
+
+              pOff += 3;
+              uOff += 2;
             }
 
-            // Flip quad diagonal to eliminate Smooth AO anisotropy artifacts
+            let idxOff = buf.indexCount;
             if (aoValues[0] + aoValues[2] > aoValues[1] + aoValues[3]) {
-              acc.indices.push(
-                baseVert, baseVert + 1, baseVert + 2,
-                baseVert, baseVert + 2, baseVert + 3
-              );
+              buf.indices[idxOff] = baseVert;
+              buf.indices[idxOff + 1] = baseVert + 1;
+              buf.indices[idxOff + 2] = baseVert + 2;
+              buf.indices[idxOff + 3] = baseVert;
+              buf.indices[idxOff + 4] = baseVert + 2;
+              buf.indices[idxOff + 5] = baseVert + 3;
             } else {
-              acc.indices.push(
-                baseVert + 1, baseVert + 2, baseVert + 3,
-                baseVert + 1, baseVert + 3, baseVert
-              );
+              buf.indices[idxOff] = baseVert + 1;
+              buf.indices[idxOff + 1] = baseVert + 2;
+              buf.indices[idxOff + 2] = baseVert + 3;
+              buf.indices[idxOff + 3] = baseVert + 1;
+              buf.indices[idxOff + 4] = baseVert + 3;
+              buf.indices[idxOff + 5] = baseVert;
             }
-            acc.vertexCount += 4;
+
+            buf.vertexCount += 4;
+            buf.indexCount += 6;
           }
         }
       }
     }
 
     return {
-      opaqueGeometry: finalizeGeometry(opaqueAcc),
-      cutoutGeometry: finalizeGeometry(cutoutAcc),
-      waterGeometry: finalizeGeometry(waterAcc),
+      opaqueGeometry: opaqueBuf.toGeometry(),
+      cutoutGeometry: cutoutBuf.toGeometry(),
+      waterGeometry: waterBuf.toGeometry(),
     };
   }
 }

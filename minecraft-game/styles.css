@@ -3,11 +3,10 @@
   --mc-border-light: rgba(255, 255, 255, 0.28);
   --mc-border-dark: rgba(0, 0, 0, 0.65);
   --mc-accent: #5cb832;
-  --mc-accent-hover: #6ed23f;
   --mc-text: #f4f6f8;
   --safe-top: max(10px, env(safe-area-inset-top));
   --safe-right: max(10px, env(safe-area-inset-right));
-  --safe-bottom: max(12px, env(safe-area-inset-bottom));
+  --safe-bottom: max(10px, env(safe-area-inset-bottom));
   --safe-left: max(10px, env(safe-area-inset-left));
 }
 
@@ -54,24 +53,33 @@ body.pseudo-fullscreen {
   touch-action: none;
 }
 
-/* Crosshair */
-#crosshair {
+/* Crosshair & Circular Break Progress */
+#crosshair-wrap {
   position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 15;
+}
+
+#crosshair {
+  position: absolute;
   left: 50%;
   top: 50%;
   width: 18px;
   height: 18px;
   transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 15;
 }
 
 #crosshair::before,
 #crosshair::after {
   content: '';
   position: absolute;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.95);
 }
 
 #crosshair::before {
@@ -88,6 +96,12 @@ body.pseudo-fullscreen {
   height: 2px;
 }
 
+#break-progress-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 /* Top-Left F3 Debug Panel */
 #debug-panel {
   position: fixed;
@@ -95,8 +109,8 @@ body.pseudo-fullscreen {
   left: var(--safe-left);
   margin: 0;
   padding: 8px 11px;
-  max-width: min(92vw, 520px);
-  background: rgba(10, 14, 20, 0.72);
+  max-width: min(92vw, 560px);
+  background: rgba(10, 14, 20, 0.74);
   border: 2px solid rgba(255, 255, 255, 0.16);
   color: #f0f5fa;
   font-size: 12px;
@@ -165,15 +179,15 @@ body.pseudo-fullscreen {
 /* PC Pointer Lock Hint */
 #pc-lock-hint {
   position: fixed;
-  bottom: max(18px, var(--safe-bottom));
+  bottom: calc(var(--safe-bottom) + 64px);
   left: 50%;
   transform: translateX(-50%);
-  padding: 8px 14px;
+  padding: 7px 13px;
   background: rgba(14, 18, 24, 0.78);
   border: 2px solid var(--mc-border-light);
-  font-size: 12px;
+  font-size: 11.5px;
   text-align: center;
-  max-width: 92vw;
+  max-width: 94vw;
   pointer-events: none;
   z-index: 20;
   text-shadow: 1px 1px 0 #000;
@@ -190,13 +204,86 @@ body.pseudo-fullscreen {
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 14px;
-  background: rgba(14, 18, 24, 0.84);
+  background: rgba(14, 18, 24, 0.86);
   border: 2px solid rgba(255, 255, 255, 0.25);
   font-size: 13px;
   font-weight: 700;
   z-index: 35;
   pointer-events: none;
   text-shadow: 1px 1px 0 #000;
+}
+
+/* 9-Slot Minecraft Hotbar */
+#hotbar-wrapper {
+  position: fixed;
+  bottom: var(--safe-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  z-index: 26;
+  pointer-events: none;
+}
+
+#hotbar-item-name {
+  padding: 2px 10px;
+  background: rgba(0, 0, 0, 0.62);
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 1px 1px 0 #000;
+  border-radius: 2px;
+}
+
+#hotbar {
+  display: flex;
+  align-items: center;
+  background: rgba(24, 26, 32, 0.84);
+  border: 2px solid #16181d;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.14), 0 4px 12px rgba(0, 0, 0, 0.55);
+  padding: 2px;
+  gap: 2px;
+  pointer-events: auto;
+}
+
+.hotbar-slot {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 2px solid rgba(130, 136, 148, 0.45);
+  background: rgba(48, 52, 62, 0.68);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hotbar-slot.selected {
+  border: 3px solid #ffffff;
+  background: rgba(92, 102, 120, 0.82);
+  box-shadow: 0 0 0 1px #111;
+  transform: scale(1.06);
+  z-index: 1;
+}
+
+.hotbar-icon {
+  width: 30px;
+  height: 30px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.hotbar-count {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+  pointer-events: none;
 }
 
 /* Mobile Multitouch Controls */
@@ -216,10 +303,10 @@ body.pseudo-fullscreen {
 
 #touch-joystick-base {
   position: fixed;
-  left: max(20px, var(--safe-left));
-  bottom: max(20px, var(--safe-bottom));
-  width: 126px;
-  height: 126px;
+  left: max(16px, var(--safe-left));
+  bottom: max(16px, var(--safe-bottom));
+  width: 116px;
+  height: 116px;
   border-radius: 50%;
   background: rgba(24, 28, 34, 0.38);
   border: 3px solid rgba(255, 255, 255, 0.32);
@@ -235,7 +322,7 @@ body.pseudo-fullscreen {
 
 .joystick-ring {
   position: absolute;
-  inset: 14px;
+  inset: 12px;
   border-radius: 50%;
   border: 1px dashed rgba(255, 255, 255, 0.22);
   pointer-events: none;
@@ -245,8 +332,8 @@ body.pseudo-fullscreen {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: rgba(235, 240, 246, 0.72);
@@ -257,23 +344,25 @@ body.pseudo-fullscreen {
 
 #touch-action-cluster {
   position: fixed;
-  right: max(16px, var(--safe-right));
-  bottom: max(18px, var(--safe-bottom));
+  right: max(14px, var(--safe-right));
+  bottom: max(16px, var(--safe-bottom));
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 8px;
   pointer-events: none;
 }
 
+.touch-col,
 .touch-vert-pair {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
 }
 
 .mc-touch-btn {
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   border: 2px solid rgba(0, 0, 0, 0.72);
   border-top-color: rgba(255, 255, 255, 0.5);
   border-left-color: rgba(255, 255, 255, 0.4);
@@ -291,21 +380,28 @@ body.pseudo-fullscreen {
 
 .mc-touch-btn.pressed,
 .mc-touch-btn.active {
-  background: rgba(92, 184, 50, 0.78);
+  background: rgba(92, 184, 50, 0.8);
   transform: scale(0.95);
 }
 
-.mc-touch-action {
-  width: 64px;
-  height: 64px;
-  font-size: 24px;
-  background: rgba(60, 68, 82, 0.58);
+.mc-touch-break {
+  width: 58px;
+  height: 58px;
+  font-size: 23px;
+  background: rgba(145, 58, 48, 0.58);
+}
+
+.mc-touch-place {
+  width: 58px;
+  height: 58px;
+  font-size: 23px;
+  background: rgba(54, 108, 158, 0.58);
 }
 
 .mc-touch-small {
-  width: 46px;
-  height: 46px;
-  font-size: 18px;
+  width: 44px;
+  height: 44px;
+  font-size: 17px;
 }
 
 /* Pause / Settings Overlay */
@@ -322,7 +418,7 @@ body.pseudo-fullscreen {
 }
 
 .mc-modal {
-  width: min(440px, 94vw);
+  width: min(450px, 94vw);
   max-height: 88dvh;
   overflow-y: auto;
   padding: 20px;
@@ -348,19 +444,19 @@ body.pseudo-fullscreen {
 .mc-modal-actions {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 
 .mc-menu-btn {
   width: 100%;
-  padding: 11px 14px;
+  padding: 10px 14px;
   border: 2px solid #16191f;
   border-top-color: rgba(255, 255, 255, 0.35);
   border-left-color: rgba(255, 255, 255, 0.25);
   background: #4e5663;
   color: #fff;
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
   text-shadow: 1px 1px 0 #000;
@@ -441,7 +537,21 @@ body.pseudo-fullscreen {
 }
 
 /* Responsive mobile adjustments (portrait & compact landscape) */
-@media (max-width: 520px) {
+@media (max-width: 680px) {
+  .hotbar-slot {
+    width: 34px;
+    height: 34px;
+  }
+  .hotbar-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .hotbar-count {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 560px) {
   .mc-fs-btn .fs-label {
     display: none;
   }
@@ -451,35 +561,64 @@ body.pseudo-fullscreen {
     padding: 0 8px;
   }
   #touch-joystick-base {
-    width: 112px;
-    height: 112px;
+    width: 102px;
+    height: 102px;
+    bottom: calc(var(--safe-bottom) + 52px);
+  }
+  #touch-action-cluster {
+    bottom: calc(var(--safe-bottom) + 52px);
+    gap: 6px;
   }
   .mc-touch-btn {
-    width: 52px;
-    height: 52px;
+    width: 46px;
+    height: 46px;
+    font-size: 17px;
   }
-  .mc-touch-action {
-    width: 56px;
-    height: 56px;
+  .mc-touch-break,
+  .mc-touch-place {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+  .mc-touch-small {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
   }
 }
 
 @media (max-height: 450px) {
+  .hotbar-slot {
+    width: 36px;
+    height: 36px;
+  }
+  .hotbar-icon {
+    width: 26px;
+    height: 26px;
+  }
   #touch-joystick-base {
-    width: 108px;
-    height: 108px;
-    bottom: max(12px, var(--safe-bottom));
+    width: 100px;
+    height: 100px;
+    bottom: max(10px, var(--safe-bottom));
   }
   #touch-action-cluster {
-    bottom: max(12px, var(--safe-bottom));
+    bottom: max(10px, var(--safe-bottom));
+    gap: 6px;
   }
   .mc-touch-btn {
-    width: 48px;
-    height: 48px;
-    font-size: 18px;
+    width: 46px;
+    height: 46px;
+    font-size: 17px;
   }
-  .mc-touch-action {
-    width: 54px;
-    height: 54px;
+  .mc-touch-break,
+  .mc-touch-place {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+  .mc-touch-small {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
   }
 }

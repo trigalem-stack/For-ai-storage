@@ -7,18 +7,17 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1e2a38">
-  <title>Minecraft Web Edition — Stage 1</title>
+  <title>Minecraft Web Edition — Stage 2</title>
   <style>
 :root {
   --mc-bg-panel: rgba(20, 24, 30, 0.72);
   --mc-border-light: rgba(255, 255, 255, 0.28);
   --mc-border-dark: rgba(0, 0, 0, 0.65);
   --mc-accent: #5cb832;
-  --mc-accent-hover: #6ed23f;
   --mc-text: #f4f6f8;
   --safe-top: max(10px, env(safe-area-inset-top));
   --safe-right: max(10px, env(safe-area-inset-right));
-  --safe-bottom: max(12px, env(safe-area-inset-bottom));
+  --safe-bottom: max(10px, env(safe-area-inset-bottom));
   --safe-left: max(10px, env(safe-area-inset-left));
 }
 
@@ -65,24 +64,33 @@ body.pseudo-fullscreen {
   touch-action: none;
 }
 
-/* Crosshair */
-#crosshair {
+/* Crosshair & Circular Break Progress */
+#crosshair-wrap {
   position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 15;
+}
+
+#crosshair {
+  position: absolute;
   left: 50%;
   top: 50%;
   width: 18px;
   height: 18px;
   transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 15;
 }
 
 #crosshair::before,
 #crosshair::after {
   content: '';
   position: absolute;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.95);
 }
 
 #crosshair::before {
@@ -99,6 +107,12 @@ body.pseudo-fullscreen {
   height: 2px;
 }
 
+#break-progress-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 /* Top-Left F3 Debug Panel */
 #debug-panel {
   position: fixed;
@@ -106,8 +120,8 @@ body.pseudo-fullscreen {
   left: var(--safe-left);
   margin: 0;
   padding: 8px 11px;
-  max-width: min(92vw, 520px);
-  background: rgba(10, 14, 20, 0.72);
+  max-width: min(92vw, 560px);
+  background: rgba(10, 14, 20, 0.74);
   border: 2px solid rgba(255, 255, 255, 0.16);
   color: #f0f5fa;
   font-size: 12px;
@@ -176,15 +190,15 @@ body.pseudo-fullscreen {
 /* PC Pointer Lock Hint */
 #pc-lock-hint {
   position: fixed;
-  bottom: max(18px, var(--safe-bottom));
+  bottom: calc(var(--safe-bottom) + 64px);
   left: 50%;
   transform: translateX(-50%);
-  padding: 8px 14px;
+  padding: 7px 13px;
   background: rgba(14, 18, 24, 0.78);
   border: 2px solid var(--mc-border-light);
-  font-size: 12px;
+  font-size: 11.5px;
   text-align: center;
-  max-width: 92vw;
+  max-width: 94vw;
   pointer-events: none;
   z-index: 20;
   text-shadow: 1px 1px 0 #000;
@@ -201,13 +215,86 @@ body.pseudo-fullscreen {
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 14px;
-  background: rgba(14, 18, 24, 0.84);
+  background: rgba(14, 18, 24, 0.86);
   border: 2px solid rgba(255, 255, 255, 0.25);
   font-size: 13px;
   font-weight: 700;
   z-index: 35;
   pointer-events: none;
   text-shadow: 1px 1px 0 #000;
+}
+
+/* 9-Slot Minecraft Hotbar */
+#hotbar-wrapper {
+  position: fixed;
+  bottom: var(--safe-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  z-index: 26;
+  pointer-events: none;
+}
+
+#hotbar-item-name {
+  padding: 2px 10px;
+  background: rgba(0, 0, 0, 0.62);
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 1px 1px 0 #000;
+  border-radius: 2px;
+}
+
+#hotbar {
+  display: flex;
+  align-items: center;
+  background: rgba(24, 26, 32, 0.84);
+  border: 2px solid #16181d;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.14), 0 4px 12px rgba(0, 0, 0, 0.55);
+  padding: 2px;
+  gap: 2px;
+  pointer-events: auto;
+}
+
+.hotbar-slot {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 2px solid rgba(130, 136, 148, 0.45);
+  background: rgba(48, 52, 62, 0.68);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hotbar-slot.selected {
+  border: 3px solid #ffffff;
+  background: rgba(92, 102, 120, 0.82);
+  box-shadow: 0 0 0 1px #111;
+  transform: scale(1.06);
+  z-index: 1;
+}
+
+.hotbar-icon {
+  width: 30px;
+  height: 30px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.hotbar-count {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+  pointer-events: none;
 }
 
 /* Mobile Multitouch Controls */
@@ -227,10 +314,10 @@ body.pseudo-fullscreen {
 
 #touch-joystick-base {
   position: fixed;
-  left: max(20px, var(--safe-left));
-  bottom: max(20px, var(--safe-bottom));
-  width: 126px;
-  height: 126px;
+  left: max(16px, var(--safe-left));
+  bottom: max(16px, var(--safe-bottom));
+  width: 116px;
+  height: 116px;
   border-radius: 50%;
   background: rgba(24, 28, 34, 0.38);
   border: 3px solid rgba(255, 255, 255, 0.32);
@@ -246,7 +333,7 @@ body.pseudo-fullscreen {
 
 .joystick-ring {
   position: absolute;
-  inset: 14px;
+  inset: 12px;
   border-radius: 50%;
   border: 1px dashed rgba(255, 255, 255, 0.22);
   pointer-events: none;
@@ -256,8 +343,8 @@ body.pseudo-fullscreen {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: rgba(235, 240, 246, 0.72);
@@ -268,23 +355,25 @@ body.pseudo-fullscreen {
 
 #touch-action-cluster {
   position: fixed;
-  right: max(16px, var(--safe-right));
-  bottom: max(18px, var(--safe-bottom));
+  right: max(14px, var(--safe-right));
+  bottom: max(16px, var(--safe-bottom));
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 8px;
   pointer-events: none;
 }
 
+.touch-col,
 .touch-vert-pair {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
 }
 
 .mc-touch-btn {
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   border: 2px solid rgba(0, 0, 0, 0.72);
   border-top-color: rgba(255, 255, 255, 0.5);
   border-left-color: rgba(255, 255, 255, 0.4);
@@ -302,21 +391,28 @@ body.pseudo-fullscreen {
 
 .mc-touch-btn.pressed,
 .mc-touch-btn.active {
-  background: rgba(92, 184, 50, 0.78);
+  background: rgba(92, 184, 50, 0.8);
   transform: scale(0.95);
 }
 
-.mc-touch-action {
-  width: 64px;
-  height: 64px;
-  font-size: 24px;
-  background: rgba(60, 68, 82, 0.58);
+.mc-touch-break {
+  width: 58px;
+  height: 58px;
+  font-size: 23px;
+  background: rgba(145, 58, 48, 0.58);
+}
+
+.mc-touch-place {
+  width: 58px;
+  height: 58px;
+  font-size: 23px;
+  background: rgba(54, 108, 158, 0.58);
 }
 
 .mc-touch-small {
-  width: 46px;
-  height: 46px;
-  font-size: 18px;
+  width: 44px;
+  height: 44px;
+  font-size: 17px;
 }
 
 /* Pause / Settings Overlay */
@@ -333,7 +429,7 @@ body.pseudo-fullscreen {
 }
 
 .mc-modal {
-  width: min(440px, 94vw);
+  width: min(450px, 94vw);
   max-height: 88dvh;
   overflow-y: auto;
   padding: 20px;
@@ -359,19 +455,19 @@ body.pseudo-fullscreen {
 .mc-modal-actions {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 
 .mc-menu-btn {
   width: 100%;
-  padding: 11px 14px;
+  padding: 10px 14px;
   border: 2px solid #16191f;
   border-top-color: rgba(255, 255, 255, 0.35);
   border-left-color: rgba(255, 255, 255, 0.25);
   background: #4e5663;
   color: #fff;
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
   text-shadow: 1px 1px 0 #000;
@@ -452,7 +548,21 @@ body.pseudo-fullscreen {
 }
 
 /* Responsive mobile adjustments (portrait & compact landscape) */
-@media (max-width: 520px) {
+@media (max-width: 680px) {
+  .hotbar-slot {
+    width: 34px;
+    height: 34px;
+  }
+  .hotbar-icon {
+    width: 24px;
+    height: 24px;
+  }
+  .hotbar-count {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 560px) {
   .mc-fs-btn .fs-label {
     display: none;
   }
@@ -462,36 +572,65 @@ body.pseudo-fullscreen {
     padding: 0 8px;
   }
   #touch-joystick-base {
-    width: 112px;
-    height: 112px;
+    width: 102px;
+    height: 102px;
+    bottom: calc(var(--safe-bottom) + 52px);
+  }
+  #touch-action-cluster {
+    bottom: calc(var(--safe-bottom) + 52px);
+    gap: 6px;
   }
   .mc-touch-btn {
-    width: 52px;
-    height: 52px;
+    width: 46px;
+    height: 46px;
+    font-size: 17px;
   }
-  .mc-touch-action {
-    width: 56px;
-    height: 56px;
+  .mc-touch-break,
+  .mc-touch-place {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+  .mc-touch-small {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
   }
 }
 
 @media (max-height: 450px) {
+  .hotbar-slot {
+    width: 36px;
+    height: 36px;
+  }
+  .hotbar-icon {
+    width: 26px;
+    height: 26px;
+  }
   #touch-joystick-base {
-    width: 108px;
-    height: 108px;
-    bottom: max(12px, var(--safe-bottom));
+    width: 100px;
+    height: 100px;
+    bottom: max(10px, var(--safe-bottom));
   }
   #touch-action-cluster {
-    bottom: max(12px, var(--safe-bottom));
+    bottom: max(10px, var(--safe-bottom));
+    gap: 6px;
   }
   .mc-touch-btn {
-    width: 48px;
-    height: 48px;
-    font-size: 18px;
+    width: 46px;
+    height: 46px;
+    font-size: 17px;
   }
-  .mc-touch-action {
-    width: 54px;
-    height: 54px;
+  .mc-touch-break,
+  .mc-touch-place {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+  .mc-touch-small {
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
   }
 }
 
@@ -500,8 +639,16 @@ body.pseudo-fullscreen {
 <body>
   <canvas id="game-canvas" aria-label="Minecraft 3D World"></canvas>
 
-  <!-- Center Crosshair -->
-  <div id="crosshair" aria-hidden="true"></div>
+  <!-- Center Crosshair + Circular Mining Progress Ring -->
+  <div id="crosshair-wrap" aria-hidden="true">
+    <div id="crosshair"></div>
+    <svg id="break-progress-ring" class="hidden" viewBox="0 0 40 40" width="40" height="40">
+      <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="3"></circle>
+      <circle id="break-progress-circle" cx="20" cy="20" r="16" fill="none" stroke="#ffffff" stroke-width="3"
+        stroke-dasharray="100.53" stroke-dashoffset="100.53" stroke-linecap="butt"
+        transform="rotate(-90 20 20)"></circle>
+    </svg>
+  </div>
 
   <!-- Top-Left F3 Debug Panel -->
   <pre id="debug-panel" class="hidden" aria-live="polite"></pre>
@@ -525,15 +672,21 @@ body.pseudo-fullscreen {
 
   <!-- PC Pointer Lock Hint -->
   <div id="pc-lock-hint">
-    Кликните по экрану для захвата мыши · <b>WASD</b> движение · <b>Space</b> прыжок · <b>Shift</b> присед · <b>F</b> полёт · <b>F5</b> камера · <b>F3</b> отладка
+    Кликните по экрану · <b>ЛКМ</b> ломать · <b>ПКМ</b> ставить · <b>1–9 / Колесо</b> хотбар · <b>2×Space / F</b> полёт · <b>Shift</b> присед (защита края) · <b>F5</b> камера
   </div>
 
   <!-- Status Toast -->
   <div id="hud-toast" class="hidden" role="status" aria-live="polite"></div>
 
+  <!-- 9-Slot Minecraft Hotbar -->
+  <div id="hotbar-wrapper">
+    <div id="hotbar-item-name" class="hidden"></div>
+    <div id="hotbar" role="toolbar" aria-label="Хотбар блоков"></div>
+  </div>
+
   <!-- Mobile Multitouch Controls -->
   <div id="mobile-controls" class="hidden">
-    <div id="touch-look-zone" aria-label="Зона поворота камеры"></div>
+    <div id="touch-look-zone" aria-label="Зона обзора, тап поставить, удержание ломать"></div>
 
     <div id="touch-joystick-base" aria-label="Виртуальный джойстик движения">
       <div class="joystick-ring"></div>
@@ -541,11 +694,16 @@ body.pseudo-fullscreen {
     </div>
 
     <div id="touch-action-cluster">
-      <button id="btn-touch-fly" class="mc-touch-btn mc-touch-small" type="button" title="Полёт">✈</button>
-      <button id="btn-touch-action" class="mc-touch-btn mc-touch-action" type="button" title="Взмах / Действие">✊</button>
+      <div class="touch-col">
+        <button id="btn-touch-fly" class="mc-touch-btn mc-touch-small" type="button" title="Полёт (или 2×▲)">🕊️</button>
+        <button id="btn-touch-break" class="mc-touch-btn mc-touch-break" type="button" title="Ломать блок (удерживать)">⛏</button>
+      </div>
+      <div class="touch-col">
+        <button id="btn-touch-place" class="mc-touch-btn mc-touch-place" type="button" title="Поставить блок">🧱</button>
+      </div>
       <div class="touch-vert-pair">
-        <button id="btn-touch-jump" class="mc-touch-btn" type="button" title="Прыжок / Вверх">▲</button>
-        <button id="btn-touch-crouch" class="mc-touch-btn" type="button" title="Присед / Вниз">▼</button>
+        <button id="btn-touch-jump" class="mc-touch-btn" type="button" title="Прыжок / 2× Полёт">▲</button>
+        <button id="btn-touch-crouch" class="mc-touch-btn" type="button" title="Присед (защита края) / Вниз">▼</button>
       </div>
     </div>
   </div>
@@ -553,17 +711,19 @@ body.pseudo-fullscreen {
   <!-- Pause / Settings Modal -->
   <div id="pause-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
     <div class="mc-modal">
-      <h1 id="pause-title">Меню игры (Этап 1)</h1>
-      <p class="mc-modal-sub">Оффлайн 3D воксельный мир · Three.js + IndexedDB</p>
+      <h1 id="pause-title">Меню и Настройки (Этап 2)</h1>
+      <p class="mc-modal-sub">Оффлайн AABB-физика · DDA Рейкастинг · IndexedDB</p>
 
       <div class="mc-modal-actions">
         <button id="btn-resume" class="mc-menu-btn mc-menu-primary" type="button">Продолжить игру</button>
         <button id="btn-control-mode" class="mc-menu-btn" type="button">Управление: ПК (Мышь + WASD)</button>
-        <button id="btn-fly-mode" class="mc-menu-btn" type="button">Полёт (F): ВЫКЛ</button>
+        <button id="btn-fly-mode" class="mc-menu-btn" type="button">Полёт (2×Space / F): ВЫКЛ</button>
+        <button id="btn-memory-mode" class="mc-menu-btn" type="button">Память мира: Бесконечная (∞)</button>
+        <button id="btn-graphics-mode" class="mc-menu-btn" type="button">Графика: Высокая (чёткий PixelRatio)</button>
 
         <label class="mc-slider-row" for="range-render-dist">
           <span>Дальность прорисовки: <strong id="label-render-dist">6 чанков</strong></span>
-          <input id="range-render-dist" type="range" min="2" max="10" step="1" value="6">
+          <input id="range-render-dist" type="range" min="2" max="16" step="1" value="6">
         </label>
 
         <button id="btn-new-world" class="mc-menu-btn mc-menu-danger" type="button">Создать новый мир (новый сид)</button>
@@ -4257,6 +4417,14 @@ body.pseudo-fullscreen {
   var e_ = new C();
   var Vc = new fh();
   var qe = new Ce();
+  var Ge = class extends Pe {
+    constructor(t) {
+      super(), this.isLineBasicMaterial = true, this.type = "LineBasicMaterial", this.color = new bt(16777215), this.map = null, this.linewidth = 1, this.linecap = "round", this.linejoin = "round", this.fog = true, this.setValues(t);
+    }
+    copy(t) {
+      return super.copy(t), this.color.copy(t.color), this.map = t.map, this.linewidth = t.linewidth, this.linecap = t.linecap, this.linejoin = t.linejoin, this.fog = t.fog, this;
+    }
+  };
   var Ao = new C();
   var Eo = new C();
   var Yd = new Ht();
@@ -4264,8 +4432,89 @@ body.pseudo-fullscreen {
   var ka = new Ie();
   var Hc = new C();
   var Zd = new C();
+  var Fn = class extends le {
+    constructor(t = new Yt(), e = new Ge()) {
+      super(), this.isLine = true, this.type = "Line", this.geometry = t, this.material = e, this.morphTargetDictionary = void 0, this.morphTargetInfluences = void 0, this.updateMorphTargets();
+    }
+    copy(t, e) {
+      return super.copy(t, e), t.morphTargetInfluences !== void 0 ? this.morphTargetInfluences = t.morphTargetInfluences.slice() : this.morphTargetInfluences = void 0, t.morphTargetDictionary !== void 0 ? this.morphTargetDictionary = Object.assign({}, t.morphTargetDictionary) : this.morphTargetDictionary = void 0, this.material = Array.isArray(t.material) ? t.material.slice() : t.material, this.geometry = t.geometry, this;
+    }
+    computeLineDistances() {
+      let t = this.geometry;
+      if (t.index === null) {
+        let e = t.attributes.position, n = [0];
+        for (let i = 1, r = e.count; i < r; i++) Ao.fromBufferAttribute(e, i - 1), Eo.fromBufferAttribute(e, i), n[i] = n[i - 1], n[i] += Ao.distanceTo(Eo);
+        t.setAttribute("lineDistance", new At(n, 1));
+      } else _t("Line.computeLineDistances(): Computation only possible with non-indexed BufferGeometry.");
+      return this;
+    }
+    intersectsFrustum(t) {
+      return t.intersectsObject(this);
+    }
+    raycast(t, e) {
+      let n = this.geometry, i = this.matrixWorld, r = t.params.Line.threshold, a = n.drawRange;
+      if (n.boundingSphere === null && n.computeBoundingSphere(), ka.copy(n.boundingSphere), ka.applyMatrix4(i), ka.radius += r, t.ray.intersectsSphere(ka) === false) return;
+      Yd.copy(i).invert(), ar.copy(t.ray).applyMatrix4(Yd);
+      let o = r / ((this.scale.x + this.scale.y + this.scale.z) / 3), l = o * o, c = this.isLineSegments ? 2 : 1, h = n.index, u = n.attributes.position;
+      if (h !== null) {
+        let f = Math.max(0, a.start), p = Math.min(h.count, a.start + a.count);
+        for (let _ = f, m = p - 1; _ < m; _ += c) {
+          let g = h.getX(_), v = h.getX(_ + 1), S = Ga(this, t, ar, l, g, v, _);
+          S && e.push(S);
+        }
+        if (this.isLineLoop) {
+          let _ = h.getX(p - 1), m = h.getX(f), g = Ga(this, t, ar, l, _, m, p - 1);
+          g && e.push(g);
+        }
+      } else {
+        let f = Math.max(0, a.start), p = Math.min(u.count, a.start + a.count);
+        for (let _ = f, m = p - 1; _ < m; _ += c) {
+          let g = Ga(this, t, ar, l, _, _ + 1, _);
+          g && e.push(g);
+        }
+        if (this.isLineLoop) {
+          let _ = Ga(this, t, ar, l, p - 1, f, p - 1);
+          _ && e.push(_);
+        }
+      }
+    }
+    updateMorphTargets() {
+      let e = this.geometry.morphAttributes, n = Object.keys(e);
+      if (n.length > 0) {
+        let i = e[n[0]];
+        if (i !== void 0) {
+          this.morphTargetInfluences = [], this.morphTargetDictionary = {};
+          for (let r = 0, a = i.length; r < a; r++) {
+            let o = i[r].name || String(r);
+            this.morphTargetInfluences.push(0), this.morphTargetDictionary[o] = r;
+          }
+        }
+      }
+    }
+  };
+  function Ga(s30, t, e, n, i, r, a) {
+    let o = s30.geometry.attributes.position;
+    if (Ao.fromBufferAttribute(o, i), Eo.fromBufferAttribute(o, r), e.distanceSqToSegment(Ao, Eo, Hc, Zd) > n) return;
+    Hc.applyMatrix4(s30.matrixWorld);
+    let c = t.ray.origin.distanceTo(Hc);
+    if (!(c < t.near || c > t.far)) return { distance: c, point: Zd.clone().applyMatrix4(s30.matrixWorld), index: a, face: null, faceIndex: null, barycoord: null, object: s30 };
+  }
   var Jd = new C();
   var $d = new C();
+  var _n = class extends Fn {
+    constructor(t, e) {
+      super(t, e), this.isLineSegments = true, this.type = "LineSegments";
+    }
+    computeLineDistances() {
+      let t = this.geometry;
+      if (t.index === null) {
+        let e = t.attributes.position, n = [];
+        for (let i = 0, r = e.count; i < r; i += 2) Jd.fromBufferAttribute(e, i), $d.fromBufferAttribute(e, i + 1), n[i] = i === 0 ? 0 : n[i - 1], n[i + 1] = n[i] + Jd.distanceTo($d);
+        t.setAttribute("lineDistance", new At(n, 1));
+      } else _t("LineSegments.computeLineDistances(): Computation only possible with non-indexed BufferGeometry.");
+      return this;
+    }
+  };
   var Kd = new Ht();
   var ph = new xi();
   var Va = new Ie();
@@ -15188,6 +15437,264 @@ void main() {
     }
   };
 
+  // src/blocks/BlockRegistry.js
+  var BLOCK_IDS = Object.freeze({
+    AIR: 0,
+    GRASS: 1,
+    DIRT: 2,
+    STONE: 3,
+    COBBLESTONE: 4,
+    BEDROCK: 5,
+    SAND: 6,
+    OAK_LOG: 7,
+    OAK_LEAVES: 8,
+    OAK_PLANKS: 9,
+    SNOW_GRASS: 10,
+    SNOW: 11,
+    WATER: 12
+  });
+  var BlockRegistryImpl = class {
+    constructor() {
+      this.byId = new Array(256).fill(null);
+      this.byKey = /* @__PURE__ */ new Map();
+      this._registerStage1Blocks();
+    }
+    register(def) {
+      const entry = {
+        id: def.id,
+        key: def.key,
+        name: def.name,
+        isAir: Boolean(def.isAir),
+        isSolid: def.isSolid !== void 0 ? def.isSolid : !def.isAir && !def.isLiquid,
+        isOpaque: def.isOpaque !== void 0 ? def.isOpaque : !def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid,
+        isTransparent: Boolean(def.isTransparent || def.isLiquid),
+        isCutout: Boolean(def.isCutout),
+        isLiquid: Boolean(def.isLiquid),
+        occludesAO: def.occludesAO !== void 0 ? def.occludesAO : !def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid,
+        hardness: def.hardness ?? 1,
+        requiresTool: Boolean(def.requiresTool),
+        preferredTool: def.preferredTool || null,
+        dropId: def.dropId !== void 0 ? def.dropId : def.id,
+        dropChance: def.dropChance ?? 1,
+        lightEmission: def.lightEmission ?? 0,
+        // Hook for Stage 4 lighting
+        faces: def.faces || null
+        // { top, bottom, north, south, east, west }
+      };
+      this.byId[entry.id] = entry;
+      this.byKey.set(entry.key, entry);
+      return entry;
+    }
+    get(id2) {
+      return this.byId[id2] || this.byId[0];
+    }
+    getByKey(key) {
+      return this.byKey.get(key) || this.byId[0];
+    }
+    isOpaque(id2) {
+      const b = this.byId[id2];
+      return b ? b.isOpaque : false;
+    }
+    isSolid(id2) {
+      const b = this.byId[id2];
+      return b ? b.isSolid : false;
+    }
+    isLiquid(id2) {
+      const b = this.byId[id2];
+      return b ? b.isLiquid : false;
+    }
+    occludesAO(id2) {
+      const b = this.byId[id2];
+      return b ? b.occludesAO : false;
+    }
+    /**
+     * Computes Minecraft block breaking time in seconds.
+     * Hook for Stage 5 tools & efficiency multipliers.
+     */
+    getBreakTime(blockId, heldItem = null, modifiers = {}) {
+      const def = this.get(blockId);
+      if (!def || def.isAir || def.isLiquid || def.hardness < 0 || !Number.isFinite(def.hardness)) {
+        return Infinity;
+      }
+      if (def.hardness === 0) return 0.05;
+      let speedMultiplier = 1;
+      const isBestTool = Boolean(heldItem && heldItem.toolType && heldItem.toolType === def.preferredTool);
+      const canHarvest = !def.requiresTool || isBestTool;
+      if (isBestTool && heldItem.toolSpeed) {
+        speedMultiplier = heldItem.toolSpeed;
+      }
+      if (modifiers.inWater) speedMultiplier /= 5;
+      if (modifiers.onGround === false) speedMultiplier /= 5;
+      const baseFactor = canHarvest ? 1.5 : 5;
+      return def.hardness * baseFactor / Math.max(0.1, speedMultiplier);
+    }
+    /**
+     * Returns dropped block ID when broken (e.g. Grass -> Dirt, Stone -> Cobblestone).
+     */
+    getDrop(blockId) {
+      const def = this.get(blockId);
+      if (!def || def.isAir || def.isLiquid) return 0;
+      if (def.dropChance < 1 && Math.random() > def.dropChance) return 0;
+      return def.dropId;
+    }
+    getAllBlocks() {
+      return this.byId.filter((b) => b && !b.isAir);
+    }
+    _allFaces(tileName) {
+      return {
+        top: tileName,
+        bottom: tileName,
+        north: tileName,
+        south: tileName,
+        east: tileName,
+        west: tileName
+      };
+    }
+    _registerStage1Blocks() {
+      this.register({
+        id: BLOCK_IDS.AIR,
+        key: "air",
+        name: "Air",
+        isAir: true,
+        isSolid: false,
+        isOpaque: false,
+        occludesAO: false,
+        hardness: 0,
+        dropId: 0
+      });
+      this.register({
+        id: BLOCK_IDS.GRASS,
+        key: "grass",
+        name: "\u0411\u043B\u043E\u043A \u0442\u0440\u0430\u0432\u044B",
+        hardness: 0.6,
+        preferredTool: "shovel",
+        dropId: BLOCK_IDS.DIRT,
+        faces: {
+          top: "grass_top",
+          bottom: "dirt",
+          north: "grass_side",
+          south: "grass_side",
+          east: "grass_side",
+          west: "grass_side"
+        }
+      });
+      this.register({
+        id: BLOCK_IDS.DIRT,
+        key: "dirt",
+        name: "\u0417\u0435\u043C\u043B\u044F",
+        hardness: 0.5,
+        preferredTool: "shovel",
+        faces: this._allFaces("dirt")
+      });
+      this.register({
+        id: BLOCK_IDS.STONE,
+        key: "stone",
+        name: "\u041A\u0430\u043C\u0435\u043D\u044C",
+        hardness: 1.5,
+        requiresTool: true,
+        preferredTool: "pickaxe",
+        dropId: BLOCK_IDS.COBBLESTONE,
+        faces: this._allFaces("stone")
+      });
+      this.register({
+        id: BLOCK_IDS.COBBLESTONE,
+        key: "cobblestone",
+        name: "\u0411\u0443\u043B\u044B\u0436\u043D\u0438\u043A",
+        hardness: 2,
+        requiresTool: true,
+        preferredTool: "pickaxe",
+        faces: this._allFaces("cobblestone")
+      });
+      this.register({
+        id: BLOCK_IDS.BEDROCK,
+        key: "bedrock",
+        name: "\u0411\u0435\u0434\u0440\u043E\u043A",
+        hardness: -1,
+        dropId: 0,
+        faces: this._allFaces("bedrock")
+      });
+      this.register({
+        id: BLOCK_IDS.SAND,
+        key: "sand",
+        name: "\u041F\u0435\u0441\u043E\u043A",
+        hardness: 0.5,
+        preferredTool: "shovel",
+        faces: this._allFaces("sand")
+      });
+      this.register({
+        id: BLOCK_IDS.OAK_LOG,
+        key: "oak_log",
+        name: "\u0414\u0443\u0431\u043E\u0432\u043E\u0435 \u0431\u0440\u0435\u0432\u043D\u043E",
+        hardness: 2,
+        preferredTool: "axe",
+        faces: {
+          top: "oak_log_top",
+          bottom: "oak_log_top",
+          north: "oak_log_side",
+          south: "oak_log_side",
+          east: "oak_log_side",
+          west: "oak_log_side"
+        }
+      });
+      this.register({
+        id: BLOCK_IDS.OAK_LEAVES,
+        key: "oak_leaves",
+        name: "\u041B\u0438\u0441\u0442\u0432\u0430 \u0434\u0443\u0431\u0430",
+        hardness: 0.2,
+        isOpaque: false,
+        isCutout: true,
+        occludesAO: false,
+        faces: this._allFaces("oak_leaves")
+      });
+      this.register({
+        id: BLOCK_IDS.OAK_PLANKS,
+        key: "oak_planks",
+        name: "\u0414\u0443\u0431\u043E\u0432\u044B\u0435 \u0434\u043E\u0441\u043A\u0438",
+        hardness: 2,
+        preferredTool: "axe",
+        faces: this._allFaces("oak_planks")
+      });
+      this.register({
+        id: BLOCK_IDS.SNOW_GRASS,
+        key: "snow_grass",
+        name: "\u0421\u043D\u0435\u0436\u043D\u044B\u0439 \u0434\u0451\u0440\u043D",
+        hardness: 0.6,
+        preferredTool: "shovel",
+        dropId: BLOCK_IDS.DIRT,
+        faces: {
+          top: "snow",
+          bottom: "dirt",
+          north: "snow_grass_side",
+          south: "snow_grass_side",
+          east: "snow_grass_side",
+          west: "snow_grass_side"
+        }
+      });
+      this.register({
+        id: BLOCK_IDS.SNOW,
+        key: "snow",
+        name: "\u0421\u043D\u0435\u0433",
+        hardness: 0.2,
+        preferredTool: "shovel",
+        faces: this._allFaces("snow")
+      });
+      this.register({
+        id: BLOCK_IDS.WATER,
+        key: "water",
+        name: "\u0412\u043E\u0434\u0430",
+        hardness: -1,
+        isSolid: false,
+        isOpaque: false,
+        isTransparent: true,
+        isLiquid: true,
+        occludesAO: false,
+        dropId: 0,
+        faces: this._allFaces("water")
+      });
+    }
+  };
+  var BlockRegistry = new BlockRegistryImpl();
+
   // src/constants.js
   var CHUNK_SIZE = 16;
   var WORLD_HEIGHT = 128;
@@ -15195,18 +15702,30 @@ void main() {
   var SEA_LEVEL = 62;
   var TICK_RATE = 20;
   var TICK_MS = 1e3 / TICK_RATE;
+  var PLAYER_WIDTH = 0.6;
+  var PLAYER_HALF_WIDTH = PLAYER_WIDTH * 0.5;
+  var PLAYER_HEIGHT = 1.8;
   var PLAYER_EYE_HEIGHT = 1.62;
-  var PLAYER_CROUCH_EYE_HEIGHT = 1.32;
+  var PLAYER_CROUCH_HEIGHT = 1.5;
+  var PLAYER_CROUCH_EYE_HEIGHT = 1.27;
   var WALK_SPEED = 4.317;
   var SPRINT_SPEED = 5.612;
-  var CROUCH_SPEED = 1.35;
-  var FLY_SPEED = 10.5;
-  var FLY_SPRINT_SPEED = 20;
-  var GRAVITY = 28;
-  var JUMP_VELOCITY = 9;
+  var CROUCH_SPEED = 1.295;
+  var FLY_SPEED = 11;
+  var FLY_SPRINT_SPEED = 22;
+  var GRAVITY = 32;
+  var JUMP_VELOCITY = 8.952;
+  var TERMINAL_VELOCITY = 54;
+  var JUMP_COOLDOWN_SEC = 0.14;
+  var SNEAK_EDGE_DEPTH = 0.6;
+  var BASE_FOV = 72;
+  var SPRINT_FOV_BOOST = 10;
+  var REACH_DISTANCE = 5;
+  var HOTBAR_SIZE = 9;
+  var MAX_STACK_SIZE = 64;
   var DEFAULT_RENDER_DISTANCE_PC = 6;
   var DEFAULT_RENDER_DISTANCE_MOBILE = 4;
-  var CHUNK_FRAME_BUDGET_MS = 3.8;
+  var CHUNK_FRAME_BUDGET_MS = 3.5;
   var ATLAS_GRID_SIZE = 16;
   var ATLAS_TILE_INNER = 16;
   var ATLAS_TILE_PAD = 8;
@@ -15233,6 +15752,440 @@ void main() {
     THIRD_PERSON_FRONT: 2
   });
   var AUTOSAVE_INTERVAL_MS = 15e3;
+
+  // src/physics/AABBPhysics.js
+  var EPS = 1e-4;
+  function aabbIntersectsBlock(x, y, z, halfWidth, height, bx2, by2, bz) {
+    return x + halfWidth > bx2 + EPS && x - halfWidth < bx2 + 1 - EPS && y + height > by2 + EPS && y < by2 + 1 - EPS && z + halfWidth > bz + EPS && z - halfWidth < bz + 1 - EPS;
+  }
+  function collidesWithWorld(world, x, y, z, halfWidth, height) {
+    const minX = Math.floor(x - halfWidth + EPS);
+    const maxX = Math.floor(x + halfWidth - EPS);
+    const minY = Math.floor(y + EPS);
+    const maxY = Math.floor(y + height - EPS);
+    const minZ = Math.floor(z - halfWidth + EPS);
+    const maxZ = Math.floor(z + halfWidth - EPS);
+    for (let by2 = minY; by2 <= maxY; by2++) {
+      for (let bz = minZ; bz <= maxZ; bz++) {
+        for (let bx2 = minX; bx2 <= maxX; bx2++) {
+          if (BlockRegistry.isSolid(world.getBlock(bx2, by2, bz))) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+  function hasSupportBelow(world, x, y, z, halfWidth, depth = SNEAK_EDGE_DEPTH) {
+    const minX = Math.floor(x - halfWidth + EPS);
+    const maxX = Math.floor(x + halfWidth - EPS);
+    const minY = Math.floor(y - depth);
+    const maxY = Math.floor(y - 2e-3);
+    const minZ = Math.floor(z - halfWidth + EPS);
+    const maxZ = Math.floor(z + halfWidth - EPS);
+    for (let by2 = minY; by2 <= maxY; by2++) {
+      for (let bz = minZ; bz <= maxZ; bz++) {
+        for (let bx2 = minX; bx2 <= maxX; bx2++) {
+          if (BlockRegistry.isSolid(world.getBlock(bx2, by2, bz))) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+  function clampSneakAxis(world, x, y, z, halfWidth, delta, axis) {
+    if (delta === 0) return 0;
+    const testX = axis === "x" ? x + delta : x;
+    const testZ = axis === "z" ? z + delta : z;
+    if (hasSupportBelow(world, testX, y, testZ, halfWidth)) {
+      return delta;
+    }
+    if (!hasSupportBelow(world, x, y, z, halfWidth)) {
+      return delta;
+    }
+    let low = 0;
+    let high = 1;
+    for (let i = 0; i < 6; i++) {
+      const mid = (low + high) * 0.5;
+      const mx2 = axis === "x" ? x + delta * mid : x;
+      const mz = axis === "z" ? z + delta * mid : z;
+      if (hasSupportBelow(world, mx2, y, mz, halfWidth)) {
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+    return delta * low * 0.98;
+  }
+  function moveAABB(world, pos, dx2, dy2, dz, halfWidth, height, sneakGuard = false) {
+    let x = pos.x;
+    let y = pos.y;
+    let z = pos.z;
+    let onGround = false;
+    let hitCeiling = false;
+    let hitWall = false;
+    if (sneakGuard && pos.onGround) {
+      dx2 = clampSneakAxis(world, x, y, z, halfWidth, dx2, "x");
+      dz = clampSneakAxis(world, x + dx2, y, z, halfWidth, dz, "z");
+    }
+    if (dy2 !== 0) {
+      const nextY = y + dy2;
+      const minX = Math.floor(x - halfWidth + EPS);
+      const maxX = Math.floor(x + halfWidth - EPS);
+      const minZ = Math.floor(z - halfWidth + EPS);
+      const maxZ = Math.floor(z + halfWidth - EPS);
+      if (dy2 < 0) {
+        const minY = Math.floor(nextY + EPS);
+        const maxY = Math.floor(y + EPS);
+        let floorY = -Infinity;
+        for (let by2 = maxY; by2 >= minY; by2--) {
+          for (let bz = minZ; bz <= maxZ; bz++) {
+            for (let bx2 = minX; bx2 <= maxX; bx2++) {
+              if (BlockRegistry.isSolid(world.getBlock(bx2, by2, bz))) {
+                if (by2 + 1 > floorY) floorY = by2 + 1;
+              }
+            }
+          }
+        }
+        if (floorY > -Infinity) {
+          y = floorY;
+          onGround = true;
+        } else {
+          y = nextY;
+        }
+      } else {
+        const minY = Math.floor(y + height - EPS);
+        const maxY = Math.floor(nextY + height - EPS);
+        let ceilY = Infinity;
+        for (let by2 = minY; by2 <= maxY; by2++) {
+          for (let bz = minZ; bz <= maxZ; bz++) {
+            for (let bx2 = minX; bx2 <= maxX; bx2++) {
+              if (BlockRegistry.isSolid(world.getBlock(bx2, by2, bz))) {
+                if (by2 < ceilY) ceilY = by2;
+              }
+            }
+          }
+        }
+        if (ceilY < Infinity) {
+          y = ceilY - height - EPS;
+          hitCeiling = true;
+        } else {
+          y = nextY;
+        }
+      }
+    }
+    if (dy2 <= 0 && !onGround) {
+      onGround = collidesWithWorld(world, x, y - 4e-3, z, halfWidth, 0.02);
+    }
+    if (dx2 !== 0) {
+      const nextX = x + dx2;
+      const minY = Math.floor(y + EPS);
+      const maxY = Math.floor(y + height - EPS);
+      const minZ = Math.floor(z - halfWidth + EPS);
+      const maxZ = Math.floor(z + halfWidth - EPS);
+      if (dx2 > 0) {
+        const minX = Math.floor(x + halfWidth - EPS);
+        const maxX = Math.floor(nextX + halfWidth - EPS);
+        let wallX = Infinity;
+        for (let bx2 = minX; bx2 <= maxX; bx2++) {
+          for (let by2 = minY; by2 <= maxY; by2++) {
+            for (let bz = minZ; bz <= maxZ; bz++) {
+              if (BlockRegistry.isSolid(world.getBlock(bx2, by2, bz))) {
+                if (bx2 < wallX) wallX = bx2;
+              }
+            }
+          }
+        }
+        if (wallX < Infinity) {
+          x = wallX - halfWidth - EPS;
+          hitWall = true;
+        } else {
+          x = nextX;
+        }
+      } else {
+        const minX = Math.floor(nextX - halfWidth + EPS);
+        const maxX = Math.floor(x - halfWidth + EPS);
+        let wallX = -Infinity;
+        for (let bx2 = maxX; bx2 >= minX; bx2--) {
+          for (let by2 = minY; by2 <= maxY; by2++) {
+            for (let bz = minZ; bz <= maxZ; bz++) {
+              if (BlockRegistry.isSolid(world.getBlock(bx2, by2, bz))) {
+                if (bx2 + 1 > wallX) wallX = bx2 + 1;
+              }
+            }
+          }
+        }
+        if (wallX > -Infinity) {
+          x = wallX + halfWidth + EPS;
+          hitWall = true;
+        } else {
+          x = nextX;
+        }
+      }
+    }
+    if (dz !== 0) {
+      const nextZ = z + dz;
+      const minY = Math.floor(y + EPS);
+      const maxY = Math.floor(y + height - EPS);
+      const minX = Math.floor(x - halfWidth + EPS);
+      const maxX = Math.floor(x + halfWidth - EPS);
+      if (dz > 0) {
+        const minZ = Math.floor(z + halfWidth - EPS);
+        const maxZ = Math.floor(nextZ + halfWidth - EPS);
+        let wallZ = Infinity;
+        for (let bz = minZ; bz <= maxZ; bz++) {
+          for (let by2 = minY; by2 <= maxY; by2++) {
+            for (let bx2 = minX; bx2 <= maxX; bx2++) {
+              if (BlockRegistry.isSolid(world.getBlock(bx2, by2, bz))) {
+                if (bz < wallZ) wallZ = bz;
+              }
+            }
+          }
+        }
+        if (wallZ < Infinity) {
+          z = wallZ - halfWidth - EPS;
+          hitWall = true;
+        } else {
+          z = nextZ;
+        }
+      } else {
+        const minZ = Math.floor(nextZ - halfWidth + EPS);
+        const maxZ = Math.floor(z - halfWidth + EPS);
+        let wallZ = -Infinity;
+        for (let bz = maxZ; bz >= minZ; bz--) {
+          for (let by2 = minY; by2 <= maxY; by2++) {
+            for (let bx2 = minX; bx2 <= maxX; bx2++) {
+              if (BlockRegistry.isSolid(world.getBlock(bx2, by2, bz))) {
+                if (bz + 1 > wallZ) wallZ = bz + 1;
+              }
+            }
+          }
+        }
+        if (wallZ > -Infinity) {
+          z = wallZ + halfWidth + EPS;
+          hitWall = true;
+        } else {
+          z = nextZ;
+        }
+      }
+    }
+    return { x, y, z, onGround, hitCeiling, hitWall };
+  }
+
+  // src/entities/ItemEntity.js
+  var ITEM_SIZE = 0.26;
+  var ITEM_HALF = ITEM_SIZE * 0.5;
+  var ITEM_GRAVITY = 24;
+  var PICKUP_DELAY = 0.22;
+  var MAGNET_RADIUS = 1.8;
+  var PICKUP_RADIUS = 0.52;
+  var MERGE_RADIUS = 1.1;
+  var MAX_DROPPED_ITEMS = 120;
+  var CUBE_FACES = [
+    { key: "top", nx: 0, ny: 1, nz: 0, shade: FACE_SHADE.TOP, verts: [[-1, 1, 1], [1, 1, 1], [1, 1, -1], [-1, 1, -1]] },
+    { key: "bottom", nx: 0, ny: -1, nz: 0, shade: FACE_SHADE.BOTTOM, verts: [[-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1]] },
+    { key: "south", nx: 0, ny: 0, nz: 1, shade: FACE_SHADE.SOUTH, verts: [[-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]] },
+    { key: "north", nx: 0, ny: 0, nz: -1, shade: FACE_SHADE.NORTH, verts: [[1, -1, -1], [-1, -1, -1], [-1, 1, -1], [1, 1, -1]] },
+    { key: "east", nx: 1, ny: 0, nz: 0, shade: FACE_SHADE.EAST, verts: [[1, -1, 1], [1, -1, -1], [1, 1, -1], [1, 1, 1]] },
+    { key: "west", nx: -1, ny: 0, nz: 0, shade: FACE_SHADE.WEST, verts: [[-1, -1, -1], [-1, -1, 1], [-1, 1, 1], [-1, 1, -1]] }
+  ];
+  function buildBlockItemGeometry(atlas, blockId, scale = 1) {
+    const def = BlockRegistry.get(blockId);
+    if (!def || !def.faces) return null;
+    const h = 0.5 * scale;
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const colors = [];
+    const indices = [];
+    for (let f = 0; f < 6; f++) {
+      const face = CUBE_FACES[f];
+      const uv2 = atlas.getUV(def.faces[face.key]);
+      const base = positions.length / 3;
+      const b = Math.pow(face.shade, 2.2);
+      for (let i = 0; i < 4; i++) {
+        const v = face.verts[i];
+        positions.push(v[0] * h, v[1] * h, v[2] * h);
+        normals.push(face.nx, face.ny, face.nz);
+        colors.push(b, b, b);
+      }
+      uvs.push(uv2.u0, uv2.vBottom, uv2.u1, uv2.vBottom, uv2.u1, uv2.vTop, uv2.u0, uv2.vTop);
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+    const geom = new Yt();
+    geom.setAttribute("position", new At(positions, 3));
+    geom.setAttribute("normal", new At(normals, 3));
+    geom.setAttribute("uv", new At(uvs, 2));
+    geom.setAttribute("color", new At(colors, 3));
+    geom.setIndex(indices);
+    return geom;
+  }
+  var ItemEntity = class {
+    constructor(blockId, count, x, y, z, geometry, material) {
+      this.blockId = blockId;
+      this.count = count;
+      this.x = x;
+      this.y = y;
+      this.z = z;
+      this.vx = (Math.random() - 0.5) * 3;
+      this.vy = 2.6 + Math.random() * 1.4;
+      this.vz = (Math.random() - 0.5) * 3;
+      this.onGround = false;
+      this.age = 0;
+      this.phase = Math.random() * Math.PI * 2;
+      this.alive = true;
+      this.mesh = new Ce(geometry, material);
+      this.mesh.position.set(x, y + ITEM_HALF, z);
+    }
+  };
+  var ItemEntityManager = class {
+    constructor(scene, atlas) {
+      this.scene = scene;
+      this.atlas = atlas;
+      this.entities = [];
+      this.geometryCache = /* @__PURE__ */ new Map();
+      this.material = new jn({
+        map: atlas.texture,
+        vertexColors: true,
+        fog: true,
+        alphaTest: 0.5,
+        side: Mi
+      });
+    }
+    _getGeometry(blockId) {
+      let geom = this.geometryCache.get(blockId);
+      if (!geom) {
+        geom = buildBlockItemGeometry(this.atlas, blockId, ITEM_SIZE);
+        if (geom) this.geometryCache.set(blockId, geom);
+      }
+      return geom;
+    }
+    spawnDrop(blockId, x, y, z, count = 1) {
+      if (!blockId || count <= 0) return null;
+      for (const other of this.entities) {
+        if (!other.alive || other.blockId !== blockId || other.count >= MAX_STACK_SIZE) continue;
+        const d = Math.hypot(other.x - x, other.y - y, other.z - z);
+        if (d < MERGE_RADIUS) {
+          const space = MAX_STACK_SIZE - other.count;
+          const add = Math.min(space, count);
+          other.count += add;
+          count -= add;
+          if (count <= 0) return other;
+        }
+      }
+      if (this.entities.length >= MAX_DROPPED_ITEMS) {
+        const oldest = this.entities.shift();
+        this.scene.remove(oldest.mesh);
+      }
+      const geom = this._getGeometry(blockId);
+      if (!geom) return null;
+      const entity = new ItemEntity(blockId, count, x, y, z, geom, this.material);
+      this.entities.push(entity);
+      this.scene.add(entity.mesh);
+      return entity;
+    }
+    update(dt, world, player, hotbar) {
+      const targetX = player.x;
+      const targetY = player.y + 0.85;
+      const targetZ = player.z;
+      for (let i = this.entities.length - 1; i >= 0; i--) {
+        const item = this.entities[i];
+        if (!item.alive) {
+          this.scene.remove(item.mesh);
+          this.entities.splice(i, 1);
+          continue;
+        }
+        item.age += dt;
+        if (item.age > 300) {
+          item.alive = false;
+          continue;
+        }
+        const dxp = targetX - item.x;
+        const dyp = targetY - item.y;
+        const dzp = targetZ - item.z;
+        const dist = Math.hypot(dxp, dyp, dzp);
+        if (item.age >= PICKUP_DELAY && dist < MAGNET_RADIUS && hotbar.canAccept(item.blockId)) {
+          if (dist < PICKUP_RADIUS) {
+            const leftover = hotbar.addItem(item.blockId, item.count);
+            if (leftover <= 0) {
+              item.alive = false;
+              this.scene.remove(item.mesh);
+              this.entities.splice(i, 1);
+              continue;
+            }
+            item.count = leftover;
+          } else {
+            const pull = Math.min(14, 6.5 + (MAGNET_RADIUS - dist) * 5);
+            item.x += dxp / dist * pull * dt;
+            item.y += dyp / dist * pull * dt;
+            item.z += dzp / dist * pull * dt;
+            item.mesh.position.set(item.x, item.y + ITEM_HALF, item.z);
+            item.mesh.rotation.y += dt * 4.5;
+            continue;
+          }
+        }
+        item.vy = Math.max(-24, item.vy - ITEM_GRAVITY * dt);
+        const res = moveAABB(
+          world,
+          item,
+          item.vx * dt,
+          item.vy * dt,
+          item.vz * dt,
+          ITEM_HALF,
+          ITEM_SIZE,
+          false
+        );
+        item.x = res.x;
+        item.y = res.y;
+        item.z = res.z;
+        item.onGround = res.onGround;
+        if (res.onGround) {
+          item.vy = 0;
+          const drag = Math.exp(-10 * dt);
+          item.vx *= drag;
+          item.vz *= drag;
+        } else {
+          item.vx *= Math.exp(-1.5 * dt);
+          item.vz *= Math.exp(-1.5 * dt);
+        }
+        if (res.hitCeiling) item.vy = 0;
+        if (item.onGround && Math.floor(item.age * 4) !== Math.floor((item.age - dt) * 4)) {
+          for (let j = i - 1; j >= 0; j--) {
+            const other = this.entities[j];
+            if (!other.alive || other.blockId !== item.blockId || other.count >= MAX_STACK_SIZE) continue;
+            const d = Math.hypot(other.x - item.x, other.y - item.y, other.z - item.z);
+            if (d < MERGE_RADIUS) {
+              const add = Math.min(MAX_STACK_SIZE - other.count, item.count);
+              other.count += add;
+              item.count -= add;
+              if (item.count <= 0) {
+                item.alive = false;
+                break;
+              }
+            }
+          }
+        }
+        const hover = Math.sin(item.age * 3.2 + item.phase) * 0.06 + 0.08;
+        item.mesh.position.set(item.x, item.y + ITEM_HALF + hover, item.z);
+        item.mesh.rotation.y += dt * 1.9;
+      }
+    }
+    clear() {
+      for (const item of this.entities) {
+        this.scene.remove(item.mesh);
+      }
+      this.entities.length = 0;
+    }
+    dispose() {
+      this.clear();
+      for (const geom of this.geometryCache.values()) {
+        geom.dispose();
+      }
+      this.geometryCache.clear();
+      this.material.dispose();
+    }
+  };
 
   // src/player/PlayerSkin.js
   var SKIN_PX = 1.8 / 32;
@@ -15547,35 +16500,82 @@ void main() {
 
   // src/player/FirstPersonHand.js
   var FirstPersonHand = class {
-    constructor(skinTexture) {
+    constructor(skinTexture, atlas) {
+      this.atlas = atlas;
       this.scene = new xo();
-      this.camera = new Oe(65, window.innerWidth / window.innerHeight, 0.05, 10);
-      const ambient = new dl(16777215, 0.72);
-      const dir = new ul(16775403, 0.78);
+      this.camera = new Oe(65, window.innerWidth / Math.max(1, window.innerHeight), 0.05, 10);
+      const ambient = new dl(16777215, 0.78);
+      const dir = new ul(16775403, 0.72);
       dir.position.set(1.2, 2, 1.4);
       this.scene.add(ambient, dir);
-      this.material = new el({
+      this.armMaterial = new el({
         map: skinTexture,
+        side: Mi
+      });
+      this.blockMaterial = new jn({
+        map: atlas.texture,
+        vertexColors: true,
+        alphaTest: 0.5,
         side: Mi
       });
       this.pivot = new gi();
       this.scene.add(this.pivot);
+      this.armHolder = new gi();
       const armGeom = createRightArmGeometry();
-      this.armMesh = new Ce(armGeom, this.material);
-      this.armMesh.scale.set(1.28, 1.32, 1.28);
-      this.pivot.add(this.armMesh);
+      this.armMesh = new Ce(armGeom, this.armMaterial);
+      this.armMesh.rotation.x = Math.PI * 0.5;
+      this.armMesh.scale.set(1.28, 1.35, 1.28);
+      this.armHolder.add(this.armMesh);
+      this.pivot.add(this.armHolder);
       this.heldItemMount = new gi();
-      this.heldItemMount.position.set(-0.04, -0.34, -0.18);
+      this.heldItemMount.visible = false;
       this.pivot.add(this.heldItemMount);
+      this.heldBlockCache = /* @__PURE__ */ new Map();
+      this.currentHeldBlockId = 0;
       this.swayX = 0;
       this.swayY = 0;
       this.swingTime = 0;
-      this.swingDuration = 0.26;
+      this.swingDuration = 0.24;
       this.isSwinging = false;
+      this.isMining = false;
     }
     resize(width, height) {
       this.camera.aspect = width / Math.max(1, height);
       this.camera.updateProjectionMatrix();
+    }
+    setHeldBlock(blockId) {
+      const id2 = blockId || 0;
+      if (id2 === this.currentHeldBlockId) return;
+      this.currentHeldBlockId = id2;
+      while (this.heldItemMount.children.length > 0) {
+        this.heldItemMount.remove(this.heldItemMount.children[0]);
+      }
+      if (id2 <= 0) {
+        this.armHolder.visible = true;
+        this.heldItemMount.visible = false;
+        return;
+      }
+      let mesh = this.heldBlockCache.get(id2);
+      if (!mesh) {
+        const geom = buildBlockItemGeometry(this.atlas, id2, 0.36);
+        if (!geom) {
+          this.armHolder.visible = true;
+          this.heldItemMount.visible = false;
+          return;
+        }
+        mesh = new Ce(geom, this.blockMaterial);
+        mesh.rotation.set(0.18, Math.PI * 0.25, 0.08);
+        this.heldBlockCache.set(id2, mesh);
+      }
+      this.heldItemMount.add(mesh);
+      this.armHolder.visible = false;
+      this.heldItemMount.visible = true;
+    }
+    setMiningActive(active) {
+      this.isMining = Boolean(active);
+      if (this.isMining && !this.isSwinging) {
+        this.triggerSwing();
+      }
     }
     triggerSwing() {
       this.isSwinging = true;
@@ -15595,26 +16595,45 @@ void main() {
       if (this.isSwinging) {
         this.swingTime += dt;
         if (this.swingTime >= this.swingDuration) {
-          this.isSwinging = false;
-          this.swingTime = 0;
+          if (this.isMining) {
+            this.swingTime %= this.swingDuration;
+          } else {
+            this.isSwinging = false;
+            this.swingTime = 0;
+          }
         }
+      } else if (this.isMining) {
+        this.triggerSwing();
       }
       const p = this.getSwingProgress();
       const swingWave = Math.sin(p * Math.PI);
-      const swingDip = Math.sin(p * Math.PI * 2) * 0.04;
+      const swingDip = Math.sin(p * Math.PI * 2) * 0.035;
       const bobX = Math.cos(walkPhase) * 0.032 * moveBlend;
       const bobY = -Math.abs(Math.sin(walkPhase)) * 0.038 * moveBlend;
       const crouchDrop = isCrouching ? -0.045 : 0;
-      this.pivot.position.set(
-        0.56 + bobX + this.swayX - swingWave * 0.28,
-        -0.46 + bobY + crouchDrop + this.swayY - swingWave * 0.14 + swingDip,
-        -0.78 - swingWave * 0.22
-      );
-      this.pivot.rotation.set(
-        -0.62 - swingWave * 0.95 + this.swayY * 0.8,
-        -0.38 + swingWave * 0.55 + this.swayX * 0.8,
-        0.32 + swingWave * 0.42
-      );
+      if (this.currentHeldBlockId > 0) {
+        this.pivot.position.set(
+          0.52 + bobX + this.swayX - swingWave * 0.24,
+          -0.44 + bobY + crouchDrop + this.swayY - swingWave * 0.14 + swingDip,
+          -0.76 - swingWave * 0.18
+        );
+        this.pivot.rotation.set(
+          -swingWave * 0.72 + this.swayY * 0.7,
+          swingWave * 0.42 + this.swayX * 0.7,
+          swingWave * 0.22
+        );
+      } else {
+        this.pivot.position.set(
+          0.54 + bobX + this.swayX - swingWave * 0.24,
+          -0.44 + bobY + crouchDrop + this.swayY - swingWave * 0.12 + swingDip,
+          -0.7 - swingWave * 0.18
+        );
+        this.pivot.rotation.set(
+          0.24 - swingWave * 0.72 + this.swayY * 0.75,
+          0.44 + swingWave * 0.44 + this.swayX * 0.75,
+          -0.18 + swingWave * 0.26
+        );
+      }
     }
     render(renderer) {
       renderer.clearDepth();
@@ -15622,7 +16641,12 @@ void main() {
     }
     dispose() {
       this.armMesh.geometry.dispose();
-      this.material.dispose();
+      this.armMaterial.dispose();
+      for (const mesh of this.heldBlockCache.values()) {
+        mesh.geometry.dispose();
+      }
+      this.heldBlockCache.clear();
+      this.blockMaterial.dispose();
     }
   };
 
@@ -15636,14 +16660,20 @@ void main() {
       this.x = options.x ?? 0.5;
       this.y = options.y ?? 70;
       this.z = options.z ?? 0.5;
+      this.vx = 0;
       this.vy = 0;
+      this.vz = 0;
       this.yaw = options.yaw ?? 0;
       this.pitch = options.pitch ?? -0.12;
       this.cameraMode = options.cameraMode ?? CAMERA_MODES.FIRST_PERSON;
       this.flyMode = Boolean(options.flyMode);
-      this.onGround = true;
+      this.onGround = false;
       this.isCrouching = false;
       this.isSprinting = false;
+      this.sprintToggled = false;
+      this.jumpCooldown = 0;
+      this.currentFov = BASE_FOV;
+      this.currentEyeHeight = PLAYER_EYE_HEIGHT;
       this.walkPhase = 0;
       this.moveBlend = 0;
       this.time = 0;
@@ -15652,18 +16682,23 @@ void main() {
       this.isPaused = false;
       this.mouseSensitivity = 22e-4;
       this.lastSpaceTime = 0;
+      this.lastWTime = 0;
+      this.primaryHeld = false;
       this.touchInput = {
         moveX: 0,
         moveZ: 0,
         jump: false,
         crouch: false,
-        sprint: false
+        sprint: false,
+        breakHeld: false
       };
-      this.onPrimaryAction = options.onPrimaryAction || null;
+      this.onPlaceAction = options.onPlaceAction || null;
       this.onCameraModeChange = options.onCameraModeChange || null;
       this.onToggleDebug = options.onToggleDebug || null;
       this.onTogglePause = options.onTogglePause || null;
       this.onFlyModeChange = options.onFlyModeChange || null;
+      this._lookVec = new C();
+      this._eyeOrigin = new C();
       this._bindEvents();
       this._syncVisibility();
     }
@@ -15691,35 +16726,56 @@ void main() {
         }
         if (e.code === "Space" && !e.repeat) {
           const now = performance.now();
-          if (now - this.lastSpaceTime < 280) {
+          if (now - this.lastSpaceTime < 300) {
             this.toggleFlyMode();
             this.lastSpaceTime = 0;
           } else {
             this.lastSpaceTime = now;
           }
         }
+        if (e.code === "KeyW" && !e.repeat) {
+          const now = performance.now();
+          if (now - this.lastWTime < 280) {
+            this.sprintToggled = true;
+          }
+          this.lastWTime = now;
+        }
         this.keys.add(e.code);
       };
       this._onKeyUp = (e) => {
         this.keys.delete(e.code);
+        if (e.code === "KeyW") {
+          this.sprintToggled = false;
+        }
       };
       this._onMouseMove = (e) => {
         if (!this.pointerLocked || this.isPaused) return;
         this.applyLookDelta(e.movementX, e.movementY, this.mouseSensitivity);
       };
       this._onMouseDown = (e) => {
-        if (this.isPaused) return;
-        if (e.button === 0 && this.pointerLocked) {
-          this.triggerPrimaryAction();
+        if (this.isPaused || !this.pointerLocked) return;
+        if (e.button === 0) {
+          this.primaryHeld = true;
+          this.firstPersonHand.triggerSwing();
+        } else if (e.button === 2) {
+          this.triggerPlaceAction();
+        }
+      };
+      this._onMouseUp = (e) => {
+        if (e.button === 0) {
+          this.primaryHeld = false;
         }
       };
       this._onBlur = () => {
         this.keys.clear();
+        this.primaryHeld = false;
+        this.sprintToggled = false;
       };
       window.addEventListener("keydown", this._onKeyDown);
       window.addEventListener("keyup", this._onKeyUp);
       window.addEventListener("mousemove", this._onMouseMove);
       window.addEventListener("mousedown", this._onMouseDown);
+      window.addEventListener("mouseup", this._onMouseUp);
       window.addEventListener("blur", this._onBlur);
     }
     applyLookDelta(dx2, dy2, sensitivity = this.mouseSensitivity) {
@@ -15730,9 +16786,32 @@ void main() {
       this.pitch = Math.max(-maxPitch, Math.min(maxPitch, this.pitch + dPitch));
       this.firstPersonHand.addLookInertia(dYaw, dPitch);
     }
-    triggerPrimaryAction() {
-      this.firstPersonHand.triggerSwing();
-      this.onPrimaryAction?.();
+    isMiningHeld() {
+      return this.primaryHeld && this.pointerLocked && !this.isPaused || this.touchInput.breakHeld && !this.isPaused;
+    }
+    triggerPlaceAction() {
+      if (this.isPaused) return false;
+      const placed = this.onPlaceAction?.();
+      if (placed) {
+        this.firstPersonHand.triggerSwing();
+      }
+      return Boolean(placed);
+    }
+    getEyeOrigin() {
+      this._eyeOrigin.set(this.x, this.y + this.currentEyeHeight, this.z);
+      return this._eyeOrigin;
+    }
+    getLookDirection() {
+      const cosP = Math.cos(this.pitch);
+      this._lookVec.set(
+        -Math.sin(this.yaw) * cosP,
+        Math.sin(this.pitch),
+        -Math.cos(this.yaw) * cosP
+      );
+      return this._lookVec;
+    }
+    getCurrentHitboxHeight() {
+      return this.isCrouching ? PLAYER_CROUCH_HEIGHT : PLAYER_HEIGHT;
     }
     cycleCameraMode() {
       this.cameraMode = (this.cameraMode + 1) % 3;
@@ -15758,6 +16837,9 @@ void main() {
       this.isPaused = paused;
       if (paused) {
         this.keys.clear();
+        this.primaryHeld = false;
+        this.touchInput.breakHeld = false;
+        this.sprintToggled = false;
         if (document.pointerLockElement) {
           document.exitPointerLock?.();
         }
@@ -15811,9 +16893,21 @@ void main() {
       }
       const wantJump = this.keys.has("Space") || this.touchInput.jump;
       const wantCrouch = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight") || this.touchInput.crouch;
-      const wantSprint = this.keys.has("ControlLeft") || this.keys.has("ControlRight") || this.touchInput.sprint;
-      this.isCrouching = !this.flyMode && wantCrouch;
-      this.isSprinting = wantSprint && forward > 0.25 && !this.isCrouching;
+      const wantSprint = this.keys.has("ControlLeft") || this.keys.has("ControlRight") || this.sprintToggled || this.touchInput.sprint;
+      let nextCrouch = !this.flyMode && wantCrouch;
+      if (!nextCrouch && this.isCrouching && !this.flyMode) {
+        if (collidesWithWorld(this.world, this.x, this.y, this.z, PLAYER_HALF_WIDTH, PLAYER_HEIGHT)) {
+          nextCrouch = true;
+        }
+      }
+      this.isCrouching = nextCrouch;
+      if (forward <= 0.25 || this.isCrouching) {
+        this.isSprinting = false;
+      } else if (wantSprint) {
+        this.isSprinting = true;
+      } else {
+        this.isSprinting = false;
+      }
       const sinY = Math.sin(this.yaw);
       const cosY = Math.cos(this.yaw);
       const moveDirX = -sinY * forward + cosY * strafe;
@@ -15826,54 +16920,87 @@ void main() {
       } else if (this.isSprinting) {
         speed = SPRINT_SPEED;
       }
-      const nextX = this.x + moveDirX * speed * dt;
-      const nextZ = this.z + moveDirZ * speed * dt;
-      if (this.flyMode) {
-        this.x = nextX;
-        this.z = nextZ;
-        let vert = 0;
-        if (wantJump) vert += 1;
-        if (wantCrouch) vert -= 1;
-        this.y = Math.max(1.5, Math.min(WORLD_HEIGHT + 24, this.y + vert * speed * dt));
-        this.onGround = false;
-      } else {
-        const curSurface = this.world.getSurfaceHeightAt(this.x, this.z);
-        const targetSurfaceX = this.world.getSurfaceHeightAt(nextX, this.z);
-        if (targetSurfaceX <= this.y + 1.25 || targetSurfaceX <= curSurface + 1.1) {
-          this.x = nextX;
-        }
-        const targetSurfaceZ = this.world.getSurfaceHeightAt(this.x, nextZ);
-        if (targetSurfaceZ <= this.y + 1.25 || targetSurfaceZ <= curSurface + 1.1) {
-          this.z = nextZ;
-        }
-        const groundY = this.world.getSurfaceHeightAt(this.x, this.z);
-        const inWater = this.y < SEA_LEVEL + 0.35 && this.world.getBlock(this.x, this.y + 0.3, this.z) === 12;
-        if (inWater) {
-          if (wantJump) {
-            this.vy = 4.2;
-          } else {
-            this.vy = Math.max(-2.6, this.vy - GRAVITY * 0.25 * dt);
-          }
-        } else {
-          if (this.onGround && wantJump) {
-            this.vy = JUMP_VELOCITY;
-            this.onGround = false;
-          } else {
-            this.vy -= GRAVITY * dt;
-          }
-        }
-        this.y += this.vy * dt;
-        if (this.y <= groundY) {
-          this.y = groundY;
-          this.vy = 0;
-          this.onGround = true;
-        } else if (this.y - groundY < 0.08 && this.vy <= 0) {
-          this.y = groundY;
-          this.vy = 0;
-          this.onGround = true;
-        } else {
+      const activeHeight = this.getCurrentHitboxHeight();
+      if (this.jumpCooldown > 0) this.jumpCooldown = Math.max(0, this.jumpCooldown - dt);
+      const substeps = Math.max(1, Math.ceil(dt / 0.016));
+      const subDt = dt / substeps;
+      let anyWallHit = false;
+      for (let s30 = 0; s30 < substeps; s30++) {
+        if (this.flyMode) {
+          let vert = 0;
+          if (wantJump) vert += 1;
+          if (wantCrouch) vert -= 1;
+          const res = moveAABB(
+            this.world,
+            this,
+            moveDirX * speed * subDt,
+            vert * speed * subDt,
+            moveDirZ * speed * subDt,
+            PLAYER_HALF_WIDTH,
+            PLAYER_HEIGHT,
+            false
+          );
+          this.x = res.x;
+          this.y = Math.max(1, Math.min(WORLD_HEIGHT + 32, res.y));
+          this.z = res.z;
           this.onGround = false;
+          this.vy = 0;
+          if (res.hitWall) anyWallHit = true;
+        } else {
+          const inWater = this.y < SEA_LEVEL + 0.4 && this.world.getBlock(this.x, this.y + 0.35, this.z) === 12;
+          let dy2;
+          if (inWater) {
+            speed = this.isSprinting ? WALK_SPEED * 0.85 : WALK_SPEED * 0.62;
+            if (wantJump) {
+              this.vy = 4.4;
+            } else {
+              this.vy = Math.max(-3.2, this.vy - GRAVITY * 0.25 * subDt);
+            }
+            dy2 = this.vy * subDt;
+          } else {
+            let prevVy = this.vy;
+            if (this.onGround && wantJump && this.jumpCooldown <= 0) {
+              prevVy = JUMP_VELOCITY;
+              this.onGround = false;
+              this.jumpCooldown = JUMP_COOLDOWN_SEC;
+            }
+            this.vy = Math.max(-TERMINAL_VELOCITY, prevVy - GRAVITY * subDt);
+            dy2 = 0.5 * (prevVy + this.vy) * subDt;
+          }
+          const res = moveAABB(
+            this.world,
+            this,
+            moveDirX * speed * subDt,
+            dy2,
+            moveDirZ * speed * subDt,
+            PLAYER_HALF_WIDTH,
+            activeHeight,
+            this.isCrouching
+          );
+          this.x = res.x;
+          this.y = res.y;
+          this.z = res.z;
+          this.onGround = res.onGround;
+          if (res.onGround && this.vy < 0) this.vy = 0;
+          if (res.hitCeiling && this.vy > 0) this.vy = 0;
+          if (res.hitWall) anyWallHit = true;
         }
+      }
+      if (anyWallHit && !this.flyMode) {
+        this.isSprinting = false;
+        this.sprintToggled = false;
+      }
+      const targetEye = this.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
+      this.currentEyeHeight += (targetEye - this.currentEyeHeight) * Math.min(1, dt * 16);
+      const targetFov = this.isSprinting ? BASE_FOV + SPRINT_FOV_BOOST : BASE_FOV;
+      if (Math.abs(this.currentFov - targetFov) > 0.05) {
+        this.currentFov += (targetFov - this.currentFov) * Math.min(1, dt * 10);
+        this.camera.fov = this.currentFov;
+        this.camera.updateProjectionMatrix();
+      } else if (this.currentFov !== targetFov) {
+        this.currentFov = targetFov;
+        this.camera.fov = targetFov;
+        this.camera.updateProjectionMatrix();
       }
       const horizontalSpeed = Math.hypot(moveDirX, moveDirZ) * speed;
       const isMoving = len > 0.05;
@@ -15898,9 +17025,8 @@ void main() {
       this._updateCamera();
     }
     _updateCamera() {
-      const eyeH = this.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
       const eyeX = this.x;
-      const eyeY = this.y + eyeH;
+      const eyeY = this.y + this.currentEyeHeight;
       const eyeZ = this.z;
       if (this.cameraMode === CAMERA_MODES.FIRST_PERSON) {
         this.camera.position.set(eyeX, eyeY, eyeZ);
@@ -15920,27 +17046,28 @@ void main() {
       const sign = this.cameraMode === CAMERA_MODES.THIRD_PERSON_BACK ? -1 : 1;
       const maxDist = 3.8;
       let dist = maxDist;
-      for (let step = 0.4; step <= maxDist; step += 0.25) {
+      for (let step = 0.35; step <= maxDist; step += 0.2) {
         const cx2 = eyeX + lookX * sign * step;
         const cy2 = eyeY + lookY * sign * step;
         const cz = eyeZ + lookZ * sign * step;
         const b = this.world.getBlock(cx2, cy2, cz);
         if (b !== 0 && b !== 12) {
-          dist = Math.max(0.6, step - 0.3);
+          dist = Math.max(0.5, step - 0.25);
           break;
         }
       }
       const camX = eyeX + lookX * sign * dist;
-      const camY = Math.max(this.world.getSurfaceHeightAt(eyeX + lookX * sign * dist, eyeZ + lookZ * sign * dist) + 0.35, eyeY + lookY * sign * dist);
+      const camY = eyeY + lookY * sign * dist;
       const camZ = eyeZ + lookZ * sign * dist;
       this.camera.position.set(camX, camY, camZ);
-      this.camera.lookAt(eyeX, eyeY - 0.1, eyeZ);
+      this.camera.lookAt(eyeX, eyeY - 0.08, eyeZ);
     }
     dispose() {
       window.removeEventListener("keydown", this._onKeyDown);
       window.removeEventListener("keyup", this._onKeyUp);
       window.removeEventListener("mousemove", this._onMouseMove);
       window.removeEventListener("mousedown", this._onMouseDown);
+      window.removeEventListener("mouseup", this._onMouseUp);
       window.removeEventListener("blur", this._onBlur);
     }
   };
@@ -15995,10 +17122,12 @@ void main() {
     }
     async saveState(state) {
       const payload = {
-        version: 1,
+        version: 2,
         worldSeed: state.worldSeed,
         player: state.player,
         settings: state.settings,
+        hotbar: state.hotbar || null,
+        modifiedBlocks: Array.isArray(state.modifiedBlocks) ? state.modifiedBlocks : [],
         updatedAt: Date.now()
       };
       this.memoryFallback = payload;
@@ -16061,6 +17190,8 @@ void main() {
       this.ctx.imageSmoothingEnabled = false;
       this.tiles = /* @__PURE__ */ new Map();
       this.nextIndex = 0;
+      this.previewCache = /* @__PURE__ */ new Map();
+      this.crackTextures = null;
       this._generateAllStage1Tiles();
       this.texture = new vh(this.canvas);
       this.texture.magFilter = Te;
@@ -16126,6 +17257,9 @@ void main() {
      * Extracts a standalone 16x16 DataURL preview for hotbar/inventory icons (Stage 2+).
      */
     getTilePreviewDataURL(name) {
+      if (this.previewCache.has(name)) {
+        return this.previewCache.get(name);
+      }
       const rec = this.getUV(name);
       const temp = document.createElement("canvas");
       temp.width = ATLAS_TILE_INNER;
@@ -16143,7 +17277,111 @@ void main() {
         ATLAS_TILE_INNER,
         ATLAS_TILE_INNER
       );
-      return temp.toDataURL();
+      const url = temp.toDataURL();
+      this.previewCache.set(name, url);
+      return url;
+    }
+    /**
+     * Generates isometric-style 2D block icon DataURL for Hotbar slots.
+     */
+    getBlockIconDataURL(blockDef) {
+      if (!blockDef || !blockDef.faces) return "";
+      const cacheKey = `block:${blockDef.id}`;
+      if (this.previewCache.has(cacheKey)) {
+        return this.previewCache.get(cacheKey);
+      }
+      const size = 32;
+      const c = document.createElement("canvas");
+      c.width = size;
+      c.height = size;
+      const g = c.getContext("2d");
+      g.imageSmoothingEnabled = false;
+      const topRec = this.getUV(blockDef.faces.top);
+      const sideLeftRec = this.getUV(blockDef.faces.west);
+      const sideRightRec = this.getUV(blockDef.faces.south);
+      const drawIsoFace = (rec, a, b, cc2, d, e, f, brightness) => {
+        g.save();
+        g.transform(a, b, cc2, d, e, f);
+        g.drawImage(
+          this.canvas,
+          rec.cx * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
+          rec.cy * ATLAS_CELL_SIZE + ATLAS_TILE_PAD,
+          ATLAS_TILE_INNER,
+          ATLAS_TILE_INNER,
+          0,
+          0,
+          16,
+          16
+        );
+        if (brightness < 1) {
+          g.fillStyle = `rgba(0,0,0,${(1 - brightness).toFixed(2)})`;
+          g.fillRect(0, 0, 16, 16);
+        }
+        g.restore();
+      };
+      drawIsoFace(topRec, 0.85, 0.42, -0.85, 0.42, 16, 2, 1);
+      drawIsoFace(sideLeftRec, 0.85, 0.42, 0, 0.92, 2.4, 8.7, 0.82);
+      drawIsoFace(sideRightRec, 0.85, -0.42, 0, 0.92, 16, 15.4, 0.64);
+      const url = c.toDataURL();
+      this.previewCache.set(cacheKey, url);
+      return url;
+    }
+    /**
+     * Procedurally generates 10 Minecraft destroy_stage_0..9 crack textures (16x16).
+     */
+    getCrackTextures() {
+      if (this.crackTextures) return this.crackTextures;
+      this.crackTextures = [];
+      const crackPaths = [
+        [[8, 8], [7, 7], [6, 6], [5, 4], [4, 2], [3, 1]],
+        [[8, 8], [9, 7], [11, 6], [13, 5], [14, 3], [15, 2]],
+        [[8, 8], [7, 9], [6, 11], [4, 12], [2, 14], [1, 15]],
+        [[8, 8], [9, 9], [10, 11], [12, 12], [13, 14], [14, 15]],
+        [[8, 8], [8, 6], [7, 4], [8, 2], [7, 0]],
+        [[8, 8], [10, 8], [12, 9], [14, 8], [15, 9]],
+        [[8, 8], [6, 8], [4, 7], [2, 8], [0, 7]],
+        [[8, 8], [8, 10], [9, 12], [8, 14], [9, 15]],
+        [[6, 6], [4, 7], [3, 9], [2, 11]],
+        [[11, 6], [12, 8], [13, 10], [14, 12]],
+        [[6, 11], [8, 12], [10, 12], [11, 13]],
+        [[5, 4], [7, 3], [9, 3], [11, 2]]
+      ];
+      for (let stage = 0; stage < 10; stage++) {
+        const c = document.createElement("canvas");
+        c.width = ATLAS_TILE_INNER;
+        c.height = ATLAS_TILE_INNER;
+        const g = c.getContext("2d");
+        g.imageSmoothingEnabled = false;
+        g.clearRect(0, 0, 16, 16);
+        const activeBranches = Math.min(crackPaths.length, 2 + Math.floor(stage * 1.15));
+        const depthSteps = 1 + Math.floor((stage + 1) * 0.6);
+        for (let b = 0; b < activeBranches; b++) {
+          const pts = crackPaths[b];
+          const limit = Math.min(pts.length, depthSteps);
+          for (let i = 0; i < limit; i++) {
+            const [px2, py2] = pts[i];
+            const alpha = Math.min(0.86, 0.35 + stage * 0.055);
+            g.fillStyle = `rgba(12, 12, 12, ${alpha.toFixed(2)})`;
+            g.fillRect(px2, py2, 1, 1);
+            if (stage >= 5 && i > 0) {
+              g.fillStyle = `rgba(28, 28, 28, ${(alpha * 0.55).toFixed(2)})`;
+              g.fillRect(Math.min(15, px2 + 1), py2, 1, 1);
+            }
+          }
+        }
+        if (stage >= 7) {
+          g.fillStyle = `rgba(0, 0, 0, ${((stage - 6) * 0.09).toFixed(2)})`;
+          g.fillRect(6, 6, 4, 4);
+        }
+        const tex = new vh(c);
+        tex.magFilter = Te;
+        tex.minFilter = Te;
+        tex.generateMipmaps = false;
+        tex.colorSpace = sn;
+        tex.needsUpdate = true;
+        this.crackTextures.push(tex);
+      }
+      return this.crackTextures;
     }
     _generateAllStage1Tiles() {
       const dirtPalette = [
@@ -16336,6 +17574,206 @@ void main() {
     }
   };
 
+  // src/ui/Hotbar.js
+  var Hotbar = class {
+    constructor(atlas, options = {}) {
+      this.atlas = atlas;
+      this.onChange = options.onChange || null;
+      this.slots = new Array(HOTBAR_SIZE).fill(null);
+      this.selectedIndex = 0;
+      this.container = document.getElementById("hotbar");
+      this.itemLabelEl = document.getElementById("hotbar-item-name");
+      this.slotEls = [];
+      this.labelTimer = null;
+      this._initStarterKit();
+      this._buildDom();
+      this._bindInput();
+      this.render();
+    }
+    _initStarterKit() {
+      this.slots = [
+        { id: BLOCK_IDS.COBBLESTONE, count: 64 },
+        { id: BLOCK_IDS.OAK_PLANKS, count: 64 },
+        { id: BLOCK_IDS.DIRT, count: 64 },
+        { id: BLOCK_IDS.OAK_LOG, count: 64 },
+        { id: BLOCK_IDS.SAND, count: 64 },
+        { id: BLOCK_IDS.OAK_LEAVES, count: 32 },
+        null,
+        null,
+        null
+      ];
+      this.selectedIndex = 0;
+    }
+    resetStarterKit() {
+      this._initStarterKit();
+      this.render();
+      this.onChange?.(this.getSelectedSlot(), true);
+    }
+    loadState(savedHotbar) {
+      if (!savedHotbar || !Array.isArray(savedHotbar.slots)) return;
+      for (let i = 0; i < HOTBAR_SIZE; i++) {
+        const s30 = savedHotbar.slots[i];
+        if (s30 && s30.id > 0 && s30.count > 0) {
+          this.slots[i] = { id: s30.id, count: Math.min(MAX_STACK_SIZE, s30.count) };
+        } else {
+          this.slots[i] = null;
+        }
+      }
+      if (Number.isFinite(savedHotbar.selectedIndex)) {
+        this.selectedIndex = Math.max(0, Math.min(HOTBAR_SIZE - 1, savedHotbar.selectedIndex | 0));
+      }
+      this.render();
+      this.onChange?.(this.getSelectedSlot(), false);
+    }
+    exportState() {
+      return {
+        selectedIndex: this.selectedIndex,
+        slots: this.slots.map((s30) => s30 ? { id: s30.id, count: s30.count } : null)
+      };
+    }
+    getSelectedSlot() {
+      return this.slots[this.selectedIndex] || null;
+    }
+    selectSlot(index) {
+      const next = (index % HOTBAR_SIZE + HOTBAR_SIZE) % HOTBAR_SIZE;
+      this.selectedIndex = next;
+      this.render();
+      this._showSelectedName();
+      this.onChange?.(this.getSelectedSlot(), true);
+    }
+    canAccept(blockId) {
+      if (!blockId) return false;
+      for (let i = 0; i < HOTBAR_SIZE; i++) {
+        const s30 = this.slots[i];
+        if (!s30) return true;
+        if (s30.id === blockId && s30.count < MAX_STACK_SIZE) return true;
+      }
+      return false;
+    }
+    /**
+     * Adds picked-up block items into matching stacks first, then empty slots.
+     * Returns leftover count that did not fit.
+     */
+    addItem(blockId, amount = 1) {
+      if (!blockId || amount <= 0) return amount;
+      let remaining = amount;
+      for (let i = 0; i < HOTBAR_SIZE && remaining > 0; i++) {
+        const s30 = this.slots[i];
+        if (s30 && s30.id === blockId && s30.count < MAX_STACK_SIZE) {
+          const add = Math.min(MAX_STACK_SIZE - s30.count, remaining);
+          s30.count += add;
+          remaining -= add;
+        }
+      }
+      for (let i = 0; i < HOTBAR_SIZE && remaining > 0; i++) {
+        if (!this.slots[i]) {
+          const add = Math.min(MAX_STACK_SIZE, remaining);
+          this.slots[i] = { id: blockId, count: add };
+          remaining -= add;
+        }
+      }
+      if (remaining !== amount) {
+        this.render();
+        this.onChange?.(this.getSelectedSlot(), true);
+      }
+      return remaining;
+    }
+    consumeSelected(amount = 1) {
+      const slot = this.slots[this.selectedIndex];
+      if (!slot || slot.count < amount) return false;
+      slot.count -= amount;
+      if (slot.count <= 0) {
+        this.slots[this.selectedIndex] = null;
+      }
+      this.render();
+      this.onChange?.(this.getSelectedSlot(), true);
+      return true;
+    }
+    _showSelectedName() {
+      if (!this.itemLabelEl) return;
+      const slot = this.getSelectedSlot();
+      if (!slot) {
+        this.itemLabelEl.classList.add("hidden");
+        return;
+      }
+      const def = BlockRegistry.get(slot.id);
+      this.itemLabelEl.textContent = def.name;
+      this.itemLabelEl.classList.remove("hidden");
+      clearTimeout(this.labelTimer);
+      this.labelTimer = setTimeout(() => {
+        this.itemLabelEl?.classList.add("hidden");
+      }, 1500);
+    }
+    _buildDom() {
+      if (!this.container) return;
+      this.container.innerHTML = "";
+      this.slotEls = [];
+      for (let i = 0; i < HOTBAR_SIZE; i++) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "hotbar-slot";
+        btn.dataset.slotIndex = String(i);
+        btn.setAttribute("aria-label", `\u0421\u043B\u043E\u0442 ${i + 1}`);
+        const icon = document.createElement("img");
+        icon.className = "hotbar-icon hidden";
+        icon.alt = "";
+        icon.draggable = false;
+        const count = document.createElement("span");
+        count.className = "hotbar-count hidden";
+        btn.append(icon, count);
+        this.container.appendChild(btn);
+        this.slotEls.push({ btn, icon, count });
+        const pickSlot = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.selectSlot(i);
+        };
+        btn.addEventListener("touchstart", pickSlot, { passive: false });
+        btn.addEventListener("mousedown", pickSlot);
+      }
+    }
+    _bindInput() {
+      this._onKeyDown = (e) => {
+        if (e.code.startsWith("Digit")) {
+          const n = parseInt(e.code.slice(5), 10);
+          if (n >= 1 && n <= HOTBAR_SIZE) {
+            this.selectSlot(n - 1);
+          }
+        }
+      };
+      this._onWheel = (e) => {
+        if (document.pointerLockElement && Math.abs(e.deltaY) > 0) {
+          const dir = e.deltaY > 0 ? 1 : -1;
+          this.selectSlot(this.selectedIndex + dir);
+        }
+      };
+      window.addEventListener("keydown", this._onKeyDown);
+      window.addEventListener("wheel", this._onWheel, { passive: true });
+    }
+    render() {
+      for (let i = 0; i < HOTBAR_SIZE; i++) {
+        const ui2 = this.slotEls[i];
+        if (!ui2) continue;
+        ui2.btn.classList.toggle("selected", i === this.selectedIndex);
+        const slot = this.slots[i];
+        if (slot && slot.id > 0 && slot.count > 0) {
+          const def = BlockRegistry.get(slot.id);
+          ui2.icon.src = this.atlas.getBlockIconDataURL(def);
+          ui2.icon.classList.remove("hidden");
+          ui2.count.textContent = slot.count > 1 ? String(slot.count) : "";
+          ui2.count.classList.toggle("hidden", slot.count <= 1);
+        } else {
+          ui2.icon.classList.add("hidden");
+          ui2.count.classList.add("hidden");
+        }
+      }
+    }
+    dispose() {
+      window.removeEventListener("keydown", this._onKeyDown);
+      window.removeEventListener("wheel", this._onWheel);
+    }
+  };
+
   // src/ui/Hud.js
   var CAMERA_MODE_NAMES = [
     "1-\u0435 \u043B\u0438\u0446\u043E",
@@ -16349,6 +17787,8 @@ void main() {
       this.pauseOverlay = document.getElementById("pause-overlay");
       this.pcHint = document.getElementById("pc-lock-hint");
       this.toastEl = document.getElementById("hud-toast");
+      this.breakRing = document.getElementById("break-progress-ring");
+      this.breakRingCircle = document.getElementById("break-progress-circle");
       this.btnCamera = document.getElementById("btn-camera");
       this.btnDebug = document.getElementById("btn-debug");
       this.btnFullscreen = document.getElementById("btn-fullscreen");
@@ -16356,6 +17796,8 @@ void main() {
       this.btnResume = document.getElementById("btn-resume");
       this.btnControlMode = document.getElementById("btn-control-mode");
       this.btnFlyMode = document.getElementById("btn-fly-mode");
+      this.btnMemoryMode = document.getElementById("btn-memory-mode");
+      this.btnGraphicsMode = document.getElementById("btn-graphics-mode");
       this.btnNewWorld = document.getElementById("btn-new-world");
       this.rangeRenderDist = document.getElementById("range-render-dist");
       this.labelRenderDist = document.getElementById("label-render-dist");
@@ -16398,6 +17840,14 @@ void main() {
       this.btnFlyMode?.addEventListener("click", (e) => {
         e.stopPropagation();
         this.callbacks.onToggleFlyMode?.();
+      });
+      this.btnMemoryMode?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.callbacks.onToggleMemoryMode?.();
+      });
+      this.btnGraphicsMode?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.callbacks.onToggleGraphicsMode?.();
       });
       this.btnNewWorld?.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -16486,7 +17936,17 @@ void main() {
     }
     setFlyModeLabel(isFly) {
       if (this.btnFlyMode) {
-        this.btnFlyMode.textContent = isFly ? "\u041F\u043E\u043B\u0451\u0442 (F): \u0412\u041A\u041B" : "\u041F\u043E\u043B\u0451\u0442 (F): \u0412\u042B\u041A\u041B";
+        this.btnFlyMode.textContent = isFly ? "\u041F\u043E\u043B\u0451\u0442 (2\xD7Space / F): \u0412\u041A\u041B" : "\u041F\u043E\u043B\u0451\u0442 (2\xD7Space / F): \u0412\u042B\u041A\u041B";
+      }
+    }
+    setMemoryModeLabel(unlimited) {
+      if (this.btnMemoryMode) {
+        this.btnMemoryMode.textContent = unlimited ? "\u041F\u0430\u043C\u044F\u0442\u044C \u043C\u0438\u0440\u0430: \u0411\u0435\u0441\u043A\u043E\u043D\u0435\u0447\u043D\u0430\u044F (\u221E)" : "\u041F\u0430\u043C\u044F\u0442\u044C \u043C\u0438\u0440\u0430: \u042D\u043A\u043E\u043D\u043E\u043C\u043D\u0430\u044F";
+      }
+    }
+    setGraphicsModeLabel(highQuality) {
+      if (this.btnGraphicsMode) {
+        this.btnGraphicsMode.textContent = highQuality ? "\u0413\u0440\u0430\u0444\u0438\u043A\u0430: \u0412\u044B\u0441\u043E\u043A\u0430\u044F (\u0447\u0451\u0442\u043A\u0438\u0439 PixelRatio)" : "\u0413\u0440\u0430\u0444\u0438\u043A\u0430: \u041F\u0440\u043E\u0438\u0437\u0432\u043E\u0434\u0438\u0442\u0435\u043B\u044C\u043D\u0430\u044F (60 FPS)";
       }
     }
     setRenderDistanceUI(dist) {
@@ -16497,6 +17957,17 @@ void main() {
       if (this.pcHint) {
         this.pcHint.classList.toggle("hidden", locked || this.isPaused);
       }
+    }
+    setBreakProgress(progress) {
+      if (!this.breakRing || !this.breakRingCircle) return;
+      if (progress <= 0) {
+        this.breakRing.classList.add("hidden");
+        return;
+      }
+      this.breakRing.classList.remove("hidden");
+      const circumference = 100.53;
+      const offset = circumference * (1 - Math.min(1, progress));
+      this.breakRingCircle.style.strokeDashoffset = String(offset.toFixed(2));
     }
     onCameraModeChanged(mode) {
       const name = CAMERA_MODE_NAMES[mode] || CAMERA_MODE_NAMES[CAMERA_MODES.FIRST_PERSON];
@@ -16511,7 +17982,7 @@ void main() {
         this.toastEl?.classList.add("hidden");
       }, durationMs);
     }
-    updateDebug({ player, world, renderer }) {
+    updateDebug({ player, world, renderer, targetHit, itemCount }) {
       this.fpsFrames++;
       const now = performance.now();
       const elapsed = now - this.fpsLastTime;
@@ -16526,14 +17997,15 @@ void main() {
       const lx2 = (Math.floor(player.x) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
       const lz = (Math.floor(player.z) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
       const info = renderer.info;
-      const mem = performance.memory ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)} / ${Math.round(performance.memory.jsHeapSizeLimit / 1048576)} MB` : "n/a";
+      const mem = performance.memory ? `${Math.round(performance.memory.usedJSHeapSize / 1048576)} MB (\u043B\u0438\u043C\u0438\u0442: \u221E)` : "\u221E (\u0431\u0435\u0437 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0439)";
+      const hitDesc = targetHit ? `${targetHit.x}, ${targetHit.y}, ${targetHit.z} [${BlockRegistry.get(targetHit.blockId).name}]` : "\u043D\u0435\u0442";
       this.debugPanel.textContent = [
-        `Minecraft Clone Stage 1 | FPS: ${this.currentFps}`,
-        `XYZ: ${player.x.toFixed(2)} / ${player.y.toFixed(2)} / ${player.z.toFixed(2)}`,
-        `Chunk: ${cx2}, ${cz} (local ${lx2}, ${Math.floor(player.y)}, ${lz})`,
-        `Facing: ${player.getFacingCardinal()} (${(player.yaw * 180 / Math.PI % 360).toFixed(1)}\xB0 / ${(player.pitch * 180 / Math.PI).toFixed(1)}\xB0)`,
-        `Chunks: ${world.chunks.size} (R=${world.renderDistance}) | Triangles: ${info.render.triangles} | Calls: ${info.render.calls}`,
-        `Memory: ${mem} | Seed: ${world.seed} | Mode: ${player.flyMode ? "Fly" : "Walk"}`
+        `Minecraft Web Edition (\u042D\u0442\u0430\u043F 2) | FPS: ${this.currentFps}`,
+        `XYZ: ${player.x.toFixed(2)} / ${player.y.toFixed(2)} / ${player.z.toFixed(2)} | ${player.isCrouching ? "\u041F\u0440\u0438\u0441\u0435\u0434" : player.isSprinting ? "\u0411\u0435\u0433" : player.flyMode ? "\u041F\u043E\u043B\u0451\u0442" : "\u0425\u043E\u0434\u044C\u0431\u0430"}`,
+        `Chunk: ${cx2}, ${cz} (local ${lx2}, ${Math.floor(player.y)}, ${lz}) | Facing: ${player.getFacingCardinal()}`,
+        `Target: ${hitDesc} | Drops: ${itemCount ?? 0}`,
+        `Chunks: ${world.chunks.size} active / ${world.unlimitedMemory ? `\u221E (${world.chunkDataCache.size} cached)` : "Economy"} | Edits: ${world.modifiedBlocks.size}`,
+        `Triangles: ${info.render.triangles} | Calls: ${info.render.calls} | Mem: ${mem} | Seed: ${world.seed}`
       ].join("\n");
     }
   };
@@ -16549,15 +18021,23 @@ void main() {
       this.lookZone = document.getElementById("touch-look-zone");
       this.btnJump = document.getElementById("btn-touch-jump");
       this.btnCrouch = document.getElementById("btn-touch-crouch");
-      this.btnAction = document.getElementById("btn-touch-action");
+      this.btnBreak = document.getElementById("btn-touch-break");
+      this.btnPlace = document.getElementById("btn-touch-place");
       this.btnFly = document.getElementById("btn-touch-fly");
       this.enabled = false;
       this.touchSensitivity = 52e-4;
+      this.crouchToggled = false;
+      this.lastJumpTapTime = 0;
       this.joystickTouchId = null;
       this.joystickCenter = { x: 0, y: 0 };
       this.maxRadius = 46;
       this.lookTouchId = null;
+      this.lookStartPos = { x: 0, y: 0 };
       this.lastLookPos = { x: 0, y: 0 };
+      this.lookStartTime = 0;
+      this.lookMoved = false;
+      this.longPressTimer = null;
+      this.longPressTriggered = false;
       this._bindEvents();
     }
     static detectTouchDevice() {
@@ -16577,19 +18057,30 @@ void main() {
       if (this.btnFly) {
         this.btnFly.classList.toggle("active", Boolean(active));
       }
+      if (active && this.crouchToggled) {
+        this.crouchToggled = false;
+        this.player.touchInput.crouch = false;
+        this.btnCrouch?.classList.remove("active");
+      }
     }
     _resetAllInputs() {
+      clearTimeout(this.longPressTimer);
       this.joystickTouchId = null;
       this.lookTouchId = null;
+      this.crouchToggled = false;
+      this.longPressTriggered = false;
       this.player.touchInput.moveX = 0;
       this.player.touchInput.moveZ = 0;
       this.player.touchInput.jump = false;
       this.player.touchInput.crouch = false;
       this.player.touchInput.sprint = false;
+      this.player.touchInput.breakHeld = false;
       if (this.joystickKnob) {
         this.joystickKnob.style.transform = "translate(-50%, -50%)";
       }
       this.joystickBase?.classList.remove("sprinting");
+      this.btnCrouch?.classList.remove("active");
+      this.btnBreak?.classList.remove("pressed");
     }
     _bindEvents() {
       if (!this.root) return;
@@ -16614,8 +18105,20 @@ void main() {
         const touch = e.changedTouches[0];
         if (!touch) return;
         this.lookTouchId = touch.identifier;
+        this.lookStartPos.x = touch.clientX;
+        this.lookStartPos.y = touch.clientY;
         this.lastLookPos.x = touch.clientX;
         this.lastLookPos.y = touch.clientY;
+        this.lookStartTime = performance.now();
+        this.lookMoved = false;
+        this.longPressTriggered = false;
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = setTimeout(() => {
+          if (this.lookTouchId !== null && !this.lookMoved && this.enabled) {
+            this.longPressTriggered = true;
+            this.player.touchInput.breakHeld = true;
+          }
+        }, 260);
       }, { passive: false });
       this._onTouchMove = (e) => {
         if (!this.enabled) return;
@@ -16626,6 +18129,11 @@ void main() {
             this._updateJoystick(t.clientX, t.clientY);
             handled = true;
           } else if (t.identifier === this.lookTouchId) {
+            const totalDist = Math.hypot(t.clientX - this.lookStartPos.x, t.clientY - this.lookStartPos.y);
+            if (totalDist > 12) {
+              this.lookMoved = true;
+              clearTimeout(this.longPressTimer);
+            }
             const dx2 = t.clientX - this.lastLookPos.x;
             const dy2 = t.clientY - this.lastLookPos.y;
             this.lastLookPos.x = t.clientX;
@@ -16650,6 +18158,13 @@ void main() {
             this.joystickBase?.classList.remove("sprinting");
           }
           if (t.identifier === this.lookTouchId) {
+            clearTimeout(this.longPressTimer);
+            if (this.longPressTriggered) {
+              this.player.touchInput.breakHeld = false;
+              this.longPressTriggered = false;
+            } else if (!this.lookMoved && performance.now() - this.lookStartTime < 250) {
+              this.player.triggerPlaceAction();
+            }
             this.lookTouchId = null;
           }
         }
@@ -16657,43 +18172,103 @@ void main() {
       window.addEventListener("touchmove", this._onTouchMove, { passive: false });
       window.addEventListener("touchend", this._onTouchEnd, { passive: false });
       window.addEventListener("touchcancel", this._onTouchEnd, { passive: false });
-      const bindHoldButton = (btn, field) => {
-        if (!btn) return;
-        let activeTouchId = null;
-        btn.addEventListener("touchstart", (e) => {
+      if (this.btnJump) {
+        let jumpTouchId = null;
+        this.btnJump.addEventListener("touchstart", (e) => {
           if (!this.enabled) return;
           e.preventDefault();
           e.stopPropagation();
           const t = e.changedTouches[0];
-          if (t) activeTouchId = t.identifier;
-          this.player.touchInput[field] = true;
-          btn.classList.add("pressed");
+          if (t) jumpTouchId = t.identifier;
+          const now = performance.now();
+          if (now - this.lastJumpTapTime < 300) {
+            const active = this.player.toggleFlyMode();
+            this.setFlyActive(active);
+            this.callbacks.onStatusToast?.(active ? "\u041F\u043E\u043B\u0451\u0442: \u0412\u041A\u041B (2\xD7\u041F\u0440\u044B\u0436\u043E\u043A)" : "\u041F\u043E\u043B\u0451\u0442: \u0412\u042B\u041A\u041B");
+            this.lastJumpTapTime = 0;
+          } else {
+            this.lastJumpTapTime = now;
+          }
+          this.player.touchInput.jump = true;
+          this.btnJump.classList.add("pressed");
         }, { passive: false });
-        const release = (e) => {
+        const endJump = (e) => {
           for (let i = 0; i < e.changedTouches.length; i++) {
-            if (e.changedTouches[i].identifier === activeTouchId) {
-              activeTouchId = null;
-              this.player.touchInput[field] = false;
-              btn.classList.remove("pressed");
+            if (e.changedTouches[i].identifier === jumpTouchId) {
+              jumpTouchId = null;
+              this.player.touchInput.jump = false;
+              this.btnJump.classList.remove("pressed");
             }
           }
         };
-        btn.addEventListener("touchend", release, { passive: false });
-        btn.addEventListener("touchcancel", release, { passive: false });
-      };
-      bindHoldButton(this.btnJump, "jump");
-      bindHoldButton(this.btnCrouch, "crouch");
-      if (this.btnAction) {
-        this.btnAction.addEventListener("touchstart", (e) => {
+        this.btnJump.addEventListener("touchend", endJump, { passive: false });
+        this.btnJump.addEventListener("touchcancel", endJump, { passive: false });
+      }
+      if (this.btnCrouch) {
+        let crouchTouchId = null;
+        this.btnCrouch.addEventListener("touchstart", (e) => {
           if (!this.enabled) return;
           e.preventDefault();
           e.stopPropagation();
-          this.btnAction.classList.add("pressed");
-          this.player.triggerPrimaryAction();
+          const t = e.changedTouches[0];
+          if (t) crouchTouchId = t.identifier;
+          if (this.player.flyMode) {
+            this.player.touchInput.crouch = true;
+            this.btnCrouch.classList.add("pressed");
+          } else {
+            this.crouchToggled = !this.crouchToggled;
+            this.player.touchInput.crouch = this.crouchToggled;
+            this.btnCrouch.classList.toggle("active", this.crouchToggled);
+          }
         }, { passive: false });
-        const endAction = () => this.btnAction.classList.remove("pressed");
-        this.btnAction.addEventListener("touchend", endAction, { passive: false });
-        this.btnAction.addEventListener("touchcancel", endAction, { passive: false });
+        const endCrouch = (e) => {
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === crouchTouchId) {
+              crouchTouchId = null;
+              this.btnCrouch.classList.remove("pressed");
+              if (this.player.flyMode) {
+                this.player.touchInput.crouch = false;
+              }
+            }
+          }
+        };
+        this.btnCrouch.addEventListener("touchend", endCrouch, { passive: false });
+        this.btnCrouch.addEventListener("touchcancel", endCrouch, { passive: false });
+      }
+      if (this.btnBreak) {
+        let breakTouchId = null;
+        this.btnBreak.addEventListener("touchstart", (e) => {
+          if (!this.enabled) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const t = e.changedTouches[0];
+          if (t) breakTouchId = t.identifier;
+          this.player.touchInput.breakHeld = true;
+          this.btnBreak.classList.add("pressed");
+        }, { passive: false });
+        const endBreak = (e) => {
+          for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === breakTouchId) {
+              breakTouchId = null;
+              this.player.touchInput.breakHeld = false;
+              this.btnBreak.classList.remove("pressed");
+            }
+          }
+        };
+        this.btnBreak.addEventListener("touchend", endBreak, { passive: false });
+        this.btnBreak.addEventListener("touchcancel", endBreak, { passive: false });
+      }
+      if (this.btnPlace) {
+        this.btnPlace.addEventListener("touchstart", (e) => {
+          if (!this.enabled) return;
+          e.preventDefault();
+          e.stopPropagation();
+          this.btnPlace.classList.add("pressed");
+          this.player.triggerPlaceAction();
+        }, { passive: false });
+        const endPlace = () => this.btnPlace.classList.remove("pressed");
+        this.btnPlace.addEventListener("touchend", endPlace, { passive: false });
+        this.btnPlace.addEventListener("touchcancel", endPlace, { passive: false });
       }
       if (this.btnFly) {
         this.btnFly.addEventListener("touchstart", (e) => {
@@ -16702,7 +18277,7 @@ void main() {
           e.stopPropagation();
           const active = this.player.toggleFlyMode();
           this.setFlyActive(active);
-          this.callbacks.onStatusToast?.(active ? "\u0420\u0435\u0436\u0438\u043C \u043F\u043E\u043B\u0451\u0442\u0430: \u0412\u041A\u041B" : "\u0420\u0435\u0436\u0438\u043C \u043F\u043E\u043B\u0451\u0442\u0430: \u0412\u042B\u041A\u041B");
+          this.callbacks.onStatusToast?.(active ? "\u041F\u043E\u043B\u0451\u0442: \u0412\u041A\u041B" : "\u041F\u043E\u043B\u0451\u0442: \u0412\u042B\u041A\u041B");
         }, { passive: false });
       }
     }
@@ -16734,9 +18309,151 @@ void main() {
       this.joystickBase?.classList.toggle("sprinting", autoSprint);
     }
     dispose() {
+      clearTimeout(this.longPressTimer);
       window.removeEventListener("touchmove", this._onTouchMove);
       window.removeEventListener("touchend", this._onTouchEnd);
       window.removeEventListener("touchcancel", this._onTouchEnd);
+    }
+  };
+
+  // src/world/Raycast.js
+  function raycastVoxel(world, origin, direction, maxDistance = REACH_DISTANCE) {
+    const dx2 = direction.x;
+    const dy2 = direction.y;
+    const dz = direction.z;
+    const dirLen = Math.hypot(dx2, dy2, dz);
+    if (dirLen < 1e-8) return null;
+    const ndx = dx2 / dirLen;
+    const ndy = dy2 / dirLen;
+    const ndz = dz / dirLen;
+    let vx2 = Math.floor(origin.x);
+    let vy2 = Math.floor(origin.y);
+    let vz = Math.floor(origin.z);
+    const stepX = ndx > 0 ? 1 : ndx < 0 ? -1 : 0;
+    const stepY = ndy > 0 ? 1 : ndy < 0 ? -1 : 0;
+    const stepZ = ndz > 0 ? 1 : ndz < 0 ? -1 : 0;
+    const tDeltaX = stepX !== 0 ? Math.abs(1 / ndx) : Infinity;
+    const tDeltaY = stepY !== 0 ? Math.abs(1 / ndy) : Infinity;
+    const tDeltaZ = stepZ !== 0 ? Math.abs(1 / ndz) : Infinity;
+    let tMaxX = stepX > 0 ? (vx2 + 1 - origin.x) * tDeltaX : stepX < 0 ? (origin.x - vx2) * tDeltaX : Infinity;
+    let tMaxY = stepY > 0 ? (vy2 + 1 - origin.y) * tDeltaY : stepY < 0 ? (origin.y - vy2) * tDeltaY : Infinity;
+    let tMaxZ = stepZ > 0 ? (vz + 1 - origin.z) * tDeltaZ : stepZ < 0 ? (origin.z - vz) * tDeltaZ : Infinity;
+    let t = 0;
+    let nx2 = 0;
+    let ny2 = 0;
+    let nz = 0;
+    for (let iter = 0; iter < 128 && t <= maxDistance; iter++) {
+      if (vy2 >= 0 && vy2 < WORLD_HEIGHT) {
+        const id2 = world.getBlock(vx2, vy2, vz);
+        if (BlockRegistry.isSolid(id2)) {
+          return {
+            x: vx2,
+            y: vy2,
+            z: vz,
+            blockId: id2,
+            normal: { x: nx2, y: ny2, z: nz },
+            distance: t
+          };
+        }
+      }
+      if (tMaxX < tMaxY) {
+        if (tMaxX < tMaxZ) {
+          vx2 += stepX;
+          t = tMaxX;
+          tMaxX += tDeltaX;
+          nx2 = -stepX;
+          ny2 = 0;
+          nz = 0;
+        } else {
+          vz += stepZ;
+          t = tMaxZ;
+          tMaxZ += tDeltaZ;
+          nx2 = 0;
+          ny2 = 0;
+          nz = -stepZ;
+        }
+      } else {
+        if (tMaxY < tMaxZ) {
+          vy2 += stepY;
+          t = tMaxY;
+          tMaxY += tDeltaY;
+          nx2 = 0;
+          ny2 = -stepY;
+          nz = 0;
+        } else {
+          vz += stepZ;
+          t = tMaxZ;
+          tMaxZ += tDeltaZ;
+          nx2 = 0;
+          ny2 = 0;
+          nz = -stepZ;
+        }
+      }
+    }
+    return null;
+  }
+  var SelectionBox = class {
+    constructor(scene) {
+      const box = new qi(1.004, 1.004, 1.004);
+      const edges = new Do(box);
+      box.dispose();
+      const material = new Ge({
+        color: 1118481,
+        transparent: true,
+        opacity: 0.78
+      });
+      this.mesh = new _n(edges, material);
+      this.mesh.visible = false;
+      this.mesh.renderOrder = 3;
+      scene.add(this.mesh);
+    }
+    update(hit) {
+      if (!hit) {
+        this.mesh.visible = false;
+        return;
+      }
+      this.mesh.visible = true;
+      this.mesh.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+    }
+    dispose(scene) {
+      scene.remove(this.mesh);
+      this.mesh.geometry.dispose();
+      this.mesh.material.dispose();
+    }
+  };
+  var BreakCrackOverlay = class {
+    constructor(scene, atlas) {
+      const geom = new qi(1.003, 1.003, 1.003);
+      const textures = atlas.getCrackTextures();
+      this.materials = textures.map((tex) => new jn({
+        map: tex,
+        transparent: true,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2
+      }));
+      this.mesh = new Ce(geom, this.materials[0]);
+      this.mesh.visible = false;
+      this.mesh.renderOrder = 4;
+      scene.add(this.mesh);
+    }
+    update(hit, progress) {
+      if (!hit || progress <= 0) {
+        this.mesh.visible = false;
+        return;
+      }
+      const stage = Math.max(0, Math.min(9, Math.floor(progress * 10)));
+      this.mesh.material = this.materials[stage];
+      this.mesh.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+      this.mesh.visible = true;
+    }
+    dispose(scene) {
+      scene.remove(this.mesh);
+      this.mesh.geometry.dispose();
+      for (const mat of this.materials) {
+        mat.dispose();
+      }
     }
   };
 
@@ -16750,6 +18467,8 @@ void main() {
       this.cz = cz;
       this.key = chunkKey(cx2, cz);
       this.blocks = new Uint8Array(CHUNK_VOLUME);
+      this.minY = 0;
+      this.maxY = WORLD_HEIGHT - 1;
       this.skyLight = null;
       this.blockLight = null;
       this.isGenerated = false;
@@ -16770,8 +18489,31 @@ void main() {
         return false;
       }
       this.blocks[(y * CHUNK_SIZE + z) * CHUNK_SIZE + x] = id2;
+      if (id2 !== 0) {
+        if (y < this.minY) this.minY = y;
+        if (y > this.maxY) this.maxY = y;
+      }
       this.dirty = true;
       return true;
+    }
+    recomputeVerticalBounds() {
+      let minY = WORLD_HEIGHT - 1;
+      let maxY = 0;
+      const blocks = this.blocks;
+      const slice = CHUNK_SIZE * CHUNK_SIZE;
+      for (let y = 0; y < WORLD_HEIGHT; y++) {
+        const start = y * slice;
+        const end = start + slice;
+        for (let i = start; i < end; i++) {
+          if (blocks[i] !== 0) {
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            break;
+          }
+        }
+      }
+      this.minY = minY <= maxY ? minY : 0;
+      this.maxY = minY <= maxY ? maxY : 0;
     }
     disposeMeshes(scene) {
       const meshes = [this.opaqueMesh, this.cutoutMesh, this.waterMesh];
@@ -16786,213 +18528,6 @@ void main() {
       this.waterMesh = null;
     }
   };
-
-  // src/blocks/BlockRegistry.js
-  var BLOCK_IDS = Object.freeze({
-    AIR: 0,
-    GRASS: 1,
-    DIRT: 2,
-    STONE: 3,
-    COBBLESTONE: 4,
-    BEDROCK: 5,
-    SAND: 6,
-    OAK_LOG: 7,
-    OAK_LEAVES: 8,
-    OAK_PLANKS: 9,
-    SNOW_GRASS: 10,
-    SNOW: 11,
-    WATER: 12
-  });
-  var BlockRegistryImpl = class {
-    constructor() {
-      this.byId = new Array(256).fill(null);
-      this.byKey = /* @__PURE__ */ new Map();
-      this._registerStage1Blocks();
-    }
-    register(def) {
-      const entry = {
-        id: def.id,
-        key: def.key,
-        name: def.name,
-        isAir: Boolean(def.isAir),
-        isSolid: def.isSolid !== void 0 ? def.isSolid : !def.isAir && !def.isLiquid,
-        isOpaque: def.isOpaque !== void 0 ? def.isOpaque : !def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid,
-        isTransparent: Boolean(def.isTransparent || def.isLiquid),
-        isCutout: Boolean(def.isCutout),
-        isLiquid: Boolean(def.isLiquid),
-        occludesAO: def.occludesAO !== void 0 ? def.occludesAO : !def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid,
-        hardness: def.hardness ?? 1,
-        lightEmission: def.lightEmission ?? 0,
-        // Hook for Stage 4 lighting
-        faces: def.faces || null
-        // { top, bottom, north, south, east, west }
-      };
-      this.byId[entry.id] = entry;
-      this.byKey.set(entry.key, entry);
-      return entry;
-    }
-    get(id2) {
-      return this.byId[id2] || this.byId[0];
-    }
-    getByKey(key) {
-      return this.byKey.get(key) || this.byId[0];
-    }
-    isOpaque(id2) {
-      const b = this.byId[id2];
-      return b ? b.isOpaque : false;
-    }
-    isSolid(id2) {
-      const b = this.byId[id2];
-      return b ? b.isSolid : false;
-    }
-    isLiquid(id2) {
-      const b = this.byId[id2];
-      return b ? b.isLiquid : false;
-    }
-    occludesAO(id2) {
-      const b = this.byId[id2];
-      return b ? b.occludesAO : false;
-    }
-    getAllBlocks() {
-      return this.byId.filter((b) => b && !b.isAir);
-    }
-    _allFaces(tileName) {
-      return {
-        top: tileName,
-        bottom: tileName,
-        north: tileName,
-        south: tileName,
-        east: tileName,
-        west: tileName
-      };
-    }
-    _registerStage1Blocks() {
-      this.register({
-        id: BLOCK_IDS.AIR,
-        key: "air",
-        name: "Air",
-        isAir: true,
-        isSolid: false,
-        isOpaque: false,
-        occludesAO: false,
-        hardness: 0
-      });
-      this.register({
-        id: BLOCK_IDS.GRASS,
-        key: "grass",
-        name: "Grass Block",
-        hardness: 0.6,
-        faces: {
-          top: "grass_top",
-          bottom: "dirt",
-          north: "grass_side",
-          south: "grass_side",
-          east: "grass_side",
-          west: "grass_side"
-        }
-      });
-      this.register({
-        id: BLOCK_IDS.DIRT,
-        key: "dirt",
-        name: "Dirt",
-        hardness: 0.5,
-        faces: this._allFaces("dirt")
-      });
-      this.register({
-        id: BLOCK_IDS.STONE,
-        key: "stone",
-        name: "Stone",
-        hardness: 1.5,
-        faces: this._allFaces("stone")
-      });
-      this.register({
-        id: BLOCK_IDS.COBBLESTONE,
-        key: "cobblestone",
-        name: "Cobblestone",
-        hardness: 2,
-        faces: this._allFaces("cobblestone")
-      });
-      this.register({
-        id: BLOCK_IDS.BEDROCK,
-        key: "bedrock",
-        name: "Bedrock",
-        hardness: Infinity,
-        faces: this._allFaces("bedrock")
-      });
-      this.register({
-        id: BLOCK_IDS.SAND,
-        key: "sand",
-        name: "Sand",
-        hardness: 0.5,
-        faces: this._allFaces("sand")
-      });
-      this.register({
-        id: BLOCK_IDS.OAK_LOG,
-        key: "oak_log",
-        name: "Oak Log",
-        hardness: 2,
-        faces: {
-          top: "oak_log_top",
-          bottom: "oak_log_top",
-          north: "oak_log_side",
-          south: "oak_log_side",
-          east: "oak_log_side",
-          west: "oak_log_side"
-        }
-      });
-      this.register({
-        id: BLOCK_IDS.OAK_LEAVES,
-        key: "oak_leaves",
-        name: "Oak Leaves",
-        hardness: 0.2,
-        isOpaque: false,
-        isCutout: true,
-        occludesAO: false,
-        faces: this._allFaces("oak_leaves")
-      });
-      this.register({
-        id: BLOCK_IDS.OAK_PLANKS,
-        key: "oak_planks",
-        name: "Oak Planks",
-        hardness: 2,
-        faces: this._allFaces("oak_planks")
-      });
-      this.register({
-        id: BLOCK_IDS.SNOW_GRASS,
-        key: "snow_grass",
-        name: "Snowy Grass",
-        hardness: 0.6,
-        faces: {
-          top: "snow",
-          bottom: "dirt",
-          north: "snow_grass_side",
-          south: "snow_grass_side",
-          east: "snow_grass_side",
-          west: "snow_grass_side"
-        }
-      });
-      this.register({
-        id: BLOCK_IDS.SNOW,
-        key: "snow",
-        name: "Snow Block",
-        hardness: 0.4,
-        faces: this._allFaces("snow")
-      });
-      this.register({
-        id: BLOCK_IDS.WATER,
-        key: "water",
-        name: "Water",
-        hardness: Infinity,
-        isSolid: false,
-        isOpaque: false,
-        isTransparent: true,
-        isLiquid: true,
-        occludesAO: false,
-        faces: this._allFaces("water")
-      });
-    }
-  };
-  var BlockRegistry = new BlockRegistryImpl();
 
   // src/world/ChunkMesher.js
   var FACES = [
@@ -17075,31 +18610,62 @@ void main() {
       ]
     }
   ];
-  function createBufferAccumulator() {
-    return {
-      positions: [],
-      normals: [],
-      uvs: [],
-      colors: [],
-      indices: [],
-      vertexCount: 0
-    };
-  }
-  function finalizeGeometry(acc) {
-    if (acc.vertexCount === 0) return null;
-    const geometry = new Yt();
-    geometry.setAttribute("position", new At(acc.positions, 3));
-    geometry.setAttribute("normal", new At(acc.normals, 3));
-    geometry.setAttribute("uv", new At(acc.uvs, 2));
-    geometry.setAttribute("color", new At(acc.colors, 3));
-    const IndexArray = acc.vertexCount > 65535 ? Uint32Array : Uint16Array;
-    geometry.setIndex(new me(new IndexArray(acc.indices), 1));
-    geometry.computeBoundingSphere();
-    return geometry;
-  }
+  var ScratchMeshBuffer = class {
+    constructor(initialQuads = 2048) {
+      this.capacityQuads = initialQuads;
+      this.positions = new Float32Array(initialQuads * 12);
+      this.normals = new Float32Array(initialQuads * 12);
+      this.uvs = new Float32Array(initialQuads * 8);
+      this.colors = new Float32Array(initialQuads * 12);
+      this.indices = new Uint32Array(initialQuads * 6);
+      this.vertexCount = 0;
+      this.indexCount = 0;
+    }
+    reset() {
+      this.vertexCount = 0;
+      this.indexCount = 0;
+    }
+    ensureQuadCapacity() {
+      const neededQuads = (this.vertexCount >> 2) + 1;
+      if (neededQuads <= this.capacityQuads) return;
+      this.capacityQuads *= 2;
+      const growFloat = (arr, stride) => {
+        const next = new Float32Array(this.capacityQuads * stride);
+        next.set(arr);
+        return next;
+      };
+      this.positions = growFloat(this.positions, 12);
+      this.normals = growFloat(this.normals, 12);
+      this.uvs = growFloat(this.uvs, 8);
+      this.colors = growFloat(this.colors, 12);
+      const nextIdx = new Uint32Array(this.capacityQuads * 6);
+      nextIdx.set(this.indices);
+      this.indices = nextIdx;
+    }
+    toGeometry() {
+      if (this.vertexCount === 0) return null;
+      const vCount = this.vertexCount;
+      const iCount = this.indexCount;
+      const geometry = new Yt();
+      geometry.setAttribute("position", new me(this.positions.slice(0, vCount * 3), 3));
+      geometry.setAttribute("normal", new me(this.normals.slice(0, vCount * 3), 3));
+      geometry.setAttribute("uv", new me(this.uvs.slice(0, vCount * 2), 2));
+      geometry.setAttribute("color", new me(this.colors.slice(0, vCount * 3), 3));
+      if (vCount <= 65535) {
+        const idx16 = new Uint16Array(iCount);
+        for (let i = 0; i < iCount; i++) idx16[i] = this.indices[i];
+        geometry.setIndex(new me(idx16, 1));
+      } else {
+        geometry.setIndex(new me(this.indices.slice(0, iCount), 1));
+      }
+      geometry.computeBoundingSphere();
+      return geometry;
+    }
+  };
   var ChunkMesher = class {
     constructor(atlas) {
       this.atlas = atlas;
+      this.aoLinearLUT = AO_CURVE.map((v) => v);
       this.opaqueMaterial = new jn({
         map: atlas.texture,
         vertexColors: true,
@@ -17122,15 +18688,21 @@ void main() {
         depthWrite: false,
         side: Bn
       });
+      this._opaqueBuf = new ScratchMeshBuffer(4096);
+      this._cutoutBuf = new ScratchMeshBuffer(1024);
+      this._waterBuf = new ScratchMeshBuffer(1024);
     }
     /**
      * Builds opaque, cutout (leaves), and water BufferGeometries for a single chunk.
-     * Queries neighbor blocks across chunk boundaries seamlessly via worldSampler.
+     * Skips empty sky layers via chunk.minY..chunk.maxY and reuses preallocated TypedArrays.
      */
     buildChunkGeometries(chunk, getWorldBlock) {
-      const opaqueAcc = createBufferAccumulator();
-      const cutoutAcc = createBufferAccumulator();
-      const waterAcc = createBufferAccumulator();
+      const opaqueBuf = this._opaqueBuf;
+      const cutoutBuf = this._cutoutBuf;
+      const waterBuf = this._waterBuf;
+      opaqueBuf.reset();
+      cutoutBuf.reset();
+      waterBuf.reset();
       const baseX = chunk.cx * CHUNK_SIZE;
       const baseZ = chunk.cz * CHUNK_SIZE;
       const blocks = chunk.blocks;
@@ -17143,10 +18715,7 @@ void main() {
         }
         return getWorldBlock(wx2, wy2, wz);
       };
-      const isOccludingAO = (wx2, wy2, wz) => {
-        const id2 = getBlockAtWorld(wx2, wy2, wz);
-        return BlockRegistry.occludesAO(id2) ? 1 : 0;
-      };
+      const isOccludingAO = (wx2, wy2, wz) => BlockRegistry.occludesAO(getBlockAtWorld(wx2, wy2, wz)) ? 1 : 0;
       const computeVertexAO = (bx2, by2, bz, nx2, ny2, nz, ox2, oy2, oz) => {
         let s1 = 0;
         let s210 = 0;
@@ -17168,7 +18737,9 @@ void main() {
         return 3 - (s1 + s210 + c);
       };
       const aoValues = [3, 3, 3, 3];
-      for (let y = 0; y < WORLD_HEIGHT; y++) {
+      const startY = Math.max(0, chunk.minY);
+      const endY = Math.min(WORLD_HEIGHT - 1, chunk.maxY);
+      for (let y = startY; y <= endY; y++) {
         const yBase = y * CHUNK_SIZE * CHUNK_SIZE;
         for (let z = 0; z < CHUNK_SIZE; z++) {
           const zBase = yBase + z * CHUNK_SIZE;
@@ -17179,8 +18750,7 @@ void main() {
             const def = BlockRegistry.get(id2);
             const wx2 = baseX + x;
             const isWater = def.isLiquid;
-            const isCutout = def.isCutout;
-            const acc = isWater ? waterAcc : isCutout ? cutoutAcc : opaqueAcc;
+            const buf = isWater ? waterBuf : def.isCutout ? cutoutBuf : opaqueBuf;
             const waterTopDrop = isWater && getBlockAtWorld(wx2, y + 1, wz) !== BLOCK_IDS.WATER ? 0.12 : 0;
             for (let f = 0; f < 6; f++) {
               const face = FACES[f];
@@ -17194,11 +18764,15 @@ void main() {
               } else {
                 if (neighborId === id2 || BlockRegistry.isOpaque(neighborId)) continue;
               }
-              const tileName = def.faces[face.key];
-              const uv2 = this.atlas.getUV(tileName);
-              const uArr = [uv2.u0, uv2.u1];
-              const vArr = [uv2.vBottom, uv2.vTop];
-              const baseVert = acc.vertexCount;
+              buf.ensureQuadCapacity();
+              const uv2 = this.atlas.getUV(def.faces[face.key]);
+              const u02 = uv2.u0;
+              const u1 = uv2.u1;
+              const v02 = uv2.vBottom;
+              const v1 = uv2.vTop;
+              const baseVert = buf.vertexCount;
+              let pOff = baseVert * 3;
+              let uOff = baseVert * 2;
               const shade = face.shade;
               for (let i = 0; i < 4; i++) {
                 const corner = face.corners[i];
@@ -17206,43 +18780,50 @@ void main() {
                 if (waterTopDrop > 0 && dy2 === 1) {
                   dy2 -= waterTopDrop;
                 }
-                acc.positions.push(x + corner[0], y + dy2, z + corner[2]);
-                acc.normals.push(face.nx, face.ny, face.nz);
-                acc.uvs.push(uArr[corner[6]], vArr[corner[7]]);
+                buf.positions[pOff] = x + corner[0];
+                buf.positions[pOff + 1] = y + dy2;
+                buf.positions[pOff + 2] = z + corner[2];
+                buf.normals[pOff] = face.nx;
+                buf.normals[pOff + 1] = face.ny;
+                buf.normals[pOff + 2] = face.nz;
+                buf.uvs[uOff] = corner[6] === 0 ? u02 : u1;
+                buf.uvs[uOff + 1] = corner[7] === 0 ? v02 : v1;
                 const ao2 = isWater ? 3 : computeVertexAO(nbx, nby, nbz, face.nx, face.ny, face.nz, corner[3], corner[4], corner[5]);
                 aoValues[i] = ao2;
                 const brightness = shade * AO_CURVE[ao2];
                 const linearBrightness = Math.pow(brightness, 2.2);
-                acc.colors.push(linearBrightness, linearBrightness, linearBrightness);
+                buf.colors[pOff] = linearBrightness;
+                buf.colors[pOff + 1] = linearBrightness;
+                buf.colors[pOff + 2] = linearBrightness;
+                pOff += 3;
+                uOff += 2;
               }
+              let idxOff = buf.indexCount;
               if (aoValues[0] + aoValues[2] > aoValues[1] + aoValues[3]) {
-                acc.indices.push(
-                  baseVert,
-                  baseVert + 1,
-                  baseVert + 2,
-                  baseVert,
-                  baseVert + 2,
-                  baseVert + 3
-                );
+                buf.indices[idxOff] = baseVert;
+                buf.indices[idxOff + 1] = baseVert + 1;
+                buf.indices[idxOff + 2] = baseVert + 2;
+                buf.indices[idxOff + 3] = baseVert;
+                buf.indices[idxOff + 4] = baseVert + 2;
+                buf.indices[idxOff + 5] = baseVert + 3;
               } else {
-                acc.indices.push(
-                  baseVert + 1,
-                  baseVert + 2,
-                  baseVert + 3,
-                  baseVert + 1,
-                  baseVert + 3,
-                  baseVert
-                );
+                buf.indices[idxOff] = baseVert + 1;
+                buf.indices[idxOff + 1] = baseVert + 2;
+                buf.indices[idxOff + 2] = baseVert + 3;
+                buf.indices[idxOff + 3] = baseVert + 1;
+                buf.indices[idxOff + 4] = baseVert + 3;
+                buf.indices[idxOff + 5] = baseVert;
               }
-              acc.vertexCount += 4;
+              buf.vertexCount += 4;
+              buf.indexCount += 6;
             }
           }
         }
       }
       return {
-        opaqueGeometry: finalizeGeometry(opaqueAcc),
-        cutoutGeometry: finalizeGeometry(cutoutAcc),
-        waterGeometry: finalizeGeometry(waterAcc)
+        opaqueGeometry: opaqueBuf.toGeometry(),
+        cutoutGeometry: cutoutBuf.toGeometry(),
+        waterGeometry: waterBuf.toGeometry()
       };
     }
   };
@@ -17493,6 +19074,7 @@ void main() {
           this._placeOakTreeIntoChunk(chunk, baseX, baseZ, anchorX, groundY, anchorZ);
         }
       }
+      chunk.recomputeVerticalBounds();
       chunk.isGenerated = true;
       chunk.dirty = true;
     }
@@ -17551,14 +19133,18 @@ void main() {
 
   // src/world/World.js
   var World = class {
-    constructor(scene, atlas, seed, renderDistance = 6) {
+    constructor(scene, atlas, seed, renderDistance = 6, options = {}) {
       this.scene = scene;
       this.atlas = atlas;
       this.seed = seed;
       this.renderDistance = renderDistance;
+      this.unlimitedMemory = options.unlimitedMemory !== void 0 ? Boolean(options.unlimitedMemory) : true;
       this.worldGen = new WorldGen(seed);
       this.mesher = new ChunkMesher(atlas);
       this.chunks = /* @__PURE__ */ new Map();
+      this.chunkDataCache = /* @__PURE__ */ new Map();
+      this.modifiedBlocks = /* @__PURE__ */ new Map();
+      this.modifiedByChunk = /* @__PURE__ */ new Map();
       this.lastPlayerChunkX = null;
       this.lastPlayerChunkZ = null;
       this.pendingCoords = [];
@@ -17571,6 +19157,49 @@ void main() {
       this.lastPlayerChunkX = null;
       this.lastPlayerChunkZ = null;
       this._updateFog();
+    }
+    setUnlimitedMemory(enabled) {
+      this.unlimitedMemory = Boolean(enabled);
+      if (!this.unlimitedMemory) {
+        for (const key of this.chunkDataCache.keys()) {
+          if (!this.chunks.has(key)) {
+            this.chunkDataCache.delete(key);
+          }
+        }
+      }
+    }
+    loadModifiedBlocks(entries) {
+      this.modifiedBlocks.clear();
+      this.modifiedByChunk.clear();
+      if (!Array.isArray(entries)) return;
+      for (const item of entries) {
+        if (!Array.isArray(item) || item.length < 4) continue;
+        const [wx2, wy2, wz, id2] = item;
+        this.modifiedBlocks.set(`${wx2},${wy2},${wz}`, id2);
+        const cx2 = Math.floor(wx2 / CHUNK_SIZE);
+        const cz = Math.floor(wz / CHUNK_SIZE);
+        const lx2 = wx2 - cx2 * CHUNK_SIZE;
+        const lz = wz - cz * CHUNK_SIZE;
+        const cKey = chunkKey(cx2, cz);
+        let list = this.modifiedByChunk.get(cKey);
+        if (!list) {
+          list = [];
+          this.modifiedByChunk.set(cKey, list);
+        }
+        list.push([lx2, wy2, lz, id2]);
+        const chunk = this.chunks.get(cKey);
+        if (chunk && chunk.isGenerated) {
+          chunk.setBlock(lx2, wy2, lz, id2);
+        }
+      }
+    }
+    exportModifiedBlocks() {
+      const out = [];
+      for (const [coordKey, id2] of this.modifiedBlocks) {
+        const parts = coordKey.split(",");
+        out.push([Number(parts[0]), Number(parts[1]), Number(parts[2]), id2]);
+      }
+      return out;
     }
     _updateFog() {
       const farDist = Math.max(24, this.renderDistance * CHUNK_SIZE - 4);
@@ -17600,10 +19229,10 @@ void main() {
       return chunk.getBlock(lx2, fy2, lz);
     }
     /**
-     * Sets a block in world coordinates and marks affected chunk + neighboring edge chunks dirty.
-     * Direct hook for Stage 2 mining/placing and Stage 7 fluid flow.
+     * Sets a block at world coordinates, records offline delta, and optionally rebuilds
+     * the current + bordering neighbor chunks immediately in the same frame (zero hole artifacts).
      */
-    setBlock(wx2, wy2, wz, id2) {
+    setBlock(wx2, wy2, wz, id2, rebuildImmediate = true) {
       if (wy2 < 0 || wy2 >= WORLD_HEIGHT) return false;
       const fx2 = Math.floor(wx2);
       const fy2 = Math.floor(wy2);
@@ -17615,12 +19244,48 @@ void main() {
       const lx2 = fx2 - cx2 * CHUNK_SIZE;
       const lz = fz - cz * CHUNK_SIZE;
       if (!chunk.setBlock(lx2, fy2, lz, id2)) return false;
-      if (lx2 === 0) this._markDirty(cx2 - 1, cz);
-      if (lx2 === CHUNK_SIZE - 1) this._markDirty(cx2 + 1, cz);
-      if (lz === 0) this._markDirty(cx2, cz - 1);
-      if (lz === CHUNK_SIZE - 1) this._markDirty(cx2, cz + 1);
+      this.modifiedBlocks.set(`${fx2},${fy2},${fz}`, id2);
+      let cMods = this.modifiedByChunk.get(chunk.key);
+      if (!cMods) {
+        cMods = [];
+        this.modifiedByChunk.set(chunk.key, cMods);
+      }
+      const existingMod = cMods.find((m) => m[0] === lx2 && m[1] === fy2 && m[2] === lz);
+      if (existingMod) existingMod[3] = id2;
+      else cMods.push([lx2, fy2, lz, id2]);
+      if (this.unlimitedMemory) {
+        this.chunkDataCache.set(chunk.key, {
+          blocks: chunk.blocks,
+          minY: chunk.minY,
+          maxY: chunk.maxY
+        });
+      }
+      const rebuildTargets = [chunk];
+      const pushNeighborIfPresent = (ncx, ncz) => {
+        const n = this.chunks.get(chunkKey(ncx, ncz));
+        if (n && n.isGenerated) {
+          n.dirty = true;
+          rebuildTargets.push(n);
+        }
+      };
+      if (lx2 === 0) pushNeighborIfPresent(cx2 - 1, cz);
+      if (lx2 === CHUNK_SIZE - 1) pushNeighborIfPresent(cx2 + 1, cz);
+      if (lz === 0) pushNeighborIfPresent(cx2, cz - 1);
+      if (lz === CHUNK_SIZE - 1) pushNeighborIfPresent(cx2, cz + 1);
+      if (lx2 === 0 && lz === 0) pushNeighborIfPresent(cx2 - 1, cz - 1);
+      if (lx2 === CHUNK_SIZE - 1 && lz === 0) pushNeighborIfPresent(cx2 + 1, cz - 1);
+      if (lx2 === 0 && lz === CHUNK_SIZE - 1) pushNeighborIfPresent(cx2 - 1, cz + 1);
+      if (lx2 === CHUNK_SIZE - 1 && lz === CHUNK_SIZE - 1) pushNeighborIfPresent(cx2 + 1, cz + 1);
+      if (rebuildImmediate) {
+        for (const target of rebuildTargets) {
+          this._rebuildChunkMesh(target);
+        }
+      }
       return true;
     }
+    /**
+     * Finds the highest solid block top Y at (wx, wz) for safe initial spawning.
+     */
     getSurfaceHeightAt(wx2, wz) {
       const fx2 = Math.floor(wx2);
       const fz = Math.floor(wz);
@@ -17630,9 +19295,9 @@ void main() {
       if (chunk && chunk.isGenerated) {
         const lx2 = fx2 - cx2 * CHUNK_SIZE;
         const lz = fz - cz * CHUNK_SIZE;
-        for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
+        for (let y = Math.min(WORLD_HEIGHT - 1, chunk.maxY); y >= 0; y--) {
           const id2 = chunk.getBlock(lx2, y, lz);
-          if (id2 !== 0 && id2 !== 12 && id2 !== 8) {
+          if (BlockRegistry.isSolid(id2)) {
             return y + 1;
           }
         }
@@ -17655,9 +19320,6 @@ void main() {
       this._markDirty(cx2 - 1, cz + 1);
       this._markDirty(cx2 + 1, cz + 1);
     }
-    /**
-     * Synchronously generates & meshes the immediate spawn radius so the first frame is populated.
-     */
     preloadSpawnArea(playerX, playerZ, radius = 2) {
       const pcx = Math.floor(playerX / CHUNK_SIZE);
       const pcz = Math.floor(playerZ / CHUNK_SIZE);
@@ -17684,13 +19346,41 @@ void main() {
       list.sort((a, b) => a[2] - b[2]);
       return list;
     }
+    _applyModifiedBlocksToChunk(chunk) {
+      const mods = this.modifiedByChunk.get(chunk.key);
+      if (!mods || mods.length === 0) return;
+      for (let i = 0; i < mods.length; i++) {
+        const [lx2, wy2, lz, id2] = mods[i];
+        if (wy2 >= 0 && wy2 < WORLD_HEIGHT) {
+          chunk.setBlock(lx2, wy2, lz, id2);
+        }
+      }
+    }
     _ensureChunkGenerated(cx2, cz) {
       const key = chunkKey(cx2, cz);
       let chunk = this.chunks.get(key);
       if (!chunk) {
         chunk = new Chunk(cx2, cz);
+        const cached = this.chunkDataCache.get(key);
+        if (cached) {
+          chunk.blocks = cached.blocks;
+          chunk.minY = cached.minY;
+          chunk.maxY = cached.maxY;
+          chunk.isGenerated = true;
+          chunk.dirty = true;
+          this._applyModifiedBlocksToChunk(chunk);
+        } else {
+          this.worldGen.generateChunk(chunk);
+          this._applyModifiedBlocksToChunk(chunk);
+          if (this.unlimitedMemory) {
+            this.chunkDataCache.set(key, {
+              blocks: chunk.blocks,
+              minY: chunk.minY,
+              maxY: chunk.maxY
+            });
+          }
+        }
         this.chunks.set(key, chunk);
-        this.worldGen.generateChunk(chunk);
         this._markNeighborsDirty(cx2, cz);
       }
       return chunk;
@@ -17752,8 +19442,8 @@ void main() {
       chunk.hasMeshed = true;
     }
     /**
-     * Streams chunks around the player within a strict per-frame time budget (<= 4ms),
-     * unloading out-of-range chunks and calling geometry.dispose() to prevent GPU leaks.
+     * Streams chunks around the player within <= 3.5 ms per frame,
+     * disposing GPU meshes on distant chunks while keeping unlimited RAM cache when enabled.
      */
     update(playerX, playerZ) {
       const pcx = Math.floor(playerX / CHUNK_SIZE);
@@ -17766,6 +19456,15 @@ void main() {
           const dx2 = chunk.cx - pcx;
           const dz = chunk.cz - pcz;
           if (dx2 * dx2 + dz * dz > unloadDistSq) {
+            if (this.unlimitedMemory) {
+              this.chunkDataCache.set(key, {
+                blocks: chunk.blocks,
+                minY: chunk.minY,
+                maxY: chunk.maxY
+              });
+            } else {
+              this.chunkDataCache.delete(key);
+            }
             chunk.disposeMeshes(this.scene);
             this.chunks.delete(key);
           }
@@ -17800,6 +19499,7 @@ void main() {
         chunk.disposeMeshes(this.scene);
       }
       this.chunks.clear();
+      this.chunkDataCache.clear();
       this.mesher.opaqueMaterial.dispose();
       this.mesher.cutoutMaterial.dispose();
       this.mesher.waterMaterial.dispose();
@@ -17823,14 +19523,16 @@ void main() {
         72,
         window.innerWidth / Math.max(1, window.innerHeight),
         0.08,
-        600
+        700
       );
-      const entityAmbient = new dl(16777215, 0.72);
+      const entityAmbient = new dl(16777215, 0.75);
       const entitySun = new ul(16774885, 0.75);
       entitySun.position.set(1.2, 2.2, 1);
       this.scene.add(entityAmbient, entitySun);
       const isTouchDevice = MobileControls.detectTouchDevice();
       this.isTouchMode = isTouchDevice;
+      this.unlimitedMemory = true;
+      this.highQuality = !isTouchDevice;
       this.renderer = new Qp({
         canvas: this.canvas,
         antialias: false,
@@ -17842,23 +19544,32 @@ void main() {
       this.renderer.setSize(window.innerWidth, window.innerHeight, false);
       this.playerModel = new PlayerModel(this.skinTexture);
       this.scene.add(this.playerModel.root);
-      this.firstPersonHand = new FirstPersonHand(this.skinTexture);
+      this.firstPersonHand = new FirstPersonHand(this.skinTexture, this.atlas);
+      this.selectionBox = new SelectionBox(this.scene);
+      this.breakOverlay = new BreakCrackOverlay(this.scene, this.atlas);
+      this.itemManager = new ItemEntityManager(this.scene, this.atlas);
       this.world = null;
       this.player = null;
+      this.hotbar = null;
       this.mobileControls = null;
       this.hud = null;
       this.worldSeed = randomWorldSeed();
       this.renderDistance = isTouchDevice ? DEFAULT_RENDER_DISTANCE_MOBILE : DEFAULT_RENDER_DISTANCE_PC;
+      this.currentTargetHit = null;
+      this.miningState = null;
+      this.miningCooldown = 0;
       this.lastFrameTime = performance.now();
       this.tickAccumulator = 0;
       this.tickCount = 0;
       this.autosaveTimer = null;
+      this.debouncedSaveTimer = null;
       this.isRunning = false;
       window.__MC_GAME__ = this;
     }
     _applyPixelRatio() {
-      const cap = this.isTouchMode ? 1.5 : 2;
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap));
+      const dpr = window.devicePixelRatio || 1;
+      const cap = this.highQuality ? this.isTouchMode ? 2 : 2.5 : 1.25;
+      this.renderer.setPixelRatio(Math.min(dpr, cap));
     }
     async init() {
       this._setLoadingText("\u0418\u043D\u0438\u0446\u0438\u0430\u043B\u0438\u0437\u0430\u0446\u0438\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0439...");
@@ -17873,26 +19584,53 @@ void main() {
           if (Number.isFinite(saved.settings.renderDistance)) {
             this.renderDistance = saved.settings.renderDistance;
           }
+          if (typeof saved.settings.unlimitedMemory === "boolean") {
+            this.unlimitedMemory = saved.settings.unlimitedMemory;
+          }
+          if (typeof saved.settings.highQuality === "boolean") {
+            this.highQuality = saved.settings.highQuality;
+          }
         }
       }
       this._applyPixelRatio();
       this._setLoadingText(`\u0413\u0435\u043D\u0435\u0440\u0430\u0446\u0438\u044F \u043C\u0438\u0440\u0430 (Seed: ${this.worldSeed})...`);
-      this.world = new World(this.scene, this.atlas, this.worldSeed, this.renderDistance);
+      this.world = new World(this.scene, this.atlas, this.worldSeed, this.renderDistance, {
+        unlimitedMemory: this.unlimitedMemory
+      });
+      if (saved?.modifiedBlocks) {
+        this.world.loadModifiedBlocks(saved.modifiedBlocks);
+      }
       const spawn = saved?.player ?? this.world.worldGen.findSafeSpawn();
       this.player = new PlayerController(this.camera, this.world, this.playerModel, this.firstPersonHand, {
         ...spawn,
+        onPlaceAction: () => this._handlePlaceBlock(),
         onCameraModeChange: (mode) => this.hud?.onCameraModeChanged(mode),
         onToggleDebug: () => this.hud?.toggleDebug(),
         onTogglePause: () => this.hud?.togglePause(),
         onFlyModeChange: (active) => {
           this.hud?.setFlyModeLabel(active);
           this.mobileControls?.setFlyActive(active);
+          this.hud?.showToast(active ? "\u0420\u0435\u0436\u0438\u043C \u043F\u043E\u043B\u0451\u0442\u0430: \u0412\u041A\u041B" : "\u0420\u0435\u0436\u0438\u043C \u043F\u043E\u043B\u0451\u0442\u0430: \u0412\u042B\u041A\u041B");
         }
       });
       this.world.preloadSpawnArea(this.player.x, this.player.z, 2);
       if (!saved?.player) {
-        this.player.y = Math.max(this.player.y, this.world.getSurfaceHeightAt(this.player.x, this.player.z));
+        this.player.y = this.world.getSurfaceHeightAt(this.player.x, this.player.z);
+        while (this.player.y < WORLD_HEIGHT - 3 && collidesWithWorld(this.world, this.player.x, this.player.y, this.player.z, PLAYER_HALF_WIDTH, 1.8)) {
+          this.player.y += 1;
+        }
       }
+      this.hotbar = new Hotbar(this.atlas, {
+        onChange: (slot, shouldSave) => {
+          this.firstPersonHand.setHeldBlock(slot ? slot.id : 0);
+          if (shouldSave) this._scheduleSave();
+        }
+      });
+      if (saved?.hotbar) {
+        this.hotbar.loadState(saved.hotbar);
+      }
+      const initSlot = this.hotbar.getSelectedSlot();
+      this.firstPersonHand.setHeldBlock(initSlot ? initSlot.id : 0);
       this.hud = new Hud({
         onCycleCamera: () => this.player.cycleCameraMode(),
         onPauseChange: (paused) => {
@@ -17908,10 +19646,22 @@ void main() {
           this.setTouchMode(!this.isTouchMode);
         },
         onToggleFlyMode: () => {
-          const active = this.player.toggleFlyMode();
-          this.hud.setFlyModeLabel(active);
-          this.mobileControls.setFlyActive(active);
-          this.hud.showToast(active ? "\u0420\u0435\u0436\u0438\u043C \u043F\u043E\u043B\u0451\u0442\u0430: \u0412\u041A\u041B" : "\u0420\u0435\u0436\u0438\u043C \u043F\u043E\u043B\u0451\u0442\u0430: \u0412\u042B\u041A\u041B");
+          this.player.toggleFlyMode();
+        },
+        onToggleMemoryMode: () => {
+          this.unlimitedMemory = !this.unlimitedMemory;
+          this.world.setUnlimitedMemory(this.unlimitedMemory);
+          this.hud.setMemoryModeLabel(this.unlimitedMemory);
+          this.hud.showToast(this.unlimitedMemory ? "\u041F\u0430\u043C\u044F\u0442\u044C \u043C\u0438\u0440\u0430: \u0411\u0435\u0441\u043A\u043E\u043D\u0435\u0447\u043D\u0430\u044F (\u221E)" : "\u041F\u0430\u043C\u044F\u0442\u044C \u043C\u0438\u0440\u0430: \u042D\u043A\u043E\u043D\u043E\u043C\u043D\u0430\u044F");
+          this.saveNow();
+        },
+        onToggleGraphicsMode: () => {
+          this.highQuality = !this.highQuality;
+          this._applyPixelRatio();
+          this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+          this.hud.setGraphicsModeLabel(this.highQuality);
+          this.hud.showToast(this.highQuality ? "\u0413\u0440\u0430\u0444\u0438\u043A\u0430: \u0412\u044B\u0441\u043E\u043A\u0430\u044F" : "\u0413\u0440\u0430\u0444\u0438\u043A\u0430: \u041F\u0440\u043E\u0438\u0437\u0432\u043E\u0434\u0438\u0442\u0435\u043B\u044C\u043D\u0430\u044F");
+          this.saveNow();
         },
         onChangeRenderDistance: (dist) => {
           this.renderDistance = dist;
@@ -17926,6 +19676,8 @@ void main() {
       this.setTouchMode(this.isTouchMode, false);
       this.hud.setFlyModeLabel(this.player.flyMode);
       this.mobileControls.setFlyActive(this.player.flyMode);
+      this.hud.setMemoryModeLabel(this.unlimitedMemory);
+      this.hud.setGraphicsModeLabel(this.highQuality);
       this.hud.setRenderDistanceUI(this.renderDistance);
       this._bindWindowEvents();
       this._bindPointerLock();
@@ -17956,9 +19708,15 @@ void main() {
       this.hud?.setPaused(false);
       this.loadingOverlay?.classList.remove("hidden");
       this._setLoadingText("\u0421\u043E\u0437\u0434\u0430\u043D\u0438\u0435 \u043D\u043E\u0432\u043E\u0433\u043E \u043C\u0438\u0440\u0430...");
+      this.itemManager.clear();
+      this.miningState = null;
+      this.breakOverlay.update(null, 0);
+      this.hud.setBreakProgress(0);
       this.world.dispose();
       this.worldSeed = randomWorldSeed();
-      this.world = new World(this.scene, this.atlas, this.worldSeed, this.renderDistance);
+      this.world = new World(this.scene, this.atlas, this.worldSeed, this.renderDistance, {
+        unlimitedMemory: this.unlimitedMemory
+      });
       this.player.world = this.world;
       const spawn = this.world.worldGen.findSafeSpawn();
       this.player.setPose({
@@ -17970,10 +19728,104 @@ void main() {
       this.hud.setFlyModeLabel(false);
       this.mobileControls.setFlyActive(false);
       this.world.preloadSpawnArea(this.player.x, this.player.z, 2);
-      this.player.y = Math.max(this.player.y, this.world.getSurfaceHeightAt(this.player.x, this.player.z));
+      this.player.y = this.world.getSurfaceHeightAt(this.player.x, this.player.z);
+      this.hotbar.resetStarterKit();
       await this.saveNow();
       this.loadingOverlay?.classList.add("hidden");
       this.hud.showToast(`\u041D\u043E\u0432\u044B\u0439 \u043C\u0438\u0440 \u0441\u043E\u0437\u0434\u0430\u043D (Seed: ${this.worldSeed})`);
+    }
+    _handlePlaceBlock() {
+      const hit = this.currentTargetHit;
+      if (!hit) return false;
+      if (!hit.normal || hit.normal.x === 0 && hit.normal.y === 0 && hit.normal.z === 0) {
+        return false;
+      }
+      const slot = this.hotbar.getSelectedSlot();
+      if (!slot || slot.id <= 0 || slot.count <= 0) return false;
+      const px2 = hit.x + hit.normal.x;
+      const py2 = hit.y + hit.normal.y;
+      const pz = hit.z + hit.normal.z;
+      if (py2 < 0 || py2 >= WORLD_HEIGHT) return false;
+      const existing = this.world.getBlock(px2, py2, pz);
+      if (existing !== 0 && existing !== 12) return false;
+      if (aabbIntersectsBlock(
+        this.player.x,
+        this.player.y,
+        this.player.z,
+        PLAYER_HALF_WIDTH,
+        this.player.getCurrentHitboxHeight(),
+        px2,
+        py2,
+        pz
+      )) {
+        return false;
+      }
+      if (!this.world.setBlock(px2, py2, pz, slot.id, true)) return false;
+      this.hotbar.consumeSelected(1);
+      this._scheduleSave();
+      return true;
+    }
+    _updateInteraction(dt) {
+      if (this.miningCooldown > 0) {
+        this.miningCooldown = Math.max(0, this.miningCooldown - dt);
+      }
+      const origin = this.player.getEyeOrigin();
+      const dir = this.player.getLookDirection();
+      const hit = raycastVoxel(this.world, origin, dir);
+      this.currentTargetHit = hit;
+      this.selectionBox.update(hit);
+      if (!hit || !this.player.isMiningHeld()) {
+        this.miningState = null;
+        this.breakOverlay.update(null, 0);
+        this.hud.setBreakProgress(0);
+        this.firstPersonHand.setMiningActive(false);
+        return;
+      }
+      const hitKey = `${hit.x},${hit.y},${hit.z}`;
+      const breakTime = BlockRegistry.getBreakTime(hit.blockId, null, {
+        onGround: this.player.onGround || this.player.flyMode,
+        inWater: this.world.getBlock(this.player.x, this.player.y + 1.4, this.player.z) === 12
+      });
+      if (!Number.isFinite(breakTime)) {
+        this.miningState = null;
+        this.breakOverlay.update(null, 0);
+        this.hud.setBreakProgress(0);
+        this.firstPersonHand.setMiningActive(true);
+        return;
+      }
+      if (this.miningCooldown > 0) {
+        this.firstPersonHand.setMiningActive(true);
+        return;
+      }
+      if (!this.miningState || this.miningState.key !== hitKey || this.miningState.blockId !== hit.blockId) {
+        this.miningState = {
+          key: hitKey,
+          x: hit.x,
+          y: hit.y,
+          z: hit.z,
+          blockId: hit.blockId,
+          elapsed: 0,
+          totalTime: breakTime
+        };
+      }
+      this.firstPersonHand.setMiningActive(true);
+      this.miningState.elapsed += dt;
+      const progress = Math.min(1, this.miningState.elapsed / this.miningState.totalTime);
+      this.breakOverlay.update(hit, progress);
+      this.hud.setBreakProgress(progress);
+      if (progress >= 1) {
+        const brokenId = hit.blockId;
+        this.world.setBlock(hit.x, hit.y, hit.z, 0, true);
+        const dropId = BlockRegistry.getDrop(brokenId);
+        if (dropId > 0) {
+          this.itemManager.spawnDrop(dropId, hit.x + 0.5, hit.y + 0.35, hit.z + 0.5, 1);
+        }
+        this.miningState = null;
+        this.miningCooldown = 0.16;
+        this.breakOverlay.update(null, 0);
+        this.hud.setBreakProgress(0);
+        this._scheduleSave();
+      }
     }
     _requestPointerLockSafe() {
       if (this.isTouchMode || this.hud?.isPaused) return;
@@ -17991,6 +19843,9 @@ void main() {
         if (!this.isTouchMode && !this.hud.isPaused && document.pointerLockElement !== this.canvas) {
           this._requestPointerLockSafe();
         }
+      });
+      this.canvas.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
       });
       document.addEventListener("pointerlockchange", () => {
         const locked = document.pointerLockElement === this.canvas;
@@ -18028,20 +19883,27 @@ void main() {
         this.saveNow();
       }, AUTOSAVE_INTERVAL_MS);
     }
+    _scheduleSave() {
+      clearTimeout(this.debouncedSaveTimer);
+      this.debouncedSaveTimer = setTimeout(() => {
+        this.saveNow();
+      }, 600);
+    }
     saveNow() {
-      if (!this.player) return Promise.resolve(false);
+      if (!this.player || !this.world || !this.hotbar) return Promise.resolve(false);
       return this.saveManager.saveState({
         worldSeed: this.worldSeed,
         player: this.player.getPose(),
+        hotbar: this.hotbar.exportState(),
+        modifiedBlocks: this.world.exportModifiedBlocks(),
         settings: {
           touchMode: this.isTouchMode,
-          renderDistance: this.renderDistance
+          renderDistance: this.renderDistance,
+          unlimitedMemory: this.unlimitedMemory,
+          highQuality: this.highQuality
         }
       });
     }
-    /**
-     * Fixed 20 TPS simulation tick (reserved cleanly for Stages 2-12: physics, fluids, mobs, redstone).
-     */
     fixedTick() {
       this.tickCount++;
     }
@@ -18057,6 +19919,8 @@ void main() {
           this.tickAccumulator -= TICK_MS;
         }
         this.player.update(dt);
+        this._updateInteraction(dt);
+        this.itemManager.update(dt, this.world, this.player, this.hotbar);
         this.world.update(this.player.x, this.player.z);
       }
       this.renderer.clear();
@@ -18067,7 +19931,9 @@ void main() {
       this.hud.updateDebug({
         player: this.player,
         world: this.world,
-        renderer: this.renderer
+        renderer: this.renderer,
+        targetHit: this.currentTargetHit,
+        itemCount: this.itemManager.entities.length
       });
     }
   };

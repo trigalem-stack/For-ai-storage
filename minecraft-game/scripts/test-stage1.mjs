@@ -291,7 +291,7 @@ async function runTests() {
   });
   assert.equal(meshCount, 6, 'Steve PlayerModel must have 6 articulated limbs (head, torso, 2 arms, 2 legs)');
 
-  const hand = new FirstPersonHand(skinTex);
+  const hand = new FirstPersonHand(skinTex, atlas);
   assert.ok(hand.heldItemMount, 'FirstPersonHand must expose heldItemMount hook for Stage 2+');
   hand.triggerSwing();
   hand.update(0.05, 1.0, 0.5, false);

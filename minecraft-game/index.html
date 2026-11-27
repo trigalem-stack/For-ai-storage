@@ -7,15 +7,23 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1e2a38">
-  <title>Minecraft Web Edition — Stage 1</title>
+  <title>Minecraft Web Edition — Stage 2</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <canvas id="game-canvas" aria-label="Minecraft 3D World"></canvas>
 
-  <!-- Center Crosshair -->
-  <div id="crosshair" aria-hidden="true"></div>
+  <!-- Center Crosshair + Circular Mining Progress Ring -->
+  <div id="crosshair-wrap" aria-hidden="true">
+    <div id="crosshair"></div>
+    <svg id="break-progress-ring" class="hidden" viewBox="0 0 40 40" width="40" height="40">
+      <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="3"></circle>
+      <circle id="break-progress-circle" cx="20" cy="20" r="16" fill="none" stroke="#ffffff" stroke-width="3"
+        stroke-dasharray="100.53" stroke-dashoffset="100.53" stroke-linecap="butt"
+        transform="rotate(-90 20 20)"></circle>
+    </svg>
+  </div>
 
   <!-- Top-Left F3 Debug Panel -->
   <pre id="debug-panel" class="hidden" aria-live="polite"></pre>
@@ -39,15 +47,21 @@
 
   <!-- PC Pointer Lock Hint -->
   <div id="pc-lock-hint">
-    Кликните по экрану для захвата мыши · <b>WASD</b> движение · <b>Space</b> прыжок · <b>Shift</b> присед · <b>F</b> полёт · <b>F5</b> камера · <b>F3</b> отладка
+    Кликните по экрану · <b>ЛКМ</b> ломать · <b>ПКМ</b> ставить · <b>1–9 / Колесо</b> хотбар · <b>2×Space / F</b> полёт · <b>Shift</b> присед (защита края) · <b>F5</b> камера
   </div>
 
   <!-- Status Toast -->
   <div id="hud-toast" class="hidden" role="status" aria-live="polite"></div>
 
+  <!-- 9-Slot Minecraft Hotbar -->
+  <div id="hotbar-wrapper">
+    <div id="hotbar-item-name" class="hidden"></div>
+    <div id="hotbar" role="toolbar" aria-label="Хотбар блоков"></div>
+  </div>
+
   <!-- Mobile Multitouch Controls -->
   <div id="mobile-controls" class="hidden">
-    <div id="touch-look-zone" aria-label="Зона поворота камеры"></div>
+    <div id="touch-look-zone" aria-label="Зона обзора, тап поставить, удержание ломать"></div>
 
     <div id="touch-joystick-base" aria-label="Виртуальный джойстик движения">
       <div class="joystick-ring"></div>
@@ -55,11 +69,16 @@
     </div>
 
     <div id="touch-action-cluster">
-      <button id="btn-touch-fly" class="mc-touch-btn mc-touch-small" type="button" title="Полёт">✈</button>
-      <button id="btn-touch-action" class="mc-touch-btn mc-touch-action" type="button" title="Взмах / Действие">✊</button>
+      <div class="touch-col">
+        <button id="btn-touch-fly" class="mc-touch-btn mc-touch-small" type="button" title="Полёт (или 2×▲)">🕊️</button>
+        <button id="btn-touch-break" class="mc-touch-btn mc-touch-break" type="button" title="Ломать блок (удерживать)">⛏</button>
+      </div>
+      <div class="touch-col">
+        <button id="btn-touch-place" class="mc-touch-btn mc-touch-place" type="button" title="Поставить блок">🧱</button>
+      </div>
       <div class="touch-vert-pair">
-        <button id="btn-touch-jump" class="mc-touch-btn" type="button" title="Прыжок / Вверх">▲</button>
-        <button id="btn-touch-crouch" class="mc-touch-btn" type="button" title="Присед / Вниз">▼</button>
+        <button id="btn-touch-jump" class="mc-touch-btn" type="button" title="Прыжок / 2× Полёт">▲</button>
+        <button id="btn-touch-crouch" class="mc-touch-btn" type="button" title="Присед (защита края) / Вниз">▼</button>
       </div>
     </div>
   </div>
@@ -67,17 +86,19 @@
   <!-- Pause / Settings Modal -->
   <div id="pause-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
     <div class="mc-modal">
-      <h1 id="pause-title">Меню игры (Этап 1)</h1>
-      <p class="mc-modal-sub">Оффлайн 3D воксельный мир · Three.js + IndexedDB</p>
+      <h1 id="pause-title">Меню и Настройки (Этап 2)</h1>
+      <p class="mc-modal-sub">Оффлайн AABB-физика · DDA Рейкастинг · IndexedDB</p>
 
       <div class="mc-modal-actions">
         <button id="btn-resume" class="mc-menu-btn mc-menu-primary" type="button">Продолжить игру</button>
         <button id="btn-control-mode" class="mc-menu-btn" type="button">Управление: ПК (Мышь + WASD)</button>
-        <button id="btn-fly-mode" class="mc-menu-btn" type="button">Полёт (F): ВЫКЛ</button>
+        <button id="btn-fly-mode" class="mc-menu-btn" type="button">Полёт (2×Space / F): ВЫКЛ</button>
+        <button id="btn-memory-mode" class="mc-menu-btn" type="button">Память мира: Бесконечная (∞)</button>
+        <button id="btn-graphics-mode" class="mc-menu-btn" type="button">Графика: Высокая (чёткий PixelRatio)</button>
 
         <label class="mc-slider-row" for="range-render-dist">
           <span>Дальность прорисовки: <strong id="label-render-dist">6 чанков</strong></span>
-          <input id="range-render-dist" type="range" min="2" max="10" step="1" value="6">
+          <input id="range-render-dist" type="range" min="2" max="16" step="1" value="6">
         </label>
 
         <button id="btn-new-world" class="mc-menu-btn mc-menu-danger" type="button">Создать новый мир (новый сид)</button>

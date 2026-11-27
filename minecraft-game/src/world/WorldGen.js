@@ -127,6 +127,7 @@ export class WorldGen {
       }
     }
 
+    chunk.recomputeVerticalBounds();
     chunk.isGenerated = true;
     chunk.dirty = true;
   }

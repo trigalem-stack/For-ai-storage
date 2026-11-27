@@ -37,6 +37,10 @@ class BlockRegistryImpl {
       isLiquid: Boolean(def.isLiquid),
       occludesAO: def.occludesAO !== undefined ? def.occludesAO : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid),
       hardness: def.hardness ?? 1.0,
+      requiresTool: Boolean(def.requiresTool),
+      preferredTool: def.preferredTool || null,
+      dropId: def.dropId !== undefined ? def.dropId : def.id,
+      dropChance: def.dropChance ?? 1.0,
       lightEmission: def.lightEmission ?? 0, // Hook for Stage 4 lighting
       faces: def.faces || null, // { top, bottom, north, south, east, west }
     };
@@ -73,6 +77,41 @@ class BlockRegistryImpl {
     return b ? b.occludesAO : false;
   }
 
+  /**
+   * Computes Minecraft block breaking time in seconds.
+   * Hook for Stage 5 tools & efficiency multipliers.
+   */
+  getBreakTime(blockId, heldItem = null, modifiers = {}) {
+    const def = this.get(blockId);
+    if (!def || def.isAir || def.isLiquid || def.hardness < 0 || !Number.isFinite(def.hardness)) {
+      return Infinity;
+    }
+    if (def.hardness === 0) return 0.05;
+
+    let speedMultiplier = 1.0;
+    const isBestTool = Boolean(heldItem && heldItem.toolType && heldItem.toolType === def.preferredTool);
+    const canHarvest = !def.requiresTool || isBestTool;
+
+    if (isBestTool && heldItem.toolSpeed) {
+      speedMultiplier = heldItem.toolSpeed;
+    }
+    if (modifiers.inWater) speedMultiplier /= 5;
+    if (modifiers.onGround === false) speedMultiplier /= 5;
+
+    const baseFactor = canHarvest ? 1.5 : 5.0;
+    return (def.hardness * baseFactor) / Math.max(0.1, speedMultiplier);
+  }
+
+  /**
+   * Returns dropped block ID when broken (e.g. Grass -> Dirt, Stone -> Cobblestone).
+   */
+  getDrop(blockId) {
+    const def = this.get(blockId);
+    if (!def || def.isAir || def.isLiquid) return 0;
+    if (def.dropChance < 1.0 && Math.random() > def.dropChance) return 0;
+    return def.dropId;
+  }
+
   getAllBlocks() {
     return this.byId.filter((b) => b && !b.isAir);
   }
@@ -98,13 +137,16 @@ class BlockRegistryImpl {
       isOpaque: false,
       occludesAO: false,
       hardness: 0,
+      dropId: 0,
     });
 
     this.register({
       id: BLOCK_IDS.GRASS,
       key: 'grass',
-      name: 'Grass Block',
+      name: 'Блок травы',
       hardness: 0.6,
+      preferredTool: 'shovel',
+      dropId: BLOCK_IDS.DIRT,
       faces: {
         top: 'grass_top',
         bottom: 'dirt',
@@ -118,48 +160,57 @@ class BlockRegistryImpl {
     this.register({
       id: BLOCK_IDS.DIRT,
       key: 'dirt',
-      name: 'Dirt',
+      name: 'Земля',
       hardness: 0.5,
+      preferredTool: 'shovel',
       faces: this._allFaces('dirt'),
     });
 
     this.register({
       id: BLOCK_IDS.STONE,
       key: 'stone',
-      name: 'Stone',
+      name: 'Камень',
       hardness: 1.5,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      dropId: BLOCK_IDS.COBBLESTONE,
       faces: this._allFaces('stone'),
     });
 
     this.register({
       id: BLOCK_IDS.COBBLESTONE,
       key: 'cobblestone',
-      name: 'Cobblestone',
+      name: 'Булыжник',
       hardness: 2.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
       faces: this._allFaces('cobblestone'),
     });
 
     this.register({
       id: BLOCK_IDS.BEDROCK,
       key: 'bedrock',
-      name: 'Bedrock',
-      hardness: Infinity,
+      name: 'Бедрок',
+      hardness: -1,
+      dropId: 0,
       faces: this._allFaces('bedrock'),
     });
 
     this.register({
       id: BLOCK_IDS.SAND,
       key: 'sand',
-      name: 'Sand',
+      name: 'Песок',
       hardness: 0.5,
+      preferredTool: 'shovel',
       faces: this._allFaces('sand'),
     });
 
     this.register({
       id: BLOCK_IDS.OAK_LOG,
       key: 'oak_log',
-      name: 'Oak Log',
+      name: 'Дубовое бревно',
       hardness: 2.0,
+      preferredTool: 'axe',
       faces: {
         top: 'oak_log_top',
         bottom: 'oak_log_top',
@@ -173,7 +224,7 @@ class BlockRegistryImpl {
     this.register({
       id: BLOCK_IDS.OAK_LEAVES,
       key: 'oak_leaves',
-      name: 'Oak Leaves',
+      name: 'Листва дуба',
       hardness: 0.2,
       isOpaque: false,
       isCutout: true,
@@ -184,16 +235,19 @@ class BlockRegistryImpl {
     this.register({
       id: BLOCK_IDS.OAK_PLANKS,
       key: 'oak_planks',
-      name: 'Oak Planks',
+      name: 'Дубовые доски',
       hardness: 2.0,
+      preferredTool: 'axe',
       faces: this._allFaces('oak_planks'),
     });
 
     this.register({
       id: BLOCK_IDS.SNOW_GRASS,
       key: 'snow_grass',
-      name: 'Snowy Grass',
+      name: 'Снежный дёрн',
       hardness: 0.6,
+      preferredTool: 'shovel',
+      dropId: BLOCK_IDS.DIRT,
       faces: {
         top: 'snow',
         bottom: 'dirt',
@@ -207,21 +261,23 @@ class BlockRegistryImpl {
     this.register({
       id: BLOCK_IDS.SNOW,
       key: 'snow',
-      name: 'Snow Block',
-      hardness: 0.4,
+      name: 'Снег',
+      hardness: 0.2,
+      preferredTool: 'shovel',
       faces: this._allFaces('snow'),
     });
 
     this.register({
       id: BLOCK_IDS.WATER,
       key: 'water',
-      name: 'Water',
-      hardness: Infinity,
+      name: 'Вода',
+      hardness: -1,
       isSolid: false,
       isOpaque: false,
       isTransparent: true,
       isLiquid: true,
       occludesAO: false,
+      dropId: 0,
       faces: this._allFaces('water'),
     });
   }

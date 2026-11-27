@@ -1,4 +1,4 @@
-// Offline IndexedDB save manager for world seed, player pose, and settings.
+// Offline IndexedDB save manager for world seed, modified blocks, hotbar, player pose, and settings.
 // Gracefully falls back to in-memory storage if IndexedDB is restricted.
 
 const DB_NAME = 'minecraft_browser_clone_db';
@@ -54,10 +54,12 @@ export class SaveManager {
 
   async saveState(state) {
     const payload = {
-      version: 1,
+      version: 2,
       worldSeed: state.worldSeed,
       player: state.player,
       settings: state.settings,
+      hotbar: state.hotbar || null,
+      modifiedBlocks: Array.isArray(state.modifiedBlocks) ? state.modifiedBlocks : [],
       updatedAt: Date.now(),
     };
     this.memoryFallback = payload;
