@@ -462,7 +462,7 @@ export function createChunkGeneratorKernel(cfg) {
 
     for (let step = 0; step < maxCount * 2 && placed < maxCount; step++) {
       const idx = (by * CHUNK_SIZE + bz) * CHUNK_SIZE + bx;
-      if (blocks[idx] === B.STONE) {
+      if (blocks[idx] === B.STONE || (B.DEEPSLATE && blocks[idx] === B.DEEPSLATE)) {
         blocks[idx] = blockId;
         placed++;
       }
@@ -516,11 +516,11 @@ export function createChunkGeneratorKernel(cfg) {
         for (let by = minY; by <= maxY; by++) {
           const dy = (by + 0.5 - sy) / r;
           if (dx * dx + dy * dy >= 1) continue;
-          for (let bz = minZ; bz <= maxZ; bz++) {
+            for (let bz = minZ; bz <= maxZ; bz++) {
             const dz = (bz + 0.5 - sz) / r;
             if (dx * dx + dy * dy + dz * dz < 1) {
               const idx = (by * CHUNK_SIZE + bz) * CHUNK_SIZE + bx;
-              if (blocks[idx] === B.STONE) {
+              if (blocks[idx] === B.STONE || (B.DEEPSLATE && blocks[idx] === B.DEEPSLATE)) {
                 blocks[idx] = blockId;
               }
             }
@@ -667,7 +667,9 @@ export function createChunkGeneratorKernel(cfg) {
         const c11 = (gx + 1) * gridStrideX + (gz + 1) * gridStrideY;
 
         for (let y = 0; y <= h; y++) {
-          let blockId = B.STONE;
+          let blockId = (B.DEEPSLATE && (y <= 12 || (y <= 16 && hash3D(ctx.seed ^ 0x222, wx, y, wz) < (17 - y) * 0.25)))
+            ? B.DEEPSLATE
+            : B.STONE;
           if (y === 0) {
             blockId = B.BEDROCK;
           } else if (y <= 4 && hash3D(ctx.seed ^ 0x111, wx, y, wz) < (5 - y) * 0.22) {
@@ -771,63 +773,71 @@ export function createChunkGeneratorKernel(cfg) {
       placeOreVein(blocks, chunkRand, B.ANDESITE, chunkRand() * 16, 6 + chunkRand() * 68, chunkRand() * 16, 16);
     }
 
-    // Coal Ore: Y=5..115, large veins (6..13 blocks)
-    for (let i = 0; i < 12; i++) {
-      const y = 5 + Math.floor(chunkRand() * 110);
-      const count = 6 + Math.floor(chunkRand() * 8);
-      placeOreCluster(blocks, chunkRand, B.COAL_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 115);
+    // Coal Ore: Y=12..115, common veins (5..10 blocks)
+    for (let i = 0; i < 10; i++) {
+      const y = 12 + Math.floor(chunkRand() * 103);
+      const count = 5 + Math.floor(chunkRand() * 6);
+      placeOreCluster(blocks, chunkRand, B.COAL_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 10, 115);
     }
 
-    // Iron Ore: Y=5..64 (+ higher mountain iron up to Y=90), veins (4..8 blocks)
-    const ironMaxY = mountainCols > 60 ? 90 : 64;
-    const ironTries = mountainCols > 60 ? 11 : 9;
+    // Copper Ore: Y=16..78, medium veins (4..8 blocks)
+    if (B.COPPER_ORE) {
+      for (let i = 0; i < 5; i++) {
+        const y = 16 + Math.floor(chunkRand() * 62);
+        const count = 4 + Math.floor(chunkRand() * 5);
+        placeOreCluster(blocks, chunkRand, B.COPPER_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 14, 78);
+      }
+    }
+
+    // Iron Ore: Y=8..63 (+ higher mountain iron up to Y=88), veins (3..7 blocks)
+    const ironMaxY = mountainCols > 60 ? 88 : 63;
+    const ironTries = mountainCols > 60 ? 9 : 7;
     for (let i = 0; i < ironTries; i++) {
-      const y = 5 + Math.floor(chunkRand() * (ironMaxY - 5));
-      const count = 4 + Math.floor(chunkRand() * 5);
-      placeOreCluster(blocks, chunkRand, B.IRON_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, ironMaxY);
+      const y = 8 + Math.floor(chunkRand() * (ironMaxY - 8));
+      const count = 3 + Math.floor(chunkRand() * 5);
+      placeOreCluster(blocks, chunkRand, B.IRON_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 6, ironMaxY);
     }
 
-    // Lapis Lazuli Ore: Y=5..32 (triangular distribution peaking ~Y=15), rare veins (3..6 blocks)
-    const lapisTries = chunkRand() < 0.45 ? 2 : 1;
-    for (let i = 0; i < lapisTries; i++) {
-      const y = Math.floor(5 + (chunkRand() + chunkRand()) * 0.5 * 27);
-      const count = 3 + Math.floor(chunkRand() * 4);
-      placeOreCluster(blocks, chunkRand, B.LAPIS_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 32);
-    }
-
-    // Gold Ore: Y=5..32, rare veins (4..7 blocks)
-    for (let i = 0; i < 2; i++) {
-      const y = 5 + Math.floor(chunkRand() * 28);
-      const count = 4 + Math.floor(chunkRand() * 4);
-      placeOreCluster(blocks, chunkRand, B.GOLD_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 32);
-    }
-
-    // Redstone Ore: Y=5..16, medium veins (4..7 blocks)
-    for (let i = 0; i < 5; i++) {
-      const y = 5 + Math.floor(chunkRand() * 12);
-      const count = 4 + Math.floor(chunkRand() * 4);
-      placeOreCluster(blocks, chunkRand, B.REDSTONE_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 16);
-    }
-
-    // Diamond Ore: truly rare! Y=5..16, 1 vein of 2..5 blocks per chunk (85% chance)
-    if (chunkRand() < 0.85) {
-      const y = 5 + Math.floor(chunkRand() * 12);
+    // Lapis Lazuli Ore: Y=5..28 (triangular distribution peaking ~Y=14), rare veins (2..5 blocks)
+    if (chunkRand() < 0.6) {
+      const y = Math.floor(5 + (chunkRand() + chunkRand()) * 0.5 * 23);
       const count = 2 + Math.floor(chunkRand() * 4);
-      placeOreCluster(blocks, chunkRand, B.DIAMOND_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 16);
+      placeOreCluster(blocks, chunkRand, B.LAPIS_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 28);
     }
 
-    // Emerald Ore: Mountain biomes only, Y=5..80, rare 1-block gems
+    // Gold Ore: Y=5..29, rare veins (3..6 blocks, ~72% of chunks)
+    if (chunkRand() < 0.72) {
+      const y = 5 + Math.floor(chunkRand() * 24);
+      const count = 3 + Math.floor(chunkRand() * 4);
+      placeOreCluster(blocks, chunkRand, B.GOLD_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 29);
+    }
+
+    // Redstone Ore: Y=5..15, deep veins (3..6 blocks)
+    for (let i = 0; i < 2; i++) {
+      const y = 5 + Math.floor(chunkRand() * 10);
+      const count = 3 + Math.floor(chunkRand() * 4);
+      placeOreCluster(blocks, chunkRand, B.REDSTONE_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 15);
+    }
+
+    // Diamond Ore: truly rare! Deep Y=5..15, 1 small vein of 1..4 blocks (~32% of chunks)
+    if (chunkRand() < 0.32) {
+      const y = 5 + Math.floor(chunkRand() * 10);
+      const count = 1 + Math.floor(chunkRand() * 4);
+      placeOreCluster(blocks, chunkRand, B.DIAMOND_ORE, chunkRand() * 16, y, chunkRand() * 16, count, 5, 15);
+    }
+
+    // Emerald Ore: Mountain biomes only, Y=5..75, rare 1-block gems
     if (mountainCols > 16) {
-      const tries = 2 + Math.floor((mountainCols / 256) * 4);
+      const tries = 1 + Math.floor((mountainCols / 256) * 3);
       for (let i = 0; i < tries; i++) {
         const lx = Math.floor(chunkRand() * 16);
         const lz = Math.floor(chunkRand() * 16);
         if (biomes[lz * CHUNK_SIZE + lx] !== BI.MOUNTAINS) continue;
         const maxH = heightMap[lz * CHUNK_SIZE + lx] - 2;
         if (maxH <= 6) continue;
-        const y = 5 + Math.floor(chunkRand() * Math.min(75, maxH - 5));
+        const y = 5 + Math.floor(chunkRand() * Math.min(70, maxH - 5));
         const idx = y * slice + lz * CHUNK_SIZE + lx;
-        if (blocks[idx] === B.STONE) {
+        if (blocks[idx] === B.STONE || (B.DEEPSLATE && blocks[idx] === B.DEEPSLATE)) {
           blocks[idx] = B.EMERALD_ORE;
         }
       }

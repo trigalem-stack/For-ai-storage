@@ -10,24 +10,28 @@ export class InventoryUI {
     this.inventory = inventory;
     this.blockEntities = blockEntities;
     this.onClose = options.onClose || null;
-    this.onDropStack = options.onDropStack || null; // (stack) => void
+    this.onDropStack = options.onDropStack || null;
     this.onOpen = options.onOpen || null;
     this.playerPreview = options.playerPreview || null;
 
     this.isOpen = false;
     this.mode = 'inventory'; // 'inventory' | 'crafting' | 'furnace' | 'chest' | 'creative'
-    this.activeBlockPos = null; // { x, y, z }
+    this.activeBlockPos = null;
     this.cursorStack = null;
-    this.selectedTouchRef = null; // { zone, index } for mobile tap-transfer
+    this.selectedTouchRef = null;
     this.splitMode = false;
     this.recipeBookOpen = false;
+    this.onlyCraftableFilter = false;
     this.craftGrid = new Array(9).fill(null);
     this.craftResult = null;
     this.craftMatchedRecipe = null;
 
-    this._slotElements = new Map(); // "zone:index" -> DOM element refs
+    this._slotElements = new Map();
     this._longPressTimer = null;
     this._longPressTriggered = false;
+    this._touchStartPos = { x: 0, y: 0 };
+    this._touchMoved = false;
+    this._lastTouchEventAt = 0;
 
     this.overlay = document.getElementById('inventory-overlay');
     this.windowEl = document.getElementById('inventory-window');
@@ -37,6 +41,7 @@ export class InventoryUI {
     this.hotbarGridEl = document.getElementById('inv-hotbar-grid');
     this.recipeDrawerEl = document.getElementById('inv-recipe-drawer');
     this.recipeListEl = document.getElementById('inv-recipe-list');
+    this.recipeFilterBtn = document.getElementById('btn-recipe-filter');
     this.cursorGhostEl = document.getElementById('inv-cursor-ghost');
     this.tooltipEl = document.getElementById('inv-tooltip');
 
@@ -60,10 +65,12 @@ export class InventoryUI {
     });
 
     this.overlay?.addEventListener('mousedown', (e) => {
+      if (performance.now() - this._lastTouchEventAt < 450) return;
       if (e.target === this.overlay) {
         if (this.cursorStack) {
-          this.onDropStack?.(this.cursorStack);
+          const dropS = ItemRegistry.cloneStack(this.cursorStack);
           this.cursorStack = null;
+          this.onDropStack?.(dropS);
           this.render();
         } else {
           this.close();
@@ -76,30 +83,26 @@ export class InventoryUI {
     this.overlay?.addEventListener('mousemove', (e) => {
       this._updateCursorGhost(e.clientX, e.clientY);
       this._updateTooltipPos(e.clientX, e.clientY);
-      if (this.playerPreview && this.playerCanvas && this.mode === 'inventory') {
-        const rect = this.playerCanvas.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-          const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1;
-          this.playerPreview.setLookTarget(nx, ny);
-        }
-      }
+      this._updatePaperDollLook(e.clientX, e.clientY);
     });
 
     this.overlay?.addEventListener('touchmove', (e) => {
-      if (this.playerPreview && this.playerCanvas && this.mode === 'inventory' && e.touches[0]) {
-        const rect = this.playerCanvas.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          const nx = ((e.touches[0].clientX - rect.left) / rect.width) * 2 - 1;
-          const ny = ((e.touches[0].clientY - rect.top) / rect.height) * 2 - 1;
-          this.playerPreview.setLookTarget(nx, ny);
-        }
+      if (e.touches[0]) {
+        this._updatePaperDollLook(e.touches[0].clientX, e.touches[0].clientY);
       }
     }, { passive: true });
 
     this.recipeToggleBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.recipeBookOpen = !this.recipeBookOpen;
+      this.renderRecipeBook();
+    });
+
+    this.recipeFilterBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.onlyCraftableFilter = !this.onlyCraftableFilter;
+      this.recipeFilterBtn.classList.toggle('active', this.onlyCraftableFilter);
+      this.recipeFilterBtn.textContent = this.onlyCraftableFilter ? '✓ Доступные' : 'Все';
       this.renderRecipeBook();
     });
 
@@ -123,27 +126,77 @@ export class InventoryUI {
 
     this.dropSelectedBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (this.cursorStack) {
-        this.onDropStack?.(this.cursorStack);
-        this.cursorStack = null;
-        this.render();
-        return;
-      }
-      if (this.selectedTouchRef) {
-        const cur = this._getSlot(this.selectedTouchRef.zone, this.selectedTouchRef.index);
-        if (cur) {
-          this._setSlot(this.selectedTouchRef.zone, this.selectedTouchRef.index, null);
-          this.onDropStack?.(cur);
-          this.selectedTouchRef = null;
-          this._recomputeCraftResult();
-          this.render();
-        }
-      }
+      this.handleVirtualDrop(
+        this.selectedTouchRef?.zone || null,
+        this.selectedTouchRef ? this.selectedTouchRef.index : -1
+      );
     });
   }
 
+  _updatePaperDollLook(clientX, clientY) {
+    if (this.playerPreview && this.playerCanvas && this.mode === 'inventory') {
+      const rect = this.playerCanvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
+        const ny = ((clientY - rect.top) / rect.height) * 2 - 1;
+        this.playerPreview.setLookTarget(nx, ny);
+      }
+    }
+  }
+
+  updateVirtualPointer(vx, vy, hoveredEl) {
+    if (!this.isOpen) return;
+    this._updateCursorGhost(vx, vy);
+    this._updatePaperDollLook(vx, vy);
+    const slotBtn = hoveredEl?.classList?.contains('inv-slot') ? hoveredEl : null;
+    if (slotBtn) {
+      const stack = this._getSlot(slotBtn.dataset.zone, Number(slotBtn.dataset.index));
+      this._showTooltip(stack, vx, vy);
+    } else {
+      this.tooltipEl?.classList.add('hidden');
+    }
+  }
+
+  handleVirtualSlotClick(zone, index, button = 0, shiftKey = false, vx = null, vy = null) {
+    if (!this.isOpen || !zone) return;
+    this._handleSlotMouseDown(zone, index, { button, shiftKey });
+    if (vx !== null && vy !== null) {
+      this._updateCursorGhost(vx, vy);
+    }
+  }
+
+  handleVirtualDrop(zone = null, index = -1) {
+    if (!this.isOpen) return;
+    if (this.cursorStack) {
+      const dropS = ItemRegistry.cloneStack(this.cursorStack);
+      this.cursorStack = null;
+      this.onDropStack?.(dropS);
+      this.render();
+      return;
+    }
+    const targetZone = zone || this.selectedTouchRef?.zone;
+    const targetIndex = zone ? index : (this.selectedTouchRef ? this.selectedTouchRef.index : -1);
+    if (!targetZone || targetIndex < 0 || targetZone === 'craft_out') return;
+    const cur = this._getSlot(targetZone, targetIndex);
+    if (cur) {
+      this._setSlot(targetZone, targetIndex, null);
+      this.onDropStack?.(cur);
+      this.selectedTouchRef = null;
+      this._recomputeCraftResult();
+      this.render();
+    }
+  }
+
   open(mode = 'inventory', blockPos = null) {
-    if (this.isOpen && this.mode === mode && (!blockPos || (this.activeBlockPos?.x === blockPos.x && this.activeBlockPos?.y === blockPos.y && this.activeBlockPos?.z === blockPos.z))) {
+    if (
+      this.isOpen &&
+      this.mode === mode &&
+      (!blockPos || (
+        this.activeBlockPos?.x === blockPos.x &&
+        this.activeBlockPos?.y === blockPos.y &&
+        this.activeBlockPos?.z === blockPos.z
+      ))
+    ) {
       return;
     }
     this._returnCraftGridToInventory();
@@ -151,6 +204,7 @@ export class InventoryUI {
     this.activeBlockPos = blockPos ? { x: blockPos.x, y: blockPos.y, z: blockPos.z } : null;
     this.selectedTouchRef = null;
     this.splitMode = false;
+    this.splitToggleBtn?.classList.remove('active');
     this.isOpen = true;
 
     if (mode === 'crafting') {
@@ -169,19 +223,21 @@ export class InventoryUI {
     if (!this.isOpen) return;
     this._returnCraftGridToInventory();
     if (this.cursorStack) {
+      const s = ItemRegistry.cloneStack(this.cursorStack);
+      this.cursorStack = null;
       const leftover = this.inventory.addItem(
-        this.cursorStack.id,
-        this.cursorStack.count,
-        this.cursorStack.maxDurability > 0 ? this.cursorStack.durability : null,
-        this.cursorStack.meta
+        s.id,
+        s.count,
+        s.maxDurability > 0 ? s.durability : null,
+        s.meta
       );
       if (leftover > 0) {
-        const dropS = ItemRegistry.cloneStack(this.cursorStack);
+        const dropS = ItemRegistry.cloneStack(s);
         dropS.count = leftover;
         this.onDropStack?.(dropS);
       }
-      this.cursorStack = null;
     }
+    clearTimeout(this._longPressTimer);
     this.selectedTouchRef = null;
     this.splitMode = false;
     this.isOpen = false;
@@ -195,6 +251,7 @@ export class InventoryUI {
   _returnCraftGridToInventory() {
     for (let i = 0; i < 9; i++) {
       const s = this.craftGrid[i];
+      this.craftGrid[i] = null;
       if (!s || s.count <= 0) continue;
       const rem = this.inventory.addItem(s.id, s.count, s.maxDurability > 0 ? s.durability : null, s.meta);
       if (rem > 0) {
@@ -202,7 +259,6 @@ export class InventoryUI {
         dropS.count = rem;
         this.onDropStack?.(dropS);
       }
-      this.craftGrid[i] = null;
     }
     this.craftResult = null;
     this.craftMatchedRecipe = null;
@@ -222,7 +278,7 @@ export class InventoryUI {
     const subGrid = this.craftGrid.slice(0, size * size);
     const match = RecipeRegistry.matchCraftingGrid(subGrid, size);
     if (match) {
-      this.craftResult = match.result;
+      this.craftResult = ItemRegistry.cloneStack(match.result);
       this.craftMatchedRecipe = match.recipe;
     } else {
       this.craftResult = null;
@@ -246,22 +302,23 @@ export class InventoryUI {
     return ['helmet', 'chestplate', 'leggings', 'boots'][index] || 'helmet';
   }
 
+  // Always returns a cloned stack so no two slots ever alias the same JS object reference (prevents all dupe bugs)
   _getSlot(zone, index) {
-    if (zone === 'inv') return this.inventory.slots[index] || null;
-    if (zone === 'armor') return this.inventory.armor[this._getArmorKeyByIndex(index)] || null;
-    if (zone === 'craft') return this.craftGrid[index] || null;
-    if (zone === 'craft_out') return this.craftResult || null;
-    if (zone === 'chest' && this.activeBlockPos) {
+    let raw = null;
+    if (zone === 'inv') raw = this.inventory.slots[index] || null;
+    else if (zone === 'armor') raw = this.inventory.armor[this._getArmorKeyByIndex(index)] || null;
+    else if (zone === 'craft') raw = this.craftGrid[index] || null;
+    else if (zone === 'craft_out') raw = this.craftResult || null;
+    else if (zone === 'chest' && this.activeBlockPos) {
       const c = this.blockEntities.getOrCreateChest(this.activeBlockPos.x, this.activeBlockPos.y, this.activeBlockPos.z);
-      return c.slots[index] || null;
-    }
-    if (zone === 'furnace' && this.activeBlockPos) {
+      raw = c.slots[index] || null;
+    } else if (zone === 'furnace' && this.activeBlockPos) {
       const f = this.blockEntities.getOrCreateFurnace(this.activeBlockPos.x, this.activeBlockPos.y, this.activeBlockPos.z);
-      if (index === 0) return f.input;
-      if (index === 1) return f.fuel;
-      if (index === 2) return f.output;
+      if (index === 0) raw = f.input;
+      else if (index === 1) raw = f.fuel;
+      else if (index === 2) raw = f.output;
     }
-    return null;
+    return ItemRegistry.cloneStack(raw);
   }
 
   _setSlot(zone, index, stack) {
@@ -288,7 +345,7 @@ export class InventoryUI {
   _isAllowedInSlot(zone, index, stack) {
     if (!stack || !stack.id) return true;
     if (zone === 'craft_out') return false;
-    if (zone === 'furnace' && index === 2) return false; // cannot place into furnace output
+    if (zone === 'furnace' && index === 2) return false;
     if (zone === 'armor') {
       const expectedSlot = this._getArmorKeyByIndex(index);
       const def = ItemRegistry.get(stack.id);
@@ -322,10 +379,11 @@ export class InventoryUI {
     btn.append(icon, count, durBar);
     this._slotElements.set(`${zone}:${index}`, { btn, icon, count, durBar, durFill });
 
-    // Desktop mouse clicks
+    // Guarded mouse down (never fires double after touch)
     btn.addEventListener('mousedown', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (performance.now() - this._lastTouchEventAt < 450) return;
       this._handleSlotMouseDown(zone, index, e);
     });
 
@@ -338,23 +396,43 @@ export class InventoryUI {
       this.tooltipEl?.classList.add('hidden');
     });
 
-    // Mobile Touch interactions (tap select/transfer + 380ms long-press split)
+    // Touch interactions: tap select/transfer + 380ms stationary long-press split (cancels on drag > 8px)
     btn.addEventListener('touchstart', (e) => {
       e.stopPropagation();
+      this._lastTouchEventAt = performance.now();
       this._longPressTriggered = false;
+      this._touchMoved = false;
+      const t = e.changedTouches[0];
+      if (t) {
+        this._touchStartPos.x = t.clientX;
+        this._touchStartPos.y = t.clientY;
+      }
       clearTimeout(this._longPressTimer);
       this._longPressTimer = setTimeout(() => {
-        this._longPressTriggered = true;
-        this._handleTouchSplit(zone, index);
+        if (!this._touchMoved) {
+          this._longPressTriggered = true;
+          this._handleTouchSplit(zone, index);
+        }
       }, 380);
+    }, { passive: true });
+
+    btn.addEventListener('touchmove', (e) => {
+      const t = e.changedTouches[0];
+      if (!t) return;
+      if (Math.hypot(t.clientX - this._touchStartPos.x, t.clientY - this._touchStartPos.y) > 8) {
+        this._touchMoved = true;
+        clearTimeout(this._longPressTimer);
+      }
     }, { passive: true });
 
     btn.addEventListener('touchend', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      this._lastTouchEventAt = performance.now();
       clearTimeout(this._longPressTimer);
-      if (this._longPressTriggered) {
+      if (this._longPressTriggered || this._touchMoved) {
         this._longPressTriggered = false;
+        this._touchMoved = false;
         return;
       }
       this._handleTouchTap(zone, index);
@@ -364,13 +442,11 @@ export class InventoryUI {
   }
 
   _handleSlotMouseDown(zone, index, e) {
-    // Shift + LMB quick move
     if (e.button === 0 && e.shiftKey) {
       this._handleQuickMove(zone, index);
       return;
     }
 
-    // Craft Output Slot click
     if (zone === 'craft_out') {
       if (!this.craftResult) return;
       if (this.cursorStack) {
@@ -394,7 +470,12 @@ export class InventoryUI {
         if (!slotStack) return;
         const takeCount = Math.ceil(slotStack.count / 2);
         const remainCount = slotStack.count - takeCount;
-        this.cursorStack = ItemRegistry.createStack(slotStack.id, takeCount, slotStack.maxDurability > 0 ? slotStack.durability : null, slotStack.meta);
+        this.cursorStack = ItemRegistry.createStack(
+          slotStack.id,
+          takeCount,
+          slotStack.maxDurability > 0 ? slotStack.durability : null,
+          slotStack.meta
+        );
         if (remainCount > 0) {
           slotStack.count = remainCount;
           this._setSlot(zone, index, slotStack);
@@ -404,7 +485,16 @@ export class InventoryUI {
       } else {
         if (!this._isAllowedInSlot(zone, index, this.cursorStack)) return;
         if (!slotStack) {
-          this._setSlot(zone, index, ItemRegistry.createStack(this.cursorStack.id, 1, this.cursorStack.maxDurability > 0 ? this.cursorStack.durability : null, this.cursorStack.meta));
+          this._setSlot(
+            zone,
+            index,
+            ItemRegistry.createStack(
+              this.cursorStack.id,
+              1,
+              this.cursorStack.maxDurability > 0 ? this.cursorStack.durability : null,
+              this.cursorStack.meta
+            )
+          );
           this.cursorStack.count -= 1;
           if (this.cursorStack.count <= 0) this.cursorStack = null;
         } else if (ItemRegistry.canStackTogether(slotStack, this.cursorStack)) {
@@ -424,7 +514,7 @@ export class InventoryUI {
     // Left-click (button 0): pick up / place / merge / swap
     if (!this.cursorStack) {
       if (!slotStack) return;
-      this.cursorStack = ItemRegistry.cloneStack(slotStack);
+      this.cursorStack = slotStack;
       this._setSlot(zone, index, null);
     } else {
       if (!this._isAllowedInSlot(zone, index, this.cursorStack)) return;
@@ -442,10 +532,8 @@ export class InventoryUI {
           if (this.cursorStack.count <= 0) this.cursorStack = null;
         }
       } else {
-        // Swap stacks
-        const old = ItemRegistry.cloneStack(slotStack);
         this._setSlot(zone, index, this.cursorStack);
-        this.cursorStack = old;
+        this.cursorStack = slotStack;
       }
     }
     this.render();
@@ -455,7 +543,7 @@ export class InventoryUI {
     if (zone === 'craft_out') {
       let guard = 0;
       while (this.craftResult && guard < 64) {
-        if (!this.inventory.canAccept(this.craftResult.id, this.craftResult.count, this.craftResult.durability)) break;
+        if (!this.inventory.canAcceptExact(this.craftResult.id, this.craftResult.count, this.craftResult.durability, this.craftResult.meta)) break;
         const res = ItemRegistry.cloneStack(this.craftResult);
         this.inventory.addItem(res.id, res.count, res.maxDurability > 0 ? res.durability : null, res.meta);
         this._consumeCraftIngredients(1);
@@ -469,8 +557,8 @@ export class InventoryUI {
     if (!src) return;
 
     const tryMoveToRange = (targetZone, startIdx, endIdx) => {
-      // Pass 1: stack with existing
       for (let i = startIdx; i < endIdx && src.count > 0; i++) {
+        if (targetZone === zone && i === index) continue;
         const dst = this._getSlot(targetZone, i);
         if (dst && ItemRegistry.canStackTogether(dst, src)) {
           const maxS = ItemRegistry.getMaxStack(dst.id);
@@ -482,8 +570,8 @@ export class InventoryUI {
           }
         }
       }
-      // Pass 2: empty slot
       for (let i = startIdx; i < endIdx && src.count > 0; i++) {
+        if (targetZone === zone && i === index) continue;
         if (!this._getSlot(targetZone, i) && this._isAllowedInSlot(targetZone, i, src)) {
           this._setSlot(targetZone, i, src);
           src.count = 0;
@@ -527,41 +615,40 @@ export class InventoryUI {
     if (zone === 'craft_out') return;
     const src = this._getSlot(zone, index);
     if (!src || src.count <= 1) return;
+    if (this.cursorStack) return; // Prevents colliding with existing cursorStack
+
     const half = Math.ceil(src.count / 2);
     const keep = src.count - half;
-    const halfStack = ItemRegistry.createStack(src.id, half, null, src.meta);
-    this._setSlot(zone, index, ItemRegistry.createStack(src.id, keep, null, src.meta));
-    // Place half into cursorStack or auto-find empty inventory slot and select it
-    if (!this.cursorStack) {
-      this.cursorStack = halfStack;
-    } else {
-      this.inventory.addItem(halfStack.id, halfStack.count);
-    }
+    this.cursorStack = ItemRegistry.createStack(src.id, half, src.maxDurability > 0 ? src.durability : null, src.meta);
+    this._setSlot(zone, index, ItemRegistry.createStack(src.id, keep, src.maxDurability > 0 ? src.durability : null, src.meta));
+    this.selectedTouchRef = null;
     this.render();
   }
 
   _handleTouchTap(zone, index) {
-    // If craft result tapped on touch, craft directly to inventory!
     if (zone === 'craft_out') {
       if (!this.craftResult) return;
-      if (this.cursorStack && ItemRegistry.canStackTogether(this.cursorStack, this.craftResult)) {
-        const maxS = ItemRegistry.getMaxStack(this.cursorStack.id);
-        if (this.cursorStack.count + this.craftResult.count <= maxS) {
-          this.cursorStack.count += this.craftResult.count;
-          this._consumeCraftIngredients(1);
-          this.render();
-          return;
+      if (this.cursorStack) {
+        if (ItemRegistry.canStackTogether(this.cursorStack, this.craftResult)) {
+          const maxS = ItemRegistry.getMaxStack(this.cursorStack.id);
+          if (this.cursorStack.count + this.craftResult.count <= maxS) {
+            this.cursorStack.count += this.craftResult.count;
+            this._consumeCraftIngredients(1);
+            this.render();
+          }
         }
+        return;
       }
-      const rem = this.inventory.addItem(this.craftResult.id, this.craftResult.count);
-      if (rem < this.craftResult.count) {
-        this._consumeCraftIngredients(1);
+      // Exact capacity check guarantees zero item loss or duplication
+      if (!this.inventory.canAcceptExact(this.craftResult.id, this.craftResult.count, this.craftResult.durability, this.craftResult.meta)) {
+        return;
       }
+      this.inventory.addItem(this.craftResult.id, this.craftResult.count, null, this.craftResult.meta);
+      this._consumeCraftIngredients(1);
       this.render();
       return;
     }
 
-    // If holding a split stack in cursorStack from long-press or split mode
     if (this.cursorStack) {
       const dst = this._getSlot(zone, index);
       if (!this._isAllowedInSlot(zone, index, this.cursorStack)) return;
@@ -571,14 +658,15 @@ export class InventoryUI {
       } else if (ItemRegistry.canStackTogether(dst, this.cursorStack)) {
         const maxS = ItemRegistry.getMaxStack(dst.id);
         const add = Math.min(maxS - dst.count, this.cursorStack.count);
-        dst.count += add;
-        this._setSlot(zone, index, dst);
-        this.cursorStack.count -= add;
-        if (this.cursorStack.count <= 0) this.cursorStack = null;
+        if (add > 0) {
+          dst.count += add;
+          this._setSlot(zone, index, dst);
+          this.cursorStack.count -= add;
+          if (this.cursorStack.count <= 0) this.cursorStack = null;
+        }
       } else {
-        const old = ItemRegistry.cloneStack(dst);
         this._setSlot(zone, index, this.cursorStack);
-        this.cursorStack = old;
+        this.cursorStack = dst;
       }
       this.selectedTouchRef = null;
       this.render();
@@ -609,12 +697,7 @@ export class InventoryUI {
     }
 
     const src = this._getSlot(this.selectedTouchRef.zone, this.selectedTouchRef.index);
-    if (!src) {
-      this.selectedTouchRef = null;
-      this.render();
-      return;
-    }
-    if (!this._isAllowedInSlot(zone, index, src)) {
+    if (!src || !this._isAllowedInSlot(zone, index, src)) {
       this.selectedTouchRef = null;
       this.render();
       return;
@@ -633,9 +716,8 @@ export class InventoryUI {
         this._setSlot(this.selectedTouchRef.zone, this.selectedTouchRef.index, src.count > 0 ? src : null);
       }
     } else {
-      const tmp = ItemRegistry.cloneStack(clickedStack);
       this._setSlot(zone, index, src);
-      this._setSlot(this.selectedTouchRef.zone, this.selectedTouchRef.index, tmp);
+      this._setSlot(this.selectedTouchRef.zone, this.selectedTouchRef.index, clickedStack);
     }
 
     this.selectedTouchRef = null;
@@ -643,10 +725,19 @@ export class InventoryUI {
     this.render();
   }
 
-  autoFillRecipe(recipe) {
+  /**
+   * Smart Recipe Book auto-fill:
+   * - Clicking a different recipe returns current grid to inventory and lays out 1 set.
+   * - Clicking the SAME active recipe stacks +1 additional set onto the crafting grid (fast bulk crafting!).
+   */
+  autoFillRecipe(recipe, fillAll = false) {
     const gridSize = this._getActiveGridSize();
     if (!RecipeRegistry.fitsInGrid(recipe, gridSize)) return;
-    this._returnCraftGridToInventory();
+
+    const alreadySameRecipe = this.craftMatchedRecipe && this.craftMatchedRecipe.id === recipe.id;
+    if (!alreadySameRecipe) {
+      this._returnCraftGridToInventory();
+    }
 
     const takeOneMatching = (expected) => {
       const opts = Array.isArray(expected) ? expected : [expected];
@@ -662,23 +753,54 @@ export class InventoryUI {
       return null;
     };
 
-    if (recipe.type === 'shapeless') {
-      recipe.ingredients.forEach((ing, idx) => {
-        const picked = takeOneMatching(ing);
-        if (picked) this.craftGrid[idx] = picked;
-      });
-    } else {
-      for (let py = 0; py < recipe.height; py++) {
-        const row = recipe.pattern[py];
-        for (let px = 0; px < recipe.width; px++) {
-          const ch = row[px];
-          if (ch !== ' ') {
-            const picked = takeOneMatching(recipe.key[ch]);
-            if (picked) this.craftGrid[py * gridSize + px] = picked;
+    const addOneSet = () => {
+      // Verify every required ingredient exists before consuming from inventory
+      if (!RecipeRegistry.canCraftFromSlots(recipe, this.inventory.slots, gridSize)) return false;
+
+      // Also ensure grid slots can stack +1 without overflowing
+      const slotsToUse = [];
+      if (recipe.type === 'shapeless') {
+        for (let idx = 0; idx < recipe.ingredients.length; idx++) {
+          const cur = this.craftGrid[idx];
+          const opts = Array.isArray(recipe.ingredients[idx]) ? recipe.ingredients[idx] : [recipe.ingredients[idx]];
+          if (cur && (!opts.includes(cur.id) || cur.count >= ItemRegistry.getMaxStack(cur.id))) return false;
+          slotsToUse.push({ gridIdx: idx, expected: recipe.ingredients[idx] });
+        }
+      } else {
+        for (let py = 0; py < recipe.height; py++) {
+          const row = recipe.pattern[py];
+          for (let px = 0; px < recipe.width; px++) {
+            const ch = row[px];
+            if (ch !== ' ') {
+              const gIdx = py * gridSize + px;
+              const cur = this.craftGrid[gIdx];
+              const expected = recipe.key[ch];
+              const opts = Array.isArray(expected) ? expected : [expected];
+              if (cur && (!opts.includes(cur.id) || cur.count >= ItemRegistry.getMaxStack(cur.id))) return false;
+              slotsToUse.push({ gridIdx: gIdx, expected });
+            }
           }
         }
       }
+
+      for (const req of slotsToUse) {
+        const picked = takeOneMatching(req.expected);
+        if (!picked) return false;
+        const cur = this.craftGrid[req.gridIdx];
+        if (cur) {
+          cur.count += 1;
+        } else {
+          this.craftGrid[req.gridIdx] = picked;
+        }
+      }
+      return true;
+    };
+
+    const maxCycles = fillAll ? 64 : 1;
+    for (let c = 0; c < maxCycles; c++) {
+      if (!addOneSet()) break;
     }
+
     this.inventory._emitChange();
     this._recomputeCraftResult();
     this.render();
@@ -704,7 +826,6 @@ export class InventoryUI {
       const layout = document.createElement('div');
       layout.className = 'inv-top-player-layout';
 
-      // Armor column (4 slots)
       const armorCol = document.createElement('div');
       armorCol.className = 'inv-armor-col';
       const placeholders = ['Шлем', 'Броня', 'Поножи', 'Боты'];
@@ -712,18 +833,16 @@ export class InventoryUI {
         armorCol.appendChild(this._createSlotElement('armor', a, placeholders[a]));
       }
 
-      // Live 3D Steve Paper Doll Canvas
       const dollWrap = document.createElement('div');
       dollWrap.className = 'inv-doll-frame';
       const canvas = document.createElement('canvas');
       canvas.id = 'inv-player-canvas';
-      canvas.width = 132;
-      canvas.height = 176;
+      canvas.width = 120;
+      canvas.height = 154;
       dollWrap.appendChild(canvas);
       this.playerCanvas = canvas;
       this.playerPreview?.bindCanvas(canvas);
 
-      // 2x2 Crafting section
       const craftWrap = document.createElement('div');
       craftWrap.className = 'inv-craft-wrap';
       const craftLabel = document.createElement('div');
@@ -830,11 +949,9 @@ export class InventoryUI {
       this.topSectionEl.appendChild(catalog);
     }
 
-    // Main player inventory (slots 9..35)
     for (let i = HOTBAR_SIZE; i < INVENTORY_SIZE; i++) {
       this.mainGridEl.appendChild(this._createSlotElement('inv', i));
     }
-    // Player hotbar row inside inventory (slots 0..8)
     for (let i = 0; i < HOTBAR_SIZE; i++) {
       const s = this._createSlotElement('inv', i);
       if (i === this.inventory.selectedSlot) s.classList.add('hotbar-active');
@@ -930,7 +1047,10 @@ export class InventoryUI {
     if (!allow) return;
 
     const gridSize = this._getActiveGridSize();
-    const list = RecipeRegistry.getRecipeBookList(this.inventory.slots, gridSize);
+    let list = RecipeRegistry.getRecipeBookList(this.inventory.slots, gridSize);
+    if (this.onlyCraftableFilter) {
+      list = list.filter((e) => e.craftable);
+    }
     this.recipeListEl.innerHTML = '';
 
     for (const entry of list) {
@@ -952,7 +1072,7 @@ export class InventoryUI {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (entry.craftable) {
-          this.autoFillRecipe(entry.recipe);
+          this.autoFillRecipe(entry.recipe, e.shiftKey);
         } else {
           this._showTooltip({ id: entry.recipe.result.id, count: entry.recipe.result.count }, e.clientX, e.clientY);
         }
@@ -979,8 +1099,8 @@ export class InventoryUI {
 
   _updateCursorGhost(x, y) {
     if (!this.cursorGhostEl || !this.cursorStack) return;
-    this.cursorGhostEl.style.left = `${x + 4}px`;
-    this.cursorGhostEl.style.top = `${y + 4}px`;
+    this.cursorGhostEl.style.left = `${x + 6}px`;
+    this.cursorGhostEl.style.top = `${y + 6}px`;
   }
 
   _showTooltip(stack, x, y) {
@@ -998,6 +1118,9 @@ export class InventoryUI {
     if (def.armorPoints > 0) {
       lines.push(`Защита: +${def.armorPoints}`);
     }
+    if (def.isFood && def.foodStats) {
+      lines.push(`Сытость: +${def.foodStats.hunger}`);
+    }
     if (def.toolSpeed > 1) {
       lines.push(`Скорость: ${def.toolSpeed}×`);
     }
@@ -1007,13 +1130,13 @@ export class InventoryUI {
       this._updateTooltipPos(x, y);
     } else {
       this.tooltipEl.style.left = '50%';
-      this.tooltipEl.style.top = '14px';
+      this.tooltipEl.style.top = '12px';
     }
   }
 
   _updateTooltipPos(x, y) {
     if (!this.tooltipEl || this.tooltipEl.classList.contains('hidden')) return;
-    this.tooltipEl.style.left = `${Math.min(window.innerWidth - 170, x + 14)}px`;
+    this.tooltipEl.style.left = `${Math.min(window.innerWidth - 170, Math.max(8, x + 14))}px`;
     this.tooltipEl.style.top = `${Math.max(8, y - 34)}px`;
   }
 }

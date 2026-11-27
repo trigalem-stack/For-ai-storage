@@ -33,6 +33,8 @@ export class World {
     this.pendingCoords = [];
     this.pendingLightChunks = [];
     this._neighborScratch = new Array(9);
+    this._dirtyScratch = [];
+    this._randomTickAccum = 0;
 
     // Offline Blob Web Worker pool for smooth zero-copy chunk generation
     this.workers = [];
@@ -652,19 +654,16 @@ export class World {
         const db = (b.cx - pcx) * (b.cx - pcx) + (b.cz - pcz) * (b.cz - pcz);
         return da - db;
       });
-      let processedLight = 0;
-      while (this.pendingLightChunks.length > 0) {
-        if (processedLight > 0 && performance.now() - startTime >= CHUNK_FRAME_BUDGET_MS * 0.6) break;
-        const chunk = this.pendingLightChunks.shift();
-        if (!this.chunks.has(chunk.key) || chunk.lightCalculated) continue;
+      const chunk = this.pendingLightChunks.shift();
+      if (chunk && this.chunks.has(chunk.key) && !chunk.lightCalculated) {
         this.lighting.initChunkLighting(this, chunk);
         chunk.dirty = true;
         if (this.unlimitedMemory) this._saveToCache(chunk);
         this._markOrthogonalNeighborsDirty(chunk.cx, chunk.cz);
-        processedLight++;
       }
     }
 
+    let syncDispatched = 0;
     while (this.pendingCoords.length > 0) {
       if (performance.now() - startTime >= CHUNK_FRAME_BUDGET_MS) break;
       const [cx, cz] = this.pendingCoords[0];
@@ -673,26 +672,116 @@ export class World {
         this.pendingCoords.shift();
         continue;
       }
+      const isCached = this.chunkDataCache.has(key);
+      if (!isCached && this.workers.length === 0 && syncDispatched >= 1) break;
       const dispatched = this._requestChunkAsyncOrSync(cx, cz);
       if (!dispatched) break;
+      if (!isCached && this.workers.length === 0) syncDispatched++;
       this.pendingCoords.shift();
     }
 
-    const dirtyChunks = [];
+    const dirtyChunks = this._dirtyScratch;
+    dirtyChunks.length = 0;
     for (const chunk of this.chunks.values()) {
       if (chunk.dirty && chunk.isGenerated && chunk.lightCalculated) {
         const dx = chunk.cx - pcx;
         const dz = chunk.cz - pcz;
-        dirtyChunks.push([chunk, dx * dx + dz * dz]);
+        dirtyChunks.push({ chunk, distSq: dx * dx + dz * dz });
       }
     }
-    if (dirtyChunks.length === 0) return;
-
-    dirtyChunks.sort((a, b) => a[1] - b[1]);
-    for (let i = 0; i < dirtyChunks.length; i++) {
-      if (i > 0 && performance.now() - startTime >= CHUNK_FRAME_BUDGET_MS) break;
-      this._rebuildChunkMesh(dirtyChunks[i][0]);
+    if (dirtyChunks.length > 0) {
+      dirtyChunks.sort((a, b) => a.distSq - b.distSq);
+      // Smooth mobile chunk streaming: max 2 meshes/frame when under budget, and skip distant chunks if frame budget already spent
+      const maxMeshes = 2;
+      for (let i = 0; i < dirtyChunks.length && i < maxMeshes; i++) {
+        const entry = dirtyChunks[i];
+        const elapsed = performance.now() - startTime;
+        if (i > 0 && elapsed >= CHUNK_FRAME_BUDGET_MS) break;
+        if (i === 0 && entry.distSq > 2 && elapsed >= CHUNK_FRAME_BUDGET_MS * 1.15) break;
+        this._rebuildChunkMesh(entry.chunk);
+      }
     }
+
+    // Stage 6 random ticks: farmland hydration & wheat growth
+    this._randomTickAccum += dt;
+    if (this._randomTickAccum >= 0.25) {
+      this._randomTickAccum -= 0.25;
+      this._stepRandomTicks(pcx, pcz);
+    }
+  }
+
+  stepRandomTicks(playerX, playerZ) {
+    const pcx = Math.floor(playerX / CHUNK_SIZE);
+    const pcz = Math.floor(playerZ / CHUNK_SIZE);
+    this._stepRandomTicks(pcx, pcz);
+  }
+
+  _stepRandomTicks(pcx, pcz) {
+    // Authentic Minecraft randomTickSpeed = 3 per active 16x16x16 sub-chunk within radius <= 3
+    for (let dz = -3; dz <= 3; dz++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        if (dx * dx + dz * dz > 10) continue;
+        const chunk = this.chunks.get(chunkKey(pcx + dx, pcz + dz));
+        if (!chunk || !chunk.isGenerated || chunk.maxY <= 1) continue;
+
+        const minSec = Math.max(0, chunk.minY >> 4);
+        const maxSec = Math.min((WORLD_HEIGHT - 1) >> 4, chunk.maxY >> 4);
+        for (let sec = minSec; sec <= maxSec; sec++) {
+          const baseY = sec << 4;
+          for (let t = 0; t < 3; t++) {
+            const lx = (Math.random() * CHUNK_SIZE) | 0;
+            const lz = (Math.random() * CHUNK_SIZE) | 0;
+            const wy = baseY + ((Math.random() * 16) | 0);
+            if (wy <= 0 || wy >= WORLD_HEIGHT - 1) continue;
+
+            const id = chunk.getBlock(lx, wy, lz);
+            if (id === 0) continue;
+
+            const wx = chunk.cx * CHUNK_SIZE + lx;
+            const wz = chunk.cz * CHUNK_SIZE + lz;
+            const def = BlockRegistry.get(id);
+
+            if (def.isFarmland) {
+              const nearWater = this._hasWaterNear(wx, wy, wz);
+              const curMeta = chunk.getMeta(lx, wy, lz);
+              if (nearWater && curMeta === 0) {
+                this.setBlock(wx, wy, wz, id, true, false, 7);
+              } else if (!nearWater && curMeta > 0) {
+                const above = this.getBlock(wx, wy + 1, wz);
+                if (!BlockRegistry.isCrop(above) && Math.random() < 0.35) {
+                  this.setBlock(wx, wy, wz, id, true, false, 0);
+                }
+              }
+            } else if (def.isCrop && def.cropStage < 7) {
+              const belowId = this.getBlock(wx, wy - 1, wz);
+              if (!BlockRegistry.get(belowId).isFarmland) {
+                continue;
+              }
+              const light = this.getLightAt(wx, wy, wz);
+              if (Math.max(light.sky, light.block) < 8) continue;
+              const wet = this.getBlockMeta(wx, wy - 1, wz) > 0;
+              const growChance = wet ? 0.42 : 0.2;
+              if (Math.random() < growChance) {
+                this.setBlock(wx, wy, wz, id + 1, true, false, 0);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  _hasWaterNear(wx, wy, wz) {
+    for (let dy = 0; dy <= 1; dy++) {
+      for (let dz = -4; dz <= 4; dz++) {
+        for (let dx = -4; dx <= 4; dx++) {
+          if (BlockRegistry.isLiquid(this.getBlock(wx + dx, wy + dy, wz + dz))) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   dispose() {

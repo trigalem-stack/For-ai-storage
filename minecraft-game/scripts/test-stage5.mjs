@@ -325,7 +325,7 @@ async function runStage5Tests() {
     modifiedBlocks: world.exportModifiedBlocks(),
   });
   const loaded = await saveMgr.loadWorld(wMeta.id);
-  assert.equal(loaded.version, 5);
+  assert.ok(loaded.version >= 5, `Expected save schema >= 5, got ${loaded.version}`);
 
   const inv2 = new Inventory();
   inv2.loadState(loaded.inventory);
@@ -432,7 +432,12 @@ async function runStage5Tests() {
     assert.ok(swSrc.includes(mod), `sw.js must cache ${mod}`);
   }
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  assert.ok(html.includes('inventory-overlay') && html.includes('btn-game-mode') && html.includes('inv-recipe-drawer'));
+  assert.ok(
+    html.includes('inventory-overlay') &&
+    html.includes('btn-new-mode-survival') &&
+    html.includes('btn-new-mode-creative') &&
+    html.includes('inv-recipe-drawer')
+  );
   console.log('✓ Stage 5 sw.js & index.html DOM invariants verified');
   console.log('\nALL STAGE 5 TESTS PASSED!');
 }

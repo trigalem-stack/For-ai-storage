@@ -211,7 +211,7 @@ export class ChunkMesher {
     this.lightUniforms = {
       uSunIntensity: { value: 1.0 },
       uSkyTint: { value: new THREE.Color('#ffffff') },
-      uTorchTint: { value: new THREE.Color('#ffc478') },
+      uTorchTint: { value: new THREE.Color('#fff3dc') },
       uMinLight: { value: 0.015 },
       uHeldLightPos: { value: new THREE.Vector3(0, 64, 0) },
       uHeldLightLevel: { value: 0.0 },
@@ -320,12 +320,12 @@ if (uHeldLightLevel > 0.01) {
   heldBlk = clamp((uHeldLightLevel - hDist) / 15.0, 0.0, 1.0);
 }
 float blkEff = max(clamp(vVoxelLight.y, 0.0, 1.0), heldBlk);
-float blkCurve = pow(0.8, (1.0 - blkEff) * 15.0);
-vec3 blkTerm = pow(max(blkCurve, 0.001), 2.0) * uTorchTint;
+float blkCurve = pow(0.87, (1.0 - blkEff) * 15.0);
+vec3 blkTerm = pow(max(blkCurve, 0.001), 1.32) * uTorchTint;
 diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
         );
     };
-    mat.customProgramCacheKey = () => 'mc-dual-light-v2';
+    mat.customProgramCacheKey = () => 'mc-dual-light-v3';
     return mat;
   }
 
@@ -447,6 +447,56 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
             continue;
           }
 
+          // 2.6. Wheat Crop 4-panel hash grid
+          if (def.isCrop) {
+            const uv = this.atlas.getUV(def.faces.top);
+            const lb = sampleLightByte(x, y, z);
+            const skyNorm = ((lb >> 4) & 0x0f) / 15;
+            const blkNorm = (lb & 0x0f) / 15;
+            const cropPanels = [
+              { verts: [[0.06, -0.06, 0.25, 0, 0], [0.94, -0.06, 0.25, 1, 0], [0.94, 0.94, 0.25, 1, 1], [0.06, 0.94, 0.25, 0, 1]], nx: 0, ny: 0.2, nz: 1, shade: 0.92 },
+              { verts: [[0.06, -0.06, 0.75, 0, 0], [0.94, -0.06, 0.75, 1, 0], [0.94, 0.94, 0.75, 1, 1], [0.06, 0.94, 0.75, 0, 1]], nx: 0, ny: 0.2, nz: -1, shade: 0.92 },
+              { verts: [[0.25, -0.06, 0.06, 0, 0], [0.25, -0.06, 0.94, 1, 0], [0.25, 0.94, 0.94, 1, 1], [0.25, 0.94, 0.06, 0, 1]], nx: -1, ny: 0.2, nz: 0, shade: 0.86 },
+              { verts: [[0.75, -0.06, 0.06, 0, 0], [0.75, -0.06, 0.94, 1, 0], [0.75, 0.94, 0.94, 1, 1], [0.75, 0.94, 0.06, 0, 1]], nx: 1, ny: 0.2, nz: 0, shade: 0.86 },
+            ];
+            for (const panel of cropPanels) {
+              cutoutBuf.ensureQuadCapacity();
+              const baseVert = cutoutBuf.vertexCount;
+              let pOff = baseVert * 3;
+              let uOff = baseVert * 2;
+              const baseLum = Math.pow(panel.shade, 2.2);
+              for (let i = 0; i < 4; i++) {
+                const v = panel.verts[i];
+                const lum = v[1] < 0 ? baseLum * 0.86 : baseLum;
+                cutoutBuf.positions[pOff] = x + v[0];
+                cutoutBuf.positions[pOff + 1] = y + v[1];
+                cutoutBuf.positions[pOff + 2] = z + v[2];
+                cutoutBuf.normals[pOff] = panel.nx;
+                cutoutBuf.normals[pOff + 1] = panel.ny;
+                cutoutBuf.normals[pOff + 2] = panel.nz;
+                cutoutBuf.uvs[uOff] = v[3] === 0 ? uv.u0 : uv.u1;
+                cutoutBuf.uvs[uOff + 1] = v[4] === 0 ? uv.vBottom : uv.vTop;
+                cutoutBuf.colors[pOff] = lum;
+                cutoutBuf.colors[pOff + 1] = lum;
+                cutoutBuf.colors[pOff + 2] = lum;
+                cutoutBuf.lights[uOff] = skyNorm;
+                cutoutBuf.lights[uOff + 1] = blkNorm;
+                pOff += 3;
+                uOff += 2;
+              }
+              const idxOff = cutoutBuf.indexCount;
+              cutoutBuf.indices[idxOff] = baseVert;
+              cutoutBuf.indices[idxOff + 1] = baseVert + 1;
+              cutoutBuf.indices[idxOff + 2] = baseVert + 2;
+              cutoutBuf.indices[idxOff + 3] = baseVert;
+              cutoutBuf.indices[idxOff + 4] = baseVert + 2;
+              cutoutBuf.indices[idxOff + 5] = baseVert + 3;
+              cutoutBuf.vertexCount += 4;
+              cutoutBuf.indexCount += 6;
+            }
+            continue;
+          }
+
           // 3. Cross-mesh plants (2 diagonal planes in cutoutBuf)
           if (def.isCross) {
             const uv = this.atlas.getUV(def.faces.top);
@@ -504,11 +554,13 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
             continue;
           }
 
-          // 4. Standard cubic blocks (and slightly inset Cactus)
+          // 4. Standard cubic blocks (and slightly inset Cactus / 15px Farmland)
           const isIce = id === BLOCK_IDS.ICE;
           const isTranslucent = def.isLiquid || def.isTransparent;
           const buf = isIce ? iceBuf : (isTranslucent ? waterBuf : (def.isCutout ? cutoutBuf : opaqueBuf));
           const waterTopDrop = def.isLiquid && sampleBlock(x, y + 1, z) !== BLOCK_IDS.WATER ? 0.12 : 0;
+          const farmlandDrop = def.isFarmland ? 0.0625 : 0;
+          const farmlandWet = def.isFarmland && (chunk.getMeta(x, y, z) > 0);
           const inset = def.inset || 0;
           const selfEmitNorm = def.lightEmission > 0 ? def.lightEmission / 15 : 0;
           const facingDir = def.directional ? (chunk.getMeta(x, y, z) & 3) : 2; // default south
@@ -524,7 +576,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
 
             if (def.isOpaque) {
               if (opaqueTable[neighborId] === 1) continue;
-            } else if (inset > 0) {
+            } else if (inset > 0 || farmlandDrop > 0) {
               if (face.ny !== 0 && (neighborId === id || opaqueTable[neighborId] === 1)) continue;
             } else if (def.isLiquid) {
               if (neighborId === id || neighborId === BLOCK_IDS.ICE || opaqueTable[neighborId] === 1) continue;
@@ -536,12 +588,13 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
 
             buf.ensureQuadCapacity();
 
-            // Support directional blocks (e.g. Jack o'Lantern front face)
+            // Support directional blocks (e.g. Jack o'Lantern front face) & wet Farmland top
             let faceKey = face.key;
             if (def.directional && face.ny === 0) {
               faceKey = DIR_FACE_KEYS[facingDir] === face.key ? 'south' : 'north';
             }
-            const uv = this.atlas.getUV(def.faces[faceKey]);
+            const tileName = (def.isFarmland && faceKey === 'top' && farmlandWet) ? 'farmland_wet' : def.faces[faceKey];
+            const uv = this.atlas.getUV(tileName);
             const u0 = uv.u0;
             const u1 = uv.u1;
             const v0 = uv.vBottom;
@@ -568,6 +621,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`
               let dz = corner[2];
 
               if (waterTopDrop > 0 && dy === 1) dy -= waterTopDrop;
+              if (farmlandDrop > 0 && dy === 1) dy -= farmlandDrop;
               if (inset > 0) {
                 dx = face.nx === 0 ? (dx === 0 ? inset : 1 - inset) : (face.nx > 0 ? 1 - inset : inset);
                 dz = face.nz === 0 ? (dz === 0 ? inset : 1 - inset) : (face.nz > 0 ? 1 - inset : inset);

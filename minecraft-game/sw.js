@@ -1,4 +1,4 @@
-const CACHE_NAME = 'minecraft-web-stage5-v1';
+const CACHE_NAME = 'minecraft-web-stage6-v1';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -37,6 +37,7 @@ const CORE_ASSETS = [
   './src/ui/Hotbar.js',
   './src/ui/InventoryUI.js',
   './src/ui/MobileControls.js',
+  './src/ui/VirtualMouse.js',
   './src/ui/Hud.js',
   './src/storage/SaveManager.js',
 ];

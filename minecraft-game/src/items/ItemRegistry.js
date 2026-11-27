@@ -20,6 +20,13 @@ const TOOL_TIERS = {
 };
 
 const ARMOR_TIERS = {
+  leather: {
+    label: 'Кожаный',
+    labelFem: 'Кожаная',
+    labelPlur: 'Кожаные',
+    durability: { helmet: 55, chestplate: 80, leggings: 75, boots: 65 },
+    defense: { helmet: 1, chestplate: 3, leggings: 2, boots: 1 },
+  },
   iron: {
     label: 'Железный',
     labelFem: 'Железная',
@@ -68,6 +75,8 @@ class ItemRegistryImpl {
       armorPoints: def.armorPoints ?? 0,
       attackDamage: def.attackDamage ?? 1,
       lightEmission: def.lightEmission ?? 0,
+      isFood: Boolean(def.foodStats),
+      foodStats: def.foodStats || null,
     };
     this.items.set(entry.id, entry);
     this.byKey.set(entry.key, entry);
@@ -88,10 +97,60 @@ class ItemRegistryImpl {
       { id: ITEM_IDS.FLINT, key: 'flint', name: 'Кремень', sprite: 'item_flint' },
       { id: ITEM_IDS.CLAY_BALL, key: 'clay_ball', name: 'Глина (ком)', sprite: 'item_clay_ball' },
       { id: ITEM_IDS.BRICK, key: 'brick', name: 'Кирпич', sprite: 'item_brick' },
-      { id: ITEM_IDS.APPLE, key: 'apple', name: 'Яблоко', sprite: 'item_apple' },
+      { id: ITEM_IDS.LEATHER, key: 'leather', name: 'Кожа', sprite: 'item_leather' },
+      { id: ITEM_IDS.WHEAT_SEEDS, key: 'wheat_seeds', name: 'Семена пшеницы', sprite: 'item_wheat_seeds' },
+      { id: ITEM_IDS.WHEAT, key: 'wheat', name: 'Пшеница', sprite: 'item_wheat' },
+      { id: ITEM_IDS.BOWL, key: 'bowl', name: 'Миска', sprite: 'item_bowl' },
+      { id: ITEM_IDS.RAW_COPPER, key: 'raw_copper', name: 'Рудная медь', sprite: 'item_raw_copper' },
+      { id: ITEM_IDS.COPPER_INGOT, key: 'copper_ingot', name: 'Медный слиток', sprite: 'item_copper_ingot' },
     ];
     for (const m of materials) {
       this._register({ ...m, category: 'material', maxStack: 64 });
+    }
+
+    // Foods (Stage 6)
+    const foods = [
+      { id: ITEM_IDS.APPLE, key: 'apple', name: 'Яблоко', sprite: 'item_apple', foodStats: { hunger: 4, saturation: 2.4 } },
+      {
+        id: ITEM_IDS.GOLDEN_APPLE,
+        key: 'golden_apple',
+        name: 'Золотое яблоко',
+        sprite: 'item_golden_apple',
+        foodStats: { hunger: 4, saturation: 9.6, canAlwaysEat: true, absorption: 4, regenTicks: 100 },
+      },
+      { id: ITEM_IDS.BREAD, key: 'bread', name: 'Хлеб', sprite: 'item_bread', foodStats: { hunger: 5, saturation: 6.0 } },
+      {
+        id: ITEM_IDS.MUSHROOM_STEW,
+        key: 'mushroom_stew',
+        name: 'Тушёные грибы',
+        sprite: 'item_mushroom_stew',
+        maxStack: 1,
+        foodStats: { hunger: 6, saturation: 7.2, returnItem: ITEM_IDS.BOWL },
+      },
+      { id: ITEM_IDS.RAW_PORKCHOP, key: 'raw_porkchop', name: 'Сырая свинина', sprite: 'item_raw_porkchop', foodStats: { hunger: 3, saturation: 1.8 } },
+      { id: ITEM_IDS.COOKED_PORKCHOP, key: 'cooked_porkchop', name: 'Жареная свинина', sprite: 'item_cooked_porkchop', foodStats: { hunger: 8, saturation: 12.8 } },
+      { id: ITEM_IDS.RAW_BEEF, key: 'raw_beef', name: 'Сырая говядина', sprite: 'item_raw_beef', foodStats: { hunger: 3, saturation: 1.8 } },
+      { id: ITEM_IDS.COOKED_BEEF, key: 'cooked_beef', name: 'Стейк', sprite: 'item_cooked_beef', foodStats: { hunger: 8, saturation: 12.8 } },
+      {
+        id: ITEM_IDS.RAW_CHICKEN,
+        key: 'raw_chicken',
+        name: 'Сырая курятина',
+        sprite: 'item_raw_chicken',
+        foodStats: { hunger: 2, saturation: 1.2, hungerDebuffChance: 0.3, hungerDebuffTicks: 600 },
+      },
+      { id: ITEM_IDS.COOKED_CHICKEN, key: 'cooked_chicken', name: 'Жареная курятина', sprite: 'item_cooked_chicken', foodStats: { hunger: 6, saturation: 7.2 } },
+      { id: ITEM_IDS.RAW_MUTTON, key: 'raw_mutton', name: 'Сырая баранина', sprite: 'item_raw_mutton', foodStats: { hunger: 2, saturation: 1.2 } },
+      { id: ITEM_IDS.COOKED_MUTTON, key: 'cooked_mutton', name: 'Жареная баранина', sprite: 'item_cooked_mutton', foodStats: { hunger: 6, saturation: 9.6 } },
+      {
+        id: ITEM_IDS.ROTTEN_FLESH,
+        key: 'rotten_flesh',
+        name: 'Гнилая плоть',
+        sprite: 'item_rotten_flesh',
+        foodStats: { hunger: 4, saturation: 0.8, hungerDebuffChance: 0.8, hungerDebuffTicks: 600 },
+      },
+    ];
+    for (const f of foods) {
+      this._register({ ...f, category: 'food', maxStack: f.maxStack ?? 64 });
     }
 
     // Tools: 5 tiers x 5 types
@@ -145,6 +204,11 @@ class ItemRegistryImpl {
 
     // Armor sets
     const armorSpecs = [
+      { id: ITEM_IDS.LEATHER_HELMET, tier: 'leather', slot: 'helmet', key: 'leather_helmet', name: 'Кожаный шлем' },
+      { id: ITEM_IDS.LEATHER_CHESTPLATE, tier: 'leather', slot: 'chestplate', key: 'leather_chestplate', name: 'Кожаная туника' },
+      { id: ITEM_IDS.LEATHER_LEGGINGS, tier: 'leather', slot: 'leggings', key: 'leather_leggings', name: 'Кожаные штаны' },
+      { id: ITEM_IDS.LEATHER_BOOTS, tier: 'leather', slot: 'boots', key: 'leather_boots', name: 'Кожаные ботинки' },
+
       { id: ITEM_IDS.IRON_HELMET, tier: 'iron', slot: 'helmet', key: 'iron_helmet', name: 'Железный шлем' },
       { id: ITEM_IDS.IRON_CHESTPLATE, tier: 'iron', slot: 'chestplate', key: 'iron_chestplate', name: 'Железный нагрудник' },
       { id: ITEM_IDS.IRON_LEGGINGS, tier: 'iron', slot: 'leggings', key: 'iron_leggings', name: 'Железные поножи' },
@@ -306,6 +370,14 @@ class ItemRegistryImpl {
     if (maxStack <= 1) return false;
     if ((a.maxDurability || 0) > 0 || (b.maxDurability || 0) > 0) return false;
     return true;
+  }
+
+  isFood(id) {
+    return Boolean(this.get(id)?.isFood);
+  }
+
+  getFoodStats(id) {
+    return this.get(id)?.foodStats || null;
   }
 
   getHeldLightEmission(stack) {

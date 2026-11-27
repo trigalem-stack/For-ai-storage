@@ -175,7 +175,8 @@ body.pseudo-fullscreen {
   display: flex;
   align-items: center;
   gap: 6px;
-  z-index: 30;
+  z-index: 42;
+  pointer-events: auto;
 }
 
 .mc-hud-btn {
@@ -1377,49 +1378,387 @@ body.pseudo-fullscreen {
   color: #ffffff;
 }
 
-@media (max-width: 720px), (max-height: 480px) {
+/* =====================================================================
+   Stage 6: Survival Vitals HUD, Vignettes, Death Screen, Mode Picker,
+   Pojav Virtual Mouse & Responsive No-Scroll Inventory
+   ===================================================================== */
+
+#damage-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 16;
+  opacity: 0;
+  transition: opacity 0.14s ease-out;
+  box-shadow: inset 0 0 90px 28px rgba(215, 22, 22, 0.72);
+}
+
+#damage-vignette.flash {
+  opacity: 1;
+}
+
+#damage-vignette.low-health {
+  opacity: 0.45;
+  animation: lowHealthPulse 1.15s infinite ease-in-out;
+}
+
+#damage-vignette.low-health.flash {
+  opacity: 1;
+}
+
+@keyframes lowHealthPulse {
+  0%, 100% { box-shadow: inset 0 0 65px 18px rgba(185, 16, 16, 0.35); }
+  50% { box-shadow: inset 0 0 110px 36px rgba(220, 20, 20, 0.68); }
+}
+
+#suffocation-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 17;
+  background: radial-gradient(circle at center, rgba(16, 14, 10, 0.35) 20%, rgba(12, 10, 8, 0.88) 100%);
+  box-shadow: inset 0 0 100px 45px rgba(0, 0, 0, 0.78);
+}
+
+/* Survival Vitals Bar positioned neatly above Hotbar */
+#survival-hud {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 52px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 396px;
+  max-width: 94vw;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 27;
+}
+
+.vitals-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vitals-left {
+  align-items: flex-start;
+}
+
+.vitals-right {
+  align-items: flex-end;
+}
+
+.vitals-row {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.85));
+}
+
+.v-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.vitals-row.vitals-hurting .v-icon svg {
+  filter: drop-shadow(0 0 1px #ffffff) brightness(1.3);
+}
+
+.vitals-row.vitals-shake .v-icon {
+  animation: vitalsShake 0.25s infinite alternate;
+}
+
+.vitals-row.vitals-shake .v-icon:nth-child(even) {
+  animation-delay: 0.12s;
+}
+
+.vitals-row.vitals-hunger-shake .v-icon {
+  animation: vitalsShake 0.32s infinite alternate;
+}
+
+@keyframes vitalsShake {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-2px); }
+}
+
+/* Death Screen */
+#death-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(135, 16, 16, 0.56);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 65;
+  padding: 16px;
+}
+
+.death-card {
+  width: min(400px, 92vw);
+  text-align: center;
+  padding: 24px 20px;
+  background: rgba(20, 14, 14, 0.84);
+  border: 3px solid #2b0f0f;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.72);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.death-card h1 {
+  margin: 0;
+  font-size: 28px;
+  color: #ff5555;
+  text-shadow: 2px 2px 0 #2b0a0a;
+}
+
+.death-reason {
+  margin: 0;
+  font-size: 14px;
+  color: #f4d6d6;
+}
+
+.death-score {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffd866;
+}
+
+.death-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+/* Mode Picker in Create World Box */
+.mode-picker-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.mode-pick-btn {
+  padding: 9px 10px;
+  font-size: 13px;
+  background: #3a404a;
+  opacity: 0.82;
+}
+
+.mode-pick-btn.active {
+  background: #4c9a2a;
+  opacity: 1;
+  border-color: #fff;
+}
+
+/* PojavLauncher Virtual Mouse & Floating Action Pad */
+#virtual-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 28px;
+  transform: translate(0, 0);
+  pointer-events: none;
+  z-index: 95;
+  filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, 0.65));
+}
+
+#vm-action-bar {
+  position: fixed;
+  left: max(8px, var(--safe-left));
+  bottom: max(12px, var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 90;
+  pointer-events: auto;
+}
+
+.vm-btn {
+  min-width: 72px;
+  height: 36px;
+  padding: 0 10px;
+  border: 2px solid #16181d;
+  border-top-color: rgba(255, 255, 255, 0.42);
+  background: rgba(28, 34, 44, 0.9);
+  color: #ffffff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  border-radius: 5px;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+}
+
+.vm-btn:active,
+.vm-btn.active {
+  background: #5cb832;
+  border-color: #ffffff;
+}
+
+/* Mobile Responsive Inventory (No-Scroll Fit across Phones & Tablets) */
+@media (max-width: 680px) {
+  #survival-hud {
+    bottom: calc(var(--safe-bottom) + 42px);
+    width: 315px;
+  }
+  .v-icon svg {
+    width: 11px;
+    height: 11px;
+  }
+}
+
+@media (max-height: 450px) {
+  #survival-hud {
+    bottom: calc(var(--safe-bottom) + 41px);
+    width: 320px;
+  }
+  .v-icon svg {
+    width: 11px;
+    height: 11px;
+  }
+}
+
+@media (max-width: 780px), (max-height: 540px) {
   .inv-shell {
-    flex-direction: column-reverse;
+    flex-direction: row;
     align-items: center;
+    justify-content: center;
     gap: 6px;
+    max-width: 98vw;
+    max-height: 96dvh;
   }
   .inv-recipe-drawer {
-    width: min(468px, 95vw);
-    max-height: 150px;
-  }
-  .inv-recipe-list {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .inv-main-modal {
-    padding: 9px 10px;
+    width: clamp(148px, 31vw, 220px);
+    max-height: 94dvh;
+    padding: 7px;
     gap: 5px;
   }
-  .inv-slot,
-  .inv-slot-grid-9 {
-    --slot-sz: 34px;
+  .inv-recipe-list {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .inv-main-modal {
+    width: auto;
+    max-width: 96vw;
+    max-height: 95dvh;
+    padding: 7px 9px;
+    gap: 4px;
+    overflow: hidden;
+  }
+  .inv-header h2 {
+    font-size: 13px;
+  }
+  .inv-tool-btn {
+    height: 24px;
+    padding: 0 6px;
+    font-size: 10.5px;
   }
   .inv-slot {
-    width: 34px;
-    height: 34px;
+    width: 31px;
+    height: 31px;
+  }
+  .inv-slot-output {
+    width: 36px;
+    height: 36px;
   }
   .inv-slot-icon {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
+  }
+  .inv-slot-count {
+    font-size: 9.5px;
   }
   .inv-slot-grid-9,
   .inv-chest-grid {
-    grid-template-columns: repeat(9, 34px);
+    grid-template-columns: repeat(9, 31px);
+    gap: 2px;
   }
   .inv-craft-grid-2 {
-    grid-template-columns: repeat(2, 34px);
+    grid-template-columns: repeat(2, 31px);
+    gap: 2px;
   }
   .inv-craft-grid-3 {
-    grid-template-columns: repeat(3, 34px);
+    grid-template-columns: repeat(3, 31px);
+    gap: 2px;
   }
   .inv-doll-frame,
   #inv-player-canvas {
-    width: 96px;
-    height: 128px;
+    width: 84px;
+    height: 112px;
+  }
+  .inv-creative-catalog {
+    max-height: 112px;
   }
 }
+
+@media (max-height: 410px) {
+  .inv-main-modal {
+    padding: 5px 7px;
+    gap: 3px;
+  }
+  .inv-section-label {
+    display: none;
+  }
+  .inv-slot {
+    width: 28px;
+    height: 28px;
+  }
+  .inv-slot-output {
+    width: 32px;
+    height: 32px;
+  }
+  .inv-slot-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .inv-slot-grid-9,
+  .inv-chest-grid {
+    grid-template-columns: repeat(9, 28px);
+    gap: 2px;
+  }
+  .inv-craft-grid-2 {
+    grid-template-columns: repeat(2, 28px);
+    gap: 2px;
+  }
+  .inv-craft-grid-3 {
+    grid-template-columns: repeat(3, 28px);
+    gap: 2px;
+  }
+  .inv-doll-frame,
+  #inv-player-canvas {
+    width: 72px;
+    height: 94px;
+  }
+  .inv-creative-catalog {
+    max-height: 94px;
+  }
+  .vm-btn {
+    min-width: 60px;
+    height: 30px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+  .inv-shell {
+    flex-direction: column-reverse;
+  }
+  .inv-recipe-drawer {
+    width: min(330px, 95vw);
+    max-height: 135px;
+  }
+  .inv-recipe-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 

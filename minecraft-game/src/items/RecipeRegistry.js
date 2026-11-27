@@ -162,6 +162,7 @@ class RecipeRegistryImpl {
 
     // 12. Armor sets (Iron, Golden, Diamond)
     const armorSets = [
+      { tier: 'leather', mat: ITEM_IDS.LEATHER, prefix: 'LEATHER' },
       { tier: 'iron', mat: ITEM_IDS.IRON_INGOT, prefix: 'IRON' },
       { tier: 'golden', mat: ITEM_IDS.GOLD_INGOT, prefix: 'GOLDEN' },
       { tier: 'diamond', mat: ITEM_IDS.DIAMOND, prefix: 'DIAMOND' },
@@ -177,17 +178,39 @@ class RecipeRegistryImpl {
     this._addShaped('bucket', ['I I', ' I '], { I: ITEM_IDS.IRON_INGOT }, { id: ITEM_IDS.BUCKET, count: 1 }, { category: 'tools' });
     this._addShaped('shears', [' I', 'I '], { I: ITEM_IDS.IRON_INGOT }, { id: ITEM_IDS.SHEARS, count: 1 }, { category: 'tools', mirror: true });
     this._addShapeless('flint_and_steel', [ITEM_IDS.IRON_INGOT, ITEM_IDS.FLINT], { id: ITEM_IDS.FLINT_AND_STEEL, count: 1 }, 'tools');
+
+    // 14. Stage 6 Foods, Farming & Decoration
+    this._addShaped('bread', ['WWW'], { W: ITEM_IDS.WHEAT }, { id: ITEM_IDS.BREAD, count: 1 }, { category: 'food' });
+    this._addShaped('bowl', ['P P', ' P '], { P: ANY_PLANKS }, { id: ITEM_IDS.BOWL, count: 4 }, { category: 'food' });
+    this._addShapeless('mushroom_stew', [ITEM_IDS.BOWL, BLOCK_IDS.RED_MUSHROOM, BLOCK_IDS.BROWN_MUSHROOM], { id: ITEM_IDS.MUSHROOM_STEW, count: 1 }, 'food');
+    this._addShaped('golden_apple', ['GGG', 'GAG', 'GGG'], { G: ITEM_IDS.GOLD_INGOT, A: ITEM_IDS.APPLE }, { id: ITEM_IDS.GOLDEN_APPLE, count: 1 }, { category: 'food' });
+
+    this._addShaped('hay_bale', ['WWW', 'WWW', 'WWW'], { W: ITEM_IDS.WHEAT }, { id: BLOCK_IDS.HAY_BALE, count: 1 }, { category: 'building' });
+    this._addShapeless('wheat_from_hay', [BLOCK_IDS.HAY_BALE], { id: ITEM_IDS.WHEAT, count: 9 }, 'building');
+
+    this._addShaped('copper_block', ['CCC', 'CCC', 'CCC'], { C: ITEM_IDS.COPPER_INGOT }, { id: BLOCK_IDS.COPPER_BLOCK, count: 1 }, { category: 'building' });
+    this._addShapeless('copper_ingot_from_block', [BLOCK_IDS.COPPER_BLOCK], { id: ITEM_IDS.COPPER_INGOT, count: 9 }, 'building');
+    this._addShaped('bricks_block', ['BB', 'BB'], { B: ITEM_IDS.BRICK }, { id: BLOCK_IDS.BRICKS, count: 1 }, { category: 'building' });
+    this._addShaped('bookshelf', ['PPP', 'CCC', 'PPP'], { P: ANY_PLANKS, C: ANY_PLANKS }, { id: BLOCK_IDS.BOOKSHELF, count: 1 }, { category: 'building' });
   }
 
   _registerSmelting() {
     this.smelting.set(BLOCK_IDS.IRON_ORE, { id: ITEM_IDS.IRON_INGOT, count: 1, cookTicks: FURNACE_COOK_TICKS });
     this.smelting.set(BLOCK_IDS.GOLD_ORE, { id: ITEM_IDS.GOLD_INGOT, count: 1, cookTicks: FURNACE_COOK_TICKS });
+    this.smelting.set(BLOCK_IDS.COPPER_ORE, { id: ITEM_IDS.COPPER_INGOT, count: 1, cookTicks: FURNACE_COOK_TICKS });
+    this.smelting.set(ITEM_IDS.RAW_COPPER, { id: ITEM_IDS.COPPER_INGOT, count: 1, cookTicks: FURNACE_COOK_TICKS });
     this.smelting.set(BLOCK_IDS.SAND, { id: BLOCK_IDS.GLASS, count: 1, cookTicks: FURNACE_COOK_TICKS });
     this.smelting.set(BLOCK_IDS.COBBLESTONE, { id: BLOCK_IDS.STONE, count: 1, cookTicks: FURNACE_COOK_TICKS });
+    this.smelting.set(BLOCK_IDS.STONE, { id: BLOCK_IDS.SMOOTH_STONE, count: 1, cookTicks: FURNACE_COOK_TICKS });
     this.smelting.set(BLOCK_IDS.OAK_LOG, { id: ITEM_IDS.CHARCOAL, count: 1, cookTicks: FURNACE_COOK_TICKS });
     this.smelting.set(BLOCK_IDS.BIRCH_LOG, { id: ITEM_IDS.CHARCOAL, count: 1, cookTicks: FURNACE_COOK_TICKS });
     this.smelting.set(BLOCK_IDS.SPRUCE_LOG, { id: ITEM_IDS.CHARCOAL, count: 1, cookTicks: FURNACE_COOK_TICKS });
     this.smelting.set(ITEM_IDS.CLAY_BALL, { id: ITEM_IDS.BRICK, count: 1, cookTicks: FURNACE_COOK_TICKS });
+    // Stage 6 meat cooking
+    this.smelting.set(ITEM_IDS.RAW_PORKCHOP, { id: ITEM_IDS.COOKED_PORKCHOP, count: 1, cookTicks: FURNACE_COOK_TICKS });
+    this.smelting.set(ITEM_IDS.RAW_BEEF, { id: ITEM_IDS.COOKED_BEEF, count: 1, cookTicks: FURNACE_COOK_TICKS });
+    this.smelting.set(ITEM_IDS.RAW_CHICKEN, { id: ITEM_IDS.COOKED_CHICKEN, count: 1, cookTicks: FURNACE_COOK_TICKS });
+    this.smelting.set(ITEM_IDS.RAW_MUTTON, { id: ITEM_IDS.COOKED_MUTTON, count: 1, cookTicks: FURNACE_COOK_TICKS });
   }
 
   _registerFuels() {

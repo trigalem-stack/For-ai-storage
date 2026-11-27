@@ -15,6 +15,7 @@ export const ITEM_IDS = Object.freeze({
   CLAY_BALL: 266,
   BRICK: 267,
   APPLE: 268,
+  LEATHER: 269,
 
   // Tools (5 tiers x 5 types)
   WOODEN_PICKAXE: 270,
@@ -47,7 +48,7 @@ export const ITEM_IDS = Object.freeze({
   DIAMOND_SWORD: 293,
   DIAMOND_HOE: 294,
 
-  // Armor (Iron, Golden, Diamond)
+  // Armor (Iron, Golden, Diamond, Leather)
   IRON_HELMET: 300,
   IRON_CHESTPLATE: 301,
   IRON_LEGGINGS: 302,
@@ -63,8 +64,32 @@ export const ITEM_IDS = Object.freeze({
   DIAMOND_LEGGINGS: 310,
   DIAMOND_BOOTS: 311,
 
+  LEATHER_HELMET: 312,
+  LEATHER_CHESTPLATE: 313,
+  LEATHER_LEGGINGS: 314,
+  LEATHER_BOOTS: 315,
+
   // Utility tools
   BUCKET: 320,
   FLINT_AND_STEEL: 321,
   SHEARS: 322,
+
+  // Stage 6 Foods, Farming & Copper
+  GOLDEN_APPLE: 323,
+  WHEAT_SEEDS: 324,
+  WHEAT: 325,
+  BREAD: 326,
+  BOWL: 327,
+  MUSHROOM_STEW: 328,
+  RAW_PORKCHOP: 329,
+  COOKED_PORKCHOP: 330,
+  RAW_BEEF: 331,
+  COOKED_BEEF: 332,
+  RAW_CHICKEN: 333,
+  COOKED_CHICKEN: 334,
+  RAW_MUTTON: 335,
+  COOKED_MUTTON: 336,
+  ROTTEN_FLESH: 337,
+  RAW_COPPER: 338,
+  COPPER_INGOT: 339,
 });

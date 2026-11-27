@@ -66,6 +66,8 @@ export class FirstPersonHand {
     this.swingDuration = 0.24;
     this.isSwinging = false;
     this.isMining = false;
+    this.isEating = false;
+    this.eatTime = 0;
   }
 
   // Alias preserved for Stage 2/4 tests
@@ -156,15 +158,15 @@ export class FirstPersonHand {
     const skyCurve = Math.pow(0.82, (1 - Math.min(1, Math.max(0, skyLevel / 15))) * 15);
     const sunCurve = Math.pow(Math.max(0.001, sunIntensity), 0.92);
     const blkEff = Math.min(1, Math.max(0, Math.max(blockLevel, heldEmit * 0.6) / 15));
-    const blkCurve = Math.pow(0.8, (1 - blkEff) * 15);
+    const blkCurve = Math.pow(0.87, (1 - blkEff) * 15);
 
     const sr = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.r : 1);
     const sg = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.g : 1);
     const sb = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.b : 1);
 
-    const br = Math.pow(Math.max(0.001, blkCurve), 2.0) * (torchTint ? torchTint.r : 1);
-    const bg = Math.pow(Math.max(0.001, blkCurve), 2.0) * (torchTint ? torchTint.g : 0.78);
-    const bb = Math.pow(Math.max(0.001, blkCurve), 2.0) * (torchTint ? torchTint.b : 0.48);
+    const br = Math.pow(Math.max(0.001, blkCurve), 1.32) * (torchTint ? torchTint.r : 1);
+    const bg = Math.pow(Math.max(0.001, blkCurve), 1.32) * (torchTint ? torchTint.g : 0.90);
+    const bb = Math.pow(Math.max(0.001, blkCurve), 1.32) * (torchTint ? torchTint.b : 0.72);
 
     const minL = 0.07;
     const ar = Math.min(1, Math.max(minL, sr, br));
@@ -188,6 +190,14 @@ export class FirstPersonHand {
     }
   }
 
+  setEatingActive(active) {
+    const next = Boolean(active);
+    if (next && !this.isEating) {
+      this.eatTime = 0;
+    }
+    this.isEating = next;
+  }
+
   triggerSwing() {
     this.isSwinging = true;
     this.swingTime = 0;
@@ -206,6 +216,23 @@ export class FirstPersonHand {
     const decay = Math.exp(-12 * dt);
     this.swayX *= decay;
     this.swayY *= decay;
+
+    if (this.isEating && this.currentHeldId > 0) {
+      this.eatTime += dt;
+      const chew = Math.sin(this.eatTime * 28.0);
+      const chewAlt = Math.cos(this.eatTime * 14.0);
+      this.pivot.position.set(
+        0.24 + this.swayX * 0.5 + chewAlt * 0.015,
+        -0.25 + this.swayY * 0.5 + chew * 0.042,
+        -0.58 - Math.abs(chew) * 0.03
+      );
+      this.pivot.rotation.set(
+        0.18 + chew * 0.22,
+        -0.38 + chewAlt * 0.12,
+        0.22
+      );
+      return;
+    }
 
     if (this.isSwinging) {
       this.swingTime += dt;

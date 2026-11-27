@@ -60,6 +60,23 @@ export const BLOCK_IDS = Object.freeze({
   GOLD_BLOCK: 54,
   DIAMOND_BLOCK: 55,
   WOOL_WHITE: 56,
+  FARMLAND: 57,
+  WHEAT_0: 58,
+  WHEAT_1: 59,
+  WHEAT_2: 60,
+  WHEAT_3: 61,
+  WHEAT_4: 62,
+  WHEAT_5: 63,
+  WHEAT_6: 64,
+  WHEAT_7: 65,
+  HAY_BALE: 66,
+  COPPER_ORE: 67,
+  COPPER_BLOCK: 68,
+  DEEPSLATE: 69,
+  SMOOTH_STONE: 70,
+  BRICKS: 71,
+  BOOKSHELF: 72,
+  MOSSY_COBBLESTONE: 73,
 });
 
 class BlockRegistryImpl {
@@ -78,9 +95,11 @@ class BlockRegistryImpl {
     const isTorch = Boolean(def.isTorch);
     const isBed = Boolean(def.isBed);
     const isLadder = Boolean(def.isLadder);
+    const isCrop = Boolean(def.isCrop);
+    const isFarmland = Boolean(def.isFarmland);
     const isOpaque = def.isOpaque !== undefined
       ? def.isOpaque
-      : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !isLadder && !(def.inset > 0));
+      : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !isLadder && !isCrop && !isFarmland && !(def.inset > 0));
     const lightOpacity = def.lightOpacity !== undefined
       ? def.lightOpacity
       : (isOpaque ? 15 : 0);
@@ -94,17 +113,20 @@ class BlockRegistryImpl {
       isTorch,
       isBed,
       isLadder,
+      isCrop,
+      isFarmland,
+      cropStage: def.cropStage ?? -1,
       isClimbable: Boolean(def.isClimbable || isLadder),
       directional: Boolean(def.directional),
       interactiveType: def.interactiveType || null, // 'crafting' | 'furnace' | 'chest' | 'bed'
-      isSolid: def.isSolid !== undefined ? def.isSolid : (!def.isAir && !def.isLiquid && !isCross && !isTorch && !isLadder),
+      isSolid: def.isSolid !== undefined ? def.isSolid : (!def.isAir && !def.isLiquid && !isCross && !isTorch && !isLadder && !isCrop),
       isOpaque,
       isTransparent: Boolean(def.isTransparent || def.isLiquid),
-      isCutout: Boolean(def.isCutout || isCross || isTorch || isBed || isLadder),
+      isCutout: Boolean(def.isCutout || isCross || isTorch || isBed || isLadder || isCrop),
       isLiquid: Boolean(def.isLiquid),
       occludesAO: def.occludesAO !== undefined
         ? def.occludesAO
-        : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !isLadder && !(def.inset > 0)),
+        : (!def.isAir && !def.isTransparent && !def.isCutout && !def.isLiquid && !isCross && !isTorch && !isBed && !isLadder && !isCrop && !isFarmland && !(def.inset > 0)),
       fallsWithGravity: Boolean(def.fallsWithGravity),
       slipperiness: def.slipperiness ?? 0.0,
       inset: def.inset ?? 0,
@@ -153,7 +175,11 @@ class BlockRegistryImpl {
 
   isTargetable(id) {
     const b = this.byId[id];
-    return b ? (b.isSolid || b.isCross || b.isTorch || b.isBed || b.isLadder) : false;
+    return b ? (b.isSolid || b.isCross || b.isTorch || b.isBed || b.isLadder || b.isCrop) : false;
+  }
+
+  isCrop(id) {
+    return id >= BLOCK_IDS.WHEAT_0 && id <= BLOCK_IDS.WHEAT_7;
   }
 
   isTorch(id) {
@@ -256,12 +282,28 @@ class BlockRegistryImpl {
       return [{ id: Math.random() < 0.1 ? ITEM_IDS.FLINT : BLOCK_IDS.GRAVEL, count: 1 }];
     }
 
-    // Leaves drop occasional sticks / oak apples
+    // Leaves drop occasional sticks / oak apples (~5% apple on oak leaves)
     if (def.id === BLOCK_IDS.OAK_LEAVES || def.id === BLOCK_IDS.BIRCH_LEAVES || def.id === BLOCK_IDS.SPRUCE_LEAVES) {
       const drops = [];
       if (Math.random() < 0.08) drops.push({ id: ITEM_IDS.STICK, count: 1 });
-      if (def.id === BLOCK_IDS.OAK_LEAVES && Math.random() < 0.025) drops.push({ id: ITEM_IDS.APPLE, count: 1 });
+      if (def.id === BLOCK_IDS.OAK_LEAVES && Math.random() < 0.05) drops.push({ id: ITEM_IDS.APPLE, count: 1 });
       return drops;
+    }
+
+    // Tall Grass drops Wheat Seeds (~16%)
+    if (def.id === BLOCK_IDS.TALL_GRASS) {
+      return Math.random() < 0.16 ? [{ id: ITEM_IDS.WHEAT_SEEDS, count: 1 }] : [];
+    }
+
+    // Wheat crops: immature gives 1 seeds, mature (stage 7) gives 1 Wheat + 1..3 Seeds
+    if (def.isCrop) {
+      if (def.cropStage >= 7) {
+        return [
+          { id: ITEM_IDS.WHEAT, count: 1 },
+          { id: ITEM_IDS.WHEAT_SEEDS, count: 1 + Math.floor(Math.random() * 3) },
+        ];
+      }
+      return [{ id: ITEM_IDS.WHEAT_SEEDS, count: 1 }];
     }
 
     if (def.dropId <= 0) return [];
@@ -275,7 +317,7 @@ class BlockRegistryImpl {
 
   getPlaceableBlocks() {
     return this.byId.filter(
-      (b) => b && !b.isAir && !b.isLiquid && b.id !== BLOCK_IDS.BEDROCK && b.id !== BLOCK_IDS.BED_HEAD && b.id !== BLOCK_IDS.FURNACE_LIT
+      (b) => b && !b.isAir && !b.isLiquid && !b.isCrop && b.id !== BLOCK_IDS.BEDROCK && b.id !== BLOCK_IDS.BED_HEAD && b.id !== BLOCK_IDS.FURNACE_LIT
     );
   }
 
@@ -1090,6 +1132,157 @@ class BlockRegistryImpl {
       hardness: 0.8,
       preferredTool: 'shears',
       faces: this._allFaces('wool_white'),
+    });
+
+    // Stage 6 Farming, Crops, Ores & Natural Stone Variants
+    this.register({
+      id: BLOCK_IDS.FARMLAND,
+      key: 'farmland',
+      name: 'Грядка',
+      materialType: 'dirt',
+      isFarmland: true,
+      isSolid: true,
+      isOpaque: false,
+      occludesAO: false,
+      hardness: 0.6,
+      preferredTool: 'shovel',
+      dropId: BLOCK_IDS.DIRT,
+      faces: {
+        top: 'farmland_dry',
+        bottom: 'dirt',
+        north: 'dirt',
+        south: 'dirt',
+        east: 'dirt',
+        west: 'dirt',
+      },
+    });
+
+    for (let st = 0; st <= 7; st++) {
+      this.register({
+        id: BLOCK_IDS.WHEAT_0 + st,
+        key: `wheat_${st}`,
+        name: st === 7 ? 'Пшеница (спелая)' : `Пшеница (рост ${st})`,
+        materialType: 'plant',
+        isCrop: true,
+        cropStage: st,
+        isSolid: false,
+        isOpaque: false,
+        isCutout: true,
+        occludesAO: false,
+        lightOpacity: 0,
+        hardness: 0,
+        dropId: st === 7 ? ITEM_IDS.WHEAT : ITEM_IDS.WHEAT_SEEDS,
+        faces: this._allFaces(`wheat_stage_${st}`),
+      });
+    }
+
+    this.register({
+      id: BLOCK_IDS.HAY_BALE,
+      key: 'hay_bale',
+      name: 'Сноп сена',
+      materialType: 'plant',
+      hardness: 0.5,
+      preferredTool: 'hoe',
+      faces: {
+        top: 'hay_bale_top',
+        bottom: 'hay_bale_top',
+        north: 'hay_bale_side',
+        south: 'hay_bale_side',
+        east: 'hay_bale_side',
+        west: 'hay_bale_side',
+      },
+    });
+
+    this.register({
+      id: BLOCK_IDS.COPPER_ORE,
+      key: 'copper_ore',
+      name: 'Медная руда',
+      materialType: 'stone',
+      hardness: 3.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 2,
+      dropId: ITEM_IDS.RAW_COPPER,
+      dropMin: 2,
+      dropMax: 4,
+      faces: this._allFaces('copper_ore'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.COPPER_BLOCK,
+      key: 'copper_block',
+      name: 'Медный блок',
+      materialType: 'stone',
+      hardness: 3.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 2,
+      faces: this._allFaces('copper_block'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.DEEPSLATE,
+      key: 'deepslate',
+      name: 'Глубинный сланец',
+      materialType: 'stone',
+      hardness: 3.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 1,
+      faces: this._allFaces('deepslate'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.SMOOTH_STONE,
+      key: 'smooth_stone',
+      name: 'Гладкий камень',
+      materialType: 'stone',
+      hardness: 2.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 1,
+      faces: this._allFaces('smooth_stone'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.BRICKS,
+      key: 'bricks',
+      name: 'Кирпичный блок',
+      materialType: 'stone',
+      hardness: 2.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 1,
+      faces: this._allFaces('bricks'),
+    });
+
+    this.register({
+      id: BLOCK_IDS.BOOKSHELF,
+      key: 'bookshelf',
+      name: 'Книжная полка',
+      materialType: 'wood',
+      hardness: 1.5,
+      preferredTool: 'axe',
+      faces: {
+        top: 'oak_planks',
+        bottom: 'oak_planks',
+        north: 'bookshelf',
+        south: 'bookshelf',
+        east: 'bookshelf',
+        west: 'bookshelf',
+      },
+    });
+
+    this.register({
+      id: BLOCK_IDS.MOSSY_COBBLESTONE,
+      key: 'mossy_cobblestone',
+      name: 'Замшелый булыжник',
+      materialType: 'stone',
+      hardness: 2.0,
+      requiresTool: true,
+      preferredTool: 'pickaxe',
+      minToolTier: 1,
+      faces: this._allFaces('mossy_cobblestone'),
     });
   }
 }

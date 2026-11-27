@@ -1,6 +1,6 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { BlockRegistry } from '../blocks/BlockRegistry.js';
-import { ITEM_DROP_PLAYER_DELAY, FACE_SHADE, MAX_STACK_DEFAULT } from '../constants.js';
+import { ITEM_DROP_PLAYER_DELAY, ITEM_DROP_DEATH_LIFETIME, FACE_SHADE, MAX_STACK_DEFAULT } from '../constants.js';
 import { moveAABB } from '../physics/AABBPhysics.js';
 import { ItemRegistry } from '../items/ItemRegistry.js';
 import { getExtrudedTileGeometry } from '../textures/ExtrudedItemMesh.js';
@@ -12,7 +12,7 @@ const PICKUP_DELAY_DEFAULT = 0.22;
 const MAGNET_RADIUS = 1.85;
 const PICKUP_RADIUS = 0.54;
 const MERGE_RADIUS = 1.1;
-const MAX_DROPPED_ITEMS = 120;
+const MAX_DROPPED_ITEMS = 160;
 
 const CUBE_FACES = [
   { key: 'top', nx: 0, ny: 1, nz: 0, shade: FACE_SHADE.TOP, verts: [[-1, 1, 1], [1, 1, 1], [1, 1, -1], [-1, 1, -1]] },
@@ -57,8 +57,8 @@ export function buildBlockItemGeometry(atlas, itemId, scale = 1.0) {
     indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   };
 
-  // 1. Flat sprite item for Cross Plants & Ladders
-  if (def.isCross || def.isLadder) {
+  // 1. Flat sprite item for Cross Plants, Crops & Ladders
+  if (def.isCross || def.isLadder || def.isCrop) {
     const uv = atlas.getUV(def.faces.top);
     const h = 0.54 * scale;
     const zOff = 0.015 * scale;
@@ -174,7 +174,11 @@ export class ItemEntity {
     this.x = x;
     this.y = y;
     this.z = z;
-    if (options.throwDir) {
+    if (options.velocity) {
+      this.vx = options.velocity.x;
+      this.vy = options.velocity.y;
+      this.vz = options.velocity.z;
+    } else if (options.throwDir) {
       this.vx = options.throwDir.x * 4.4 + (Math.random() - 0.5) * 0.4;
       this.vy = options.throwDir.y * 2.5 + 2.2;
       this.vz = options.throwDir.z * 4.4 + (Math.random() - 0.5) * 0.4;
@@ -264,20 +268,48 @@ export class ItemEntityManager {
       meta,
       pickupDelay: options.pickupDelay ?? PICKUP_DELAY_DEFAULT,
       throwDir: options.throwDir || null,
+      velocity: options.velocity || null,
     });
     this.entities.push(entity);
     this.scene.add(entity.mesh);
     return entity;
   }
 
-  spawnPlayerDrop(stack, player, lookDir) {
+  spawnPlayerDrop(stack, arg2, arg3, arg4, arg5) {
     if (!stack || !stack.id || stack.count <= 0) return null;
-    const sx = player.x + lookDir.x * 0.6;
-    const sy = player.y + 1.25;
-    const sz = player.z + lookDir.z * 0.6;
+    let sx;
+    let sy;
+    let sz;
+    let dir;
+    if (typeof arg2 === 'number') {
+      sx = arg2;
+      sy = arg3;
+      sz = arg4;
+      dir = arg5 || { x: 0, y: 0, z: -1 };
+    } else {
+      const player = arg2;
+      dir = arg3 || { x: 0, y: 0, z: -1 };
+      sx = player.x + dir.x * 0.6;
+      sy = player.y + 1.25;
+      sz = player.z + dir.z * 0.6;
+    }
     return this.spawnDrop(stack, sx, sy, sz, stack.count, {
       pickupDelay: ITEM_DROP_PLAYER_DELAY,
-      throwDir: lookDir,
+      throwDir: dir,
+    });
+  }
+
+  spawnDeathDrop(stack, x, y, z) {
+    if (!stack || !stack.id || stack.count <= 0) return null;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.6 + Math.random() * 2.4;
+    return this.spawnDrop(stack, x, y + 0.9, z, stack.count, {
+      pickupDelay: 0.75,
+      velocity: {
+        x: Math.cos(angle) * speed,
+        y: 3.1 + Math.random() * 2.0,
+        z: Math.sin(angle) * speed,
+      },
     });
   }
 
@@ -295,7 +327,7 @@ export class ItemEntityManager {
       }
 
       item.age += dt;
-      if (item.age > 300) {
+      if (item.age > ITEM_DROP_DEATH_LIFETIME) {
         item.alive = false;
         continue;
       }
@@ -305,7 +337,7 @@ export class ItemEntityManager {
       const dzp = targetZ - item.z;
       const dist = Math.hypot(dxp, dyp, dzp);
 
-      const canPick = receiver && (typeof receiver.canAccept === 'function' ? receiver.canAccept(item.id, item.count, item.durability) : true);
+      const canPick = !player.isDead && receiver && (typeof receiver.canAccept === 'function' ? receiver.canAccept(item.id, item.count, item.durability) : true);
       if (item.age >= item.pickupDelay && dist < MAGNET_RADIUS && canPick) {
         if (dist < PICKUP_RADIUS) {
           const leftover = receiver.addItem(item.id, item.count, item.durability, item.meta);

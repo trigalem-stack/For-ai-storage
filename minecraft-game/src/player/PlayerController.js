@@ -4,11 +4,17 @@ import {
   BASE_FOV,
   CAMERA_MODES,
   CROUCH_SPEED,
+  EAT_DURATION_SEC,
+  EXHAUSTION_THRESHOLD,
   FLY_SPEED,
   FLY_SPRINT_SPEED,
   GRAVITY,
+  HURT_INVULN_TICKS,
   JUMP_COOLDOWN_SEC,
   JUMP_VELOCITY,
+  MAX_AIR_TICKS,
+  MAX_FOOD,
+  MAX_HEALTH,
   PLAYER_CROUCH_EYE_HEIGHT,
   PLAYER_CROUCH_HEIGHT,
   PLAYER_EYE_HEIGHT,
@@ -23,6 +29,7 @@ import {
   TERMINAL_VELOCITY,
   WALK_SPEED,
   WORLD_HEIGHT,
+  DEFAULT_SATURATION,
 } from '../constants.js';
 import { collidesWithWorld, moveAABB } from '../physics/AABBPhysics.js';
 
@@ -43,7 +50,43 @@ export class PlayerController {
     this.pitch = options.pitch ?? -0.12;
 
     this.cameraMode = options.cameraMode ?? CAMERA_MODES.FIRST_PERSON;
-    this.flyMode = Boolean(options.flyMode);
+    this.creativeMode = options.creativeMode !== undefined ? Boolean(options.creativeMode) : Boolean(options.flyMode);
+    this.flyMode = this.creativeMode ? Boolean(options.flyMode) : false;
+
+    // Stage 6 Survival Vitals
+    this.maxHealth = MAX_HEALTH;
+    this.health = options.health ?? MAX_HEALTH;
+    this.absorption = options.absorption ?? 0;
+    this.foodLevel = options.foodLevel ?? MAX_FOOD;
+    this.saturation = options.saturation ?? DEFAULT_SATURATION;
+    this.exhaustion = options.exhaustion ?? 0;
+    this.airTicks = options.airTicks ?? MAX_AIR_TICKS;
+    this.score = options.score ?? 0;
+
+    this.hurtTimer = 0; // seconds of invulnerability frames (0.5s)
+    this.hurtTilt = 0;  // camera roll tilt on hit
+    this.hungerDebuffTimer = 0;
+    this.goldenRegenTimer = 0;
+    this.goldenRegenStep = 0;
+    this.regenFoodTimer = 0;
+    this.regenFastTimer = 0;
+    this.starveTimer = 0;
+    this.drownTimer = 0;
+    this.inWallTimer = 0;
+    this.cactusTimer = 0;
+    this.voidTimer = 0;
+    this.fallDistance = 0;
+    this.isDead = this.health <= 0 && !this.creativeMode;
+    this.deathTilt = 0;
+    this.inWallSuffocating = false;
+    this.headInWater = false;
+    this.lastDamageSource = options.lastDamageSource || null;
+
+    // Eating progress state (1.6s hold)
+    this.eatActive = false;
+    this.eatElapsed = 0;
+    this.eatDuration = EAT_DURATION_SEC;
+    this.eatItemId = 0;
 
     this.onGround = false;
     this.isCrouching = false;
@@ -67,6 +110,7 @@ export class PlayerController {
     this.lastWDownTime = 0;
     this.wTapReleased = false;
     this.primaryHeld = false;
+    this.secondaryHeld = false;
 
     // External mobile input bridge (updated by MobileControls)
     this.touchInput = {
@@ -76,6 +120,7 @@ export class PlayerController {
       crouch: false,
       sprint: false,
       breakHeld: false,
+      useHeld: false,
     };
 
     // Action & HUD callbacks
@@ -85,6 +130,12 @@ export class PlayerController {
     this.onToggleDebug = options.onToggleDebug || null;
     this.onTogglePause = options.onTogglePause || null;
     this.onFlyModeChange = options.onFlyModeChange || null;
+    this.getArmorPoints = options.getArmorPoints || null;
+    this.onArmorDamage = options.onArmorDamage || null;
+    this.onDamage = options.onDamage || null;
+    this.onDeath = options.onDeath || null;
+    this.onEatComplete = options.onEatComplete || null;
+    this.onVitalsChange = options.onVitalsChange || null;
 
     this._lookVec = new THREE.Vector3();
     this._eyeOrigin = new THREE.Vector3();
@@ -154,7 +205,7 @@ export class PlayerController {
     };
 
     this._onMouseDown = (e) => {
-      if (this.isPaused || !this.pointerLocked) return;
+      if (this.isPaused || !this.pointerLocked || this.isDead) return;
       if (e.button === 0) {
         this.primaryHeld = true;
         this.firstPersonHand.triggerSwing();
@@ -162,6 +213,7 @@ export class PlayerController {
         e.preventDefault();
         this.onPickBlock?.();
       } else if (e.button === 2) {
+        this.secondaryHeld = true;
         this.triggerPlaceAction();
       }
     };
@@ -169,13 +221,18 @@ export class PlayerController {
     this._onMouseUp = (e) => {
       if (e.button === 0) {
         this.primaryHeld = false;
+      } else if (e.button === 2) {
+        this.secondaryHeld = false;
+        this.stopEating();
       }
     };
 
     this._onBlur = () => {
       this.keys.clear();
       this.primaryHeld = false;
+      this.secondaryHeld = false;
       this.sprintToggled = false;
+      this.stopEating();
     };
 
     window.addEventListener('keydown', this._onKeyDown);
@@ -196,11 +253,15 @@ export class PlayerController {
   }
 
   isMiningHeld() {
-    return (this.primaryHeld && this.pointerLocked && !this.isPaused) || (this.touchInput.breakHeld && !this.isPaused);
+    return !this.isDead && ((this.primaryHeld && this.pointerLocked && !this.isPaused) || (this.touchInput.breakHeld && !this.isPaused));
+  }
+
+  isSecondaryHeld() {
+    return !this.isDead && ((this.secondaryHeld && this.pointerLocked && !this.isPaused) || (this.touchInput.useHeld && !this.isPaused));
   }
 
   triggerPlaceAction() {
-    if (this.isPaused) return false;
+    if (this.isPaused || this.isDead) return false;
     const placed = this.onPlaceAction?.();
     if (placed) {
       this.firstPersonHand.triggerSwing();
@@ -243,11 +304,222 @@ export class PlayerController {
   }
 
   toggleFlyMode() {
+    if (!this.creativeMode) {
+      this.flyMode = false;
+      return false;
+    }
     this.flyMode = !this.flyMode;
     this.vy = 0;
-    if (this.flyMode) this.isSwimming = false;
+    if (this.flyMode) {
+      this.isSwimming = false;
+      this.fallDistance = 0;
+    }
     this.onFlyModeChange?.(this.flyMode);
     return this.flyMode;
+  }
+
+  setCreativeMode(enabled) {
+    this.creativeMode = Boolean(enabled);
+    if (!this.creativeMode && this.flyMode) {
+      this.flyMode = false;
+      this.vy = 0;
+      this.onFlyModeChange?.(false);
+    }
+    this.fallDistance = 0;
+    this.inWallSuffocating = false;
+    this.stopEating();
+    this.onVitalsChange?.();
+  }
+
+  addExhaustion(amount) {
+    if (this.creativeMode || this.isDead || amount <= 0) return;
+    this.exhaustion += amount;
+    while (this.exhaustion >= EXHAUSTION_THRESHOLD) {
+      this.exhaustion -= EXHAUSTION_THRESHOLD;
+      if (this.saturation > 0) {
+        this.saturation = Math.max(0, this.saturation - 1.0);
+      } else if (this.foodLevel > 0) {
+        this.foodLevel = Math.max(0, this.foodLevel - 1);
+      }
+    }
+  }
+
+  heal(amount) {
+    if (this.isDead || amount <= 0) return false;
+    const prev = this.health;
+    this.health = Math.min(this.maxHealth, this.health + amount);
+    if (this.health !== prev) {
+      this.onVitalsChange?.();
+      return true;
+    }
+    return false;
+  }
+
+  canEatFood(foodStats) {
+    if (!foodStats || this.isDead) return false;
+    if (this.creativeMode) return true;
+    return Boolean(foodStats.canAlwaysEat) || this.foodLevel < MAX_FOOD;
+  }
+
+  canEat(foodStats) {
+    return this.canEatFood(foodStats);
+  }
+
+  startEating(itemId) {
+    if (this.isDead || this.isPaused) return false;
+    this.eatActive = true;
+    this.eatItemId = itemId;
+    this.firstPersonHand.setEatingActive(true);
+    return true;
+  }
+
+  stopEating() {
+    if (!this.eatActive && this.eatElapsed === 0) return;
+    this.eatActive = false;
+    this.eatElapsed = 0;
+    this.eatItemId = 0;
+    this.firstPersonHand.setEatingActive(false);
+  }
+
+  getEatProgress() {
+    return this.eatActive ? Math.min(1, this.eatElapsed / this.eatDuration) : 0;
+  }
+
+  applyFood(foodStats) {
+    return this.applyFoodEffects(foodStats);
+  }
+
+  applyFoodEffects(foodStats) {
+    if (!foodStats) return;
+    this.foodLevel = Math.min(MAX_FOOD, this.foodLevel + (foodStats.hunger || 0));
+    this.saturation = Math.min(this.foodLevel, this.saturation + (foodStats.saturation || 0));
+    if (foodStats.absorption > 0) {
+      this.absorption = Math.max(this.absorption, foodStats.absorption);
+    }
+    if (foodStats.regenTicks > 0) {
+      this.goldenRegenTimer = Math.max(this.goldenRegenTimer, foodStats.regenTicks / 20);
+    }
+    if (foodStats.hungerDebuffChance && Math.random() < foodStats.hungerDebuffChance) {
+      this.hungerDebuffTimer = Math.max(this.hungerDebuffTimer, (foodStats.hungerDebuffTicks || 600) / 20);
+    }
+    this.onVitalsChange?.();
+  }
+
+  damage(amount, sourceType = 'generic') {
+    if (this.creativeMode || this.isDead || amount <= 0) return false;
+    if (sourceType !== 'void' && sourceType !== 'starve' && this.hurtTimer > 0) {
+      return false;
+    }
+
+    // Armor mitigates physical/contact hits (up to 80% at 20 points), bypassing fall/drown/inWall/starve/void
+    const armorBypass = sourceType === 'fall' || sourceType === 'drown' || sourceType === 'inWall' || sourceType === 'starve' || sourceType === 'void';
+    let finalDmg = amount;
+    if (!armorBypass && this.getArmorPoints) {
+      const armorPts = Math.max(0, Math.min(20, this.getArmorPoints()));
+      if (armorPts > 0) {
+        const eff = Math.min(20, Math.max(armorPts / 5, armorPts - amount / 2));
+        finalDmg = amount * (1 - eff / 25);
+        this.onArmorDamage?.(1);
+      }
+    }
+
+    if (finalDmg <= 0) return false;
+
+    // Absorption gold hearts absorb damage first
+    let remaining = finalDmg;
+    if (this.absorption > 0) {
+      const absorbed = Math.min(this.absorption, remaining);
+      this.absorption -= absorbed;
+      remaining -= absorbed;
+    }
+    if (remaining > 0) {
+      this.health = Math.max(0, this.health - remaining);
+    }
+
+    this.hurtTimer = HURT_INVULN_TICKS / 20; // 0.5s i-frames
+    this.hurtTilt = (Math.random() < 0.5 ? -1 : 1) * 0.14; // ~8 deg roll kick
+    this.lastDamageSource = sourceType;
+    this.playerModel.triggerHurtFlash(0.4);
+    this.addExhaustion(0.1);
+    this.onDamage?.({ amount, finalDmg, sourceType, health: this.health });
+    this.onVitalsChange?.();
+
+    if (this.health <= 0) {
+      this.health = 0;
+      this.isDead = true;
+      this.stopEating();
+      this.primaryHeld = false;
+      this.touchInput.breakHeld = false;
+      this.keys.clear();
+      this.onDeath?.(sourceType);
+    }
+    return true;
+  }
+
+  respawn(spawnPose) {
+    this.isDead = false;
+    this.deathTilt = 0;
+    this.health = this.maxHealth;
+    this.absorption = 0;
+    this.foodLevel = MAX_FOOD;
+    this.saturation = DEFAULT_SATURATION;
+    this.exhaustion = 0;
+    this.airTicks = MAX_AIR_TICKS;
+    this.hurtTimer = 0;
+    this.hurtTilt = 0;
+    this.hungerDebuffTimer = 0;
+    this.goldenRegenTimer = 0;
+    this.regenFoodTimer = 0;
+    this.regenFastTimer = 0;
+    this.starveTimer = 0;
+    this.drownTimer = 0;
+    this.inWallTimer = 0;
+    this.cactusTimer = 0;
+    this.voidTimer = 0;
+    this.fallDistance = 0;
+    this.inWallSuffocating = false;
+    this.lastDamageSource = null;
+    this.vx = 0;
+    this.vy = 0;
+    this.vz = 0;
+    this.stopEating();
+    if (spawnPose) {
+      this.x = spawnPose.x;
+      this.y = spawnPose.y;
+      this.z = spawnPose.z;
+    }
+    this.onVitalsChange?.();
+  }
+
+  respawnAt(x, y, z) {
+    this.respawn({ x, y, z });
+  }
+
+  getSurvivalState() {
+    return {
+      health: this.health,
+      absorption: this.absorption,
+      foodLevel: this.foodLevel,
+      saturation: this.saturation,
+      exhaustion: this.exhaustion,
+      airTicks: this.airTicks,
+      score: this.score,
+      hungerDebuffTimer: this.hungerDebuffTimer,
+    };
+  }
+
+  setSurvivalState(s) {
+    if (!s) return;
+    if (Number.isFinite(s.health)) this.health = Math.max(0, Math.min(this.maxHealth, s.health));
+    if (Number.isFinite(s.absorption)) this.absorption = Math.max(0, s.absorption);
+    if (Number.isFinite(s.foodLevel)) this.foodLevel = Math.max(0, Math.min(MAX_FOOD, s.foodLevel));
+    if (Number.isFinite(s.saturation)) this.saturation = Math.max(0, Math.min(MAX_FOOD, s.saturation));
+    if (Number.isFinite(s.exhaustion)) this.exhaustion = Math.max(0, s.exhaustion);
+    if (Number.isFinite(s.airTicks)) this.airTicks = Math.max(0, Math.min(MAX_AIR_TICKS, s.airTicks));
+    if (Number.isFinite(s.score)) this.score = Math.max(0, s.score | 0);
+    if (Number.isFinite(s.hungerDebuffTimer)) this.hungerDebuffTimer = Math.max(0, s.hungerDebuffTimer);
+    this.isDead = this.health <= 0 && !this.creativeMode;
+    this.onVitalsChange?.();
   }
 
   _syncVisibility() {
@@ -259,8 +531,11 @@ export class PlayerController {
     if (paused) {
       this.keys.clear();
       this.primaryHeld = false;
+      this.secondaryHeld = false;
       this.touchInput.breakHeld = false;
+      this.touchInput.useHeld = false;
       this.sprintToggled = false;
+      this.stopEating();
       if (document.pointerLockElement) {
         document.exitPointerLock?.();
       }
@@ -306,6 +581,50 @@ export class PlayerController {
     this.time += dt;
     if (this.isPaused) return;
 
+    if (this.isDead) {
+      this.deathTilt += (-1.45 - this.deathTilt) * Math.min(1, dt * 10);
+      this.firstPersonHand.setEatingActive(false);
+      this.firstPersonHand.update(dt, this.walkPhase, 0, false);
+      this.playerModel.updatePose({
+        x: this.x,
+        y: this.y,
+        z: this.z,
+        yaw: this.yaw,
+        pitch: this.pitch,
+        walkPhase: this.walkPhase,
+        moveBlend: 0,
+        swingProgress: 0,
+        isCrouching: false,
+        isSwimming: false,
+        isDead: true,
+        time: this.time,
+      });
+      this._updateCamera();
+      return;
+    }
+
+    if (this.hurtTimer > 0) this.hurtTimer = Math.max(0, this.hurtTimer - dt);
+    if (Math.abs(this.hurtTilt) > 0.001) {
+      this.hurtTilt *= Math.exp(-10 * dt);
+    } else {
+      this.hurtTilt = 0;
+    }
+
+    // Eating progress tick
+    if (this.eatActive) {
+      this.eatElapsed += dt;
+      if (this.eatElapsed >= this.eatDuration) {
+        const finishedId = this.eatItemId;
+        this.stopEating();
+        this.onEatComplete?.(finishedId);
+      }
+    }
+
+    const prevX = this.x;
+    const prevY = this.y;
+    const prevZ = this.z;
+    const wasOnGround = this.onGround;
+
     let forward = 0;
     let strafe = 0;
     if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) forward += 1;
@@ -324,11 +643,12 @@ export class PlayerController {
 
     const wantJump = this.keys.has('Space') || this.touchInput.jump;
     const wantCrouch = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchInput.crouch;
-    const wantSprint =
+    const rawSprint =
       this.keys.has('ControlLeft') ||
       this.keys.has('ControlRight') ||
       this.sprintToggled ||
       this.touchInput.sprint;
+    const wantSprint = (this.creativeMode || this.foodLevel > 6) && !this.eatActive && rawSprint;
 
     // Water & ladder submersion probe
     const feetInWater = this.world.getBlock(this.x, this.y + 0.12, this.z) === BLOCK_IDS.WATER;
@@ -378,6 +698,8 @@ export class PlayerController {
     let speed = WALK_SPEED;
     if (this.flyMode) {
       speed = this.isSprinting ? FLY_SPRINT_SPEED : FLY_SPEED;
+    } else if (this.eatActive) {
+      speed = CROUCH_SPEED;
     } else if (this.isSwimming) {
       speed = this.isSprinting ? SWIM_SPRINT_SPEED : SWIM_SPEED;
     } else if (inWater) {
@@ -415,6 +737,7 @@ export class PlayerController {
     const substeps = Math.max(1, Math.ceil(dt / 0.016));
     const subDt = dt / substeps;
     let anyWallHit = false;
+    let jumpedThisFrame = false;
 
     for (let s = 0; s < substeps; s++) {
       if (this.flyMode) {
@@ -502,6 +825,7 @@ export class PlayerController {
             prevVy = JUMP_VELOCITY;
             this.onGround = false;
             this.jumpCooldown = JUMP_COOLDOWN_SEC;
+            jumpedThisFrame = true;
           }
           this.vy = Math.max(-TERMINAL_VELOCITY, prevVy - GRAVITY * subDt);
           dy = 0.5 * (prevVy + this.vy) * subDt;
@@ -531,6 +855,151 @@ export class PlayerController {
     if (anyWallHit && !this.flyMode && !inWater) {
       this.isSprinting = false;
       this.sprintToggled = false;
+    }
+
+    // --- Stage 6 Survival Physics, Exhaustion, Regeneration & Environmental Hazards ---
+    const eyeBlockId = this.world.getBlock(this.x, this.y + this.currentEyeHeight, this.z);
+    this.headInWater = eyeBlockId === BLOCK_IDS.WATER;
+    this.inWallSuffocating = !this.creativeMode && !this.flyMode && BlockRegistry.isOpaque(eyeBlockId);
+
+    if (!this.creativeMode) {
+      // 1. Distance & jump exhaustion
+      const horizMoved = Math.hypot(this.x - prevX, this.z - prevZ);
+      if (inWater && horizMoved > 0.001) {
+        this.addExhaustion(horizMoved * 0.015);
+      } else if (this.isSprinting && horizMoved > 0.001) {
+        this.addExhaustion(horizMoved * 0.1);
+      }
+      if (jumpedThisFrame) {
+        this.addExhaustion(this.isSprinting ? 0.2 : 0.05);
+      }
+
+      // 2. Fall distance tracking & landing damage (water/ladder/fly resets; bed halves + bounces; hay bale reduces 80%)
+      if (this.flyMode || inWater || onLadder) {
+        this.fallDistance = 0;
+      } else {
+        const dyMoved = this.y - prevY;
+        if (!this.onGround && dyMoved < 0) {
+          this.fallDistance += -dyMoved;
+        }
+        if (this.onGround && !wasOnGround) {
+          if (this.fallDistance > 3.0) {
+            const standId = this.world.getBlock(this.x, this.y - 0.15, this.z);
+            const standDef = BlockRegistry.get(standId);
+            let fallDmg = 0;
+            if (standDef.isBed) {
+              fallDmg = Math.floor((this.fallDistance - 3.0) * 0.5);
+              this.vy = Math.max(this.vy, 4.2);
+              this.onGround = false;
+            } else if (standId === BLOCK_IDS.HAY_BALE) {
+              fallDmg = Math.max(1, Math.ceil((this.fallDistance - 3.0) * 0.2));
+            } else {
+              fallDmg = Math.ceil(this.fallDistance - 3.0);
+            }
+            if (fallDmg > 0) this.damage(fallDmg, 'fall');
+          }
+          this.fallDistance = 0;
+        } else if (this.onGround) {
+          this.fallDistance = 0;
+        }
+      }
+
+      // 3. Oxygen / Drowning
+      if (this.headInWater) {
+        this.airTicks = Math.max(0, this.airTicks - dt * 20);
+        if (this.airTicks <= 0) {
+          this.drownTimer += dt;
+          if (this.drownTimer >= 1.0) {
+            this.drownTimer -= 1.0;
+            this.damage(2, 'drown');
+          }
+        }
+      } else {
+        this.airTicks = Math.min(MAX_AIR_TICKS, this.airTicks + dt * 100);
+        this.drownTimer = 0;
+      }
+
+      // 4. Cactus contact damage
+      if (this._touchesBlockId(BLOCK_IDS.CACTUS, 0.06)) {
+        this.cactusTimer += dt;
+        if (this.cactusTimer >= 0.5) {
+          this.cactusTimer = 0;
+          this.damage(1, 'cactus');
+        }
+      } else {
+        this.cactusTimer = 0.5;
+      }
+
+      // 5. Wall / Falling Sand suffocation
+      if (this.inWallSuffocating) {
+        this.inWallTimer += dt;
+        if (this.inWallTimer >= 0.5) {
+          this.inWallTimer = 0;
+          this.damage(1, 'inWall');
+        }
+      } else {
+        this.inWallTimer = 0.5;
+      }
+
+      // 6. Void damage (Y < -10)
+      if (this.y < -10) {
+        this.voidTimer += dt;
+        if (this.voidTimer >= 0.5) {
+          this.voidTimer = 0;
+          this.damage(4, 'void');
+        }
+      } else {
+        this.voidTimer = 0.5;
+      }
+
+      // 7. Hunger debuff, Regeneration & Starvation
+      if (this.hungerDebuffTimer > 0) {
+        this.hungerDebuffTimer = Math.max(0, this.hungerDebuffTimer - dt);
+        this.addExhaustion(0.5 * dt);
+      }
+      if (this.goldenRegenTimer > 0) {
+        this.goldenRegenTimer = Math.max(0, this.goldenRegenTimer - dt);
+        this.goldenRegenStep += dt;
+        if (this.goldenRegenStep >= 0.5) {
+          this.goldenRegenStep -= 0.5;
+          this.heal(1);
+        }
+      }
+
+      if (!this.isDead && this.health < this.maxHealth) {
+        if (this.foodLevel >= MAX_FOOD && this.saturation > 0) {
+          this.regenFastTimer += dt;
+          if (this.regenFastTimer >= 0.5) {
+            this.regenFastTimer = 0;
+            if (this.heal(1)) this.addExhaustion(6.0);
+          }
+        } else if (this.foodLevel >= 18) {
+          this.regenFoodTimer += dt;
+          if (this.regenFoodTimer >= 4.0) {
+            this.regenFoodTimer = 0;
+            if (this.heal(1)) this.addExhaustion(6.0);
+          }
+        } else {
+          this.regenFoodTimer = 0;
+          this.regenFastTimer = 0;
+        }
+      } else {
+        this.regenFoodTimer = 0;
+        this.regenFastTimer = 0;
+      }
+
+      if (!this.isDead && this.foodLevel <= 0) {
+        this.starveTimer += dt;
+        if (this.starveTimer >= 4.0) {
+          this.starveTimer = 0;
+          this.damage(1, 'starve');
+        }
+      } else {
+        this.starveTimer = 0;
+      }
+    } else {
+      this.airTicks = MAX_AIR_TICKS;
+      this.fallDistance = 0;
     }
 
     // Smooth camera eye-height transition
@@ -590,7 +1059,7 @@ export class PlayerController {
       this.camera.rotation.order = 'YXZ';
       this.camera.rotation.y = this.yaw;
       this.camera.rotation.x = this.pitch;
-      this.camera.rotation.z = 0;
+      this.camera.rotation.z = this.hurtTilt + this.deathTilt;
       return;
     }
 
@@ -624,6 +1093,26 @@ export class PlayerController {
 
     this.camera.position.set(camX, camY, camZ);
     this.camera.lookAt(eyeX, eyeY - 0.08, eyeZ);
+  }
+
+  _touchesBlockId(targetId, pad = 0.06) {
+    const h = this.getCurrentHitboxHeight();
+    const minX = Math.floor(this.x - PLAYER_HALF_WIDTH - pad);
+    const maxX = Math.floor(this.x + PLAYER_HALF_WIDTH + pad);
+    const minY = Math.floor(this.y + 0.02);
+    const maxY = Math.floor(this.y + h - 0.02);
+    const minZ = Math.floor(this.z - PLAYER_HALF_WIDTH - pad);
+    const maxZ = Math.floor(this.z + PLAYER_HALF_WIDTH + pad);
+    for (let by = minY; by <= maxY; by++) {
+      for (let bz = minZ; bz <= maxZ; bz++) {
+        for (let bx = minX; bx <= maxX; bx++) {
+          if (this.world.getBlock(bx, by, bz) === targetId) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   dispose() {

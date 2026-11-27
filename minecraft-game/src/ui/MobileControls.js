@@ -78,6 +78,19 @@ export class MobileControls {
     }
   }
 
+  setCreativeMode(creative) {
+    if (this.btnFly) {
+      this.btnFly.classList.toggle('hidden', !creative);
+    }
+  }
+
+  setHeldFoodIndicator(isFood) {
+    if (this.btnPlace) {
+      this.btnPlace.textContent = isFood ? '🍖' : '🧱';
+      this.btnPlace.title = isFood ? 'Зажмите, чтобы съесть (1.6с)' : 'Поставить / Использовать';
+    }
+  }
+
   _hideFloatingJoystick() {
     if (this.joystickBase) {
       this.joystickBase.classList.remove('active', 'sprinting');
@@ -102,6 +115,10 @@ export class MobileControls {
     this.player.touchInput.crouch = false;
     this.player.touchInput.sprint = false;
     this.player.touchInput.breakHeld = false;
+    if (this.player) {
+      this.player.touchInput.useHeld = false;
+      this.player.stopEating?.();
+    }
     this._hideFloatingJoystick();
     this.btnCrouch?.classList.remove('active');
     this.btnBreak?.classList.remove('pressed');
@@ -257,12 +274,12 @@ export class MobileControls {
       btn.addEventListener('touchcancel', finish, { passive: false });
     };
 
-    // Jump button: hold to jump/ascend + quick double-tap (<300ms) toggles Fly Mode
+    // Jump button: hold to jump/ascend + quick double-tap (<300ms) toggles Fly Mode (Creative only)
     bindHoldBtn(
       this.btnJump,
       () => {
         const now = performance.now();
-        if (now - this.lastJumpTapTime < 300) {
+        if (this.player.creativeMode && now - this.lastJumpTapTime < 300) {
           const active = this.player.toggleFlyMode();
           this.setFlyActive(active);
           this.callbacks.onStatusToast?.(active ? 'Полёт: ВКЛ (2×Прыжок)' : 'Полёт: ВЫКЛ');
@@ -307,13 +324,17 @@ export class MobileControls {
       }
     );
 
-    // Dedicated Place button
+    // Dedicated Place / Eat-Hold button
     bindHoldBtn(
       this.btnPlace,
       () => {
+        this.player.touchInput.useHeld = true;
         this.player.triggerPlaceAction();
       },
-      null
+      () => {
+        this.player.touchInput.useHeld = false;
+        this.player.stopEating?.();
+      }
     );
 
     // Fly quick toggle button

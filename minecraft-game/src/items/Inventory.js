@@ -64,6 +64,10 @@ export class Inventory {
     return pts;
   }
 
+  getArmorDefense() {
+    return this.getTotalArmorPoints();
+  }
+
   canAccept(id, count = 1, durability = 0) {
     const def = ItemRegistry.get(id);
     if (!def || count <= 0) return false;
@@ -77,6 +81,31 @@ export class Inventory {
     }
     for (let i = 0; i < INVENTORY_SIZE; i++) {
       if (!this.slots[i]) return true;
+    }
+    return false;
+  }
+
+  canAcceptExact(idOrStack, count = 1, durability = 0, meta = 0) {
+    let id = idOrStack;
+    let qty = count;
+    let stackMeta = meta;
+    if (typeof idOrStack === 'object' && idOrStack !== null) {
+      id = idOrStack.id;
+      qty = idOrStack.count ?? count;
+      stackMeta = idOrStack.meta ?? meta;
+    }
+    const def = ItemRegistry.get(id);
+    if (!def || qty <= 0) return false;
+    const maxStack = def.maxStack;
+    let space = 0;
+    for (let i = 0; i < INVENTORY_SIZE; i++) {
+      const s = this.slots[i];
+      if (!s) {
+        space += maxStack;
+      } else if (maxStack > 1 && !def.maxDurability && s.id === id && (s.meta || 0) === stackMeta && s.count < maxStack) {
+        space += maxStack - s.count;
+      }
+      if (space >= qty) return true;
     }
     return false;
   }
@@ -139,6 +168,58 @@ export class Inventory {
     }
     this._emitChange();
     return true;
+  }
+
+  damageArmor(amount = 1) {
+    if (this.creativeMode || amount <= 0) return false;
+    let damaged = false;
+    for (const slotName of ['helmet', 'chestplate', 'leggings', 'boots']) {
+      const piece = this.armor[slotName];
+      if (!piece || !piece.maxDurability || piece.maxDurability <= 0) continue;
+      piece.durability = Math.max(0, (piece.durability || piece.maxDurability) - amount);
+      damaged = true;
+      if (piece.durability <= 0) {
+        const brokenId = piece.id;
+        this.armor[slotName] = null;
+        this.onToolBreak?.(brokenId);
+      }
+    }
+    if (damaged) this._emitChange();
+    return damaged;
+  }
+
+  consumeOneHeld(returnItemId = 0) {
+    const idx = this.selectedSlot;
+    const s = this.slots[idx];
+    if (!s || s.count <= 0) return false;
+    if (!this.creativeMode) {
+      s.count -= 1;
+      if (s.count <= 0) {
+        this.slots[idx] = returnItemId ? ItemRegistry.createStack(returnItemId, 1) : null;
+      } else if (returnItemId) {
+        this.addItem(returnItemId, 1);
+      }
+      this._emitChange();
+    }
+    return true;
+  }
+
+  extractAllForDeath() {
+    const items = [];
+    for (let i = 0; i < this.slots.length; i++) {
+      if (this.slots[i] && this.slots[i].count > 0) {
+        items.push(ItemRegistry.cloneStack(this.slots[i]));
+        this.slots[i] = null;
+      }
+    }
+    for (const slotName of ['helmet', 'chestplate', 'leggings', 'boots']) {
+      if (this.armor[slotName] && this.armor[slotName].count > 0) {
+        items.push(ItemRegistry.cloneStack(this.armor[slotName]));
+        this.armor[slotName] = null;
+      }
+    }
+    this._emitChange();
+    return items;
   }
 
   dropFromSlot(idx, countOrWhole = false) {

@@ -1,11 +1,81 @@
 import { BlockRegistry } from '../blocks/BlockRegistry.js';
-import { CAMERA_MODES, CHUNK_SIZE } from '../constants.js';
+import { CAMERA_MODES, CHUNK_SIZE, MAX_AIR_TICKS, MAX_FOOD, MAX_HEALTH } from '../constants.js';
 
 const CAMERA_MODE_NAMES = [
   '1-е лицо',
   '3-е лицо (сзади)',
   '3-е лицо (спереди)',
 ];
+
+const DEATH_REASON_TEXT = {
+  fall: 'Разбился при падении',
+  drown: 'Захлебнулся под водой',
+  inWall: 'Задохнулся в блоках',
+  cactus: 'Укололся насмерть о кактус',
+  starve: 'Умер от голода',
+  void: 'Провалился в бездну',
+  generic: 'Погиб в мире',
+};
+
+function makeHeartSvg(state, gold = false) {
+  // state: 'empty' | 'half' | 'full'
+  const fillColor = gold ? '#f8d028' : '#e42424';
+  const hiColor = gold ? '#fff6a8' : '#ff8a8a';
+  const darkFill = '#2a1616';
+  const outline = '#120808';
+  const leftFill = state === 'empty' ? darkFill : fillColor;
+  const rightFill = state === 'full' ? fillColor : darkFill;
+  const leftHi = state !== 'empty';
+  return `<svg viewBox="0 0 9 9" width="14" height="14" shape-rendering="crispEdges">
+    <path d="M1,1h2v1h1v1h1V2h1V1h2v1h1v3H8v1H7v1H6v1H5v1H4V8H3V7H2V6H1V5H0V2h1V1z" fill="${outline}"/>
+    <path d="M1,2h2v1h1v1h1v4H4V7H3V6H2V5H1V2z" fill="${leftFill}"/>
+    <path d="M5,4h1V3h1V2h1v3H7v1H6v1H5V4z" fill="${rightFill}"/>
+    ${leftHi ? `<rect x="1" y="2" width="1" height="1" fill="${hiColor}"/>` : ''}
+  </svg>`;
+}
+
+function makeArmorSvg(state) {
+  // state: 'empty' | 'half' | 'full'
+  const fullCol = '#d2d8e4';
+  const emptyCol = '#353842';
+  const hiCol = '#ffffff';
+  const leftCol = state === 'empty' ? emptyCol : fullCol;
+  const rightCol = state === 'full' ? fullCol : emptyCol;
+  return `<svg viewBox="0 0 9 9" width="13" height="13" shape-rendering="crispEdges">
+    <path d="M1,1h2v1h3V1h2v3H7v4H2V4H1V1z" fill="#12141a"/>
+    <path d="M1.5,1.5h1.5v1h1.5v5h-2V4h-1v-2.5z" fill="${leftCol}"/>
+    <path d="M4.5,2.5h1.5v-1h1.5V4h-1v3.5h-2v-5z" fill="${rightCol}"/>
+    ${state !== 'empty' ? `<rect x="2" y="2" width="1" height="1" fill="${hiCol}"/>` : ''}
+  </svg>`;
+}
+
+function makeDrumstickSvg(state, poisoned = false) {
+  // state: 'empty' | 'half' | 'full' (fills right-to-left or standard icon look)
+  const meatFull = poisoned ? '#6fa83b' : '#c66838';
+  const meatEmpty = '#362720';
+  const rim = '#18100c';
+  const bone = '#ece4d4';
+  const leftCol = state === 'full' ? meatFull : meatEmpty;
+  const rightCol = state === 'empty' ? meatEmpty : meatFull;
+  return `<svg viewBox="0 0 9 9" width="13" height="13" shape-rendering="crispEdges">
+    <path d="M3,1h4v1h1v3H7v1H5v1H3V6H2V3h1V1z" fill="${rim}"/>
+    <rect x="3" y="2" width="2" height="3" fill="${leftCol}"/>
+    <rect x="5" y="2" width="2" height="3" fill="${rightCol}"/>
+    ${state !== 'empty' ? `<rect x="5" y="2" width="1" height="1" fill="${poisoned ? '#a8de68' : '#ebb28c'}"/>` : ''}
+    <path d="M1,6h2v2H1V6z" fill="${rim}"/>
+    <rect x="1" y="6" width="1.5" height="1.5" fill="${bone}"/>
+  </svg>`;
+}
+
+function makeBubbleSvg(filled) {
+  if (!filled) {
+    return `<svg viewBox="0 0 9 9" width="12" height="12" shape-rendering="crispEdges"><circle cx="4.5" cy="4.5" r="3" fill="none" stroke="rgba(160,210,255,0.28)" stroke-width="1"/></svg>`;
+  }
+  return `<svg viewBox="0 0 9 9" width="12" height="12" shape-rendering="crispEdges">
+    <circle cx="4.5" cy="4.5" r="3.4" fill="rgba(54,158,255,0.52)" stroke="#164684" stroke-width="1"/>
+    <rect x="2.5" y="2.2" width="1.5" height="1.5" fill="#ffffff"/>
+  </svg>`;
+}
 
 export class Hud {
   constructor(callbacks = {}) {
@@ -23,6 +93,24 @@ export class Hud {
     this.worldsListEl = document.getElementById('worlds-list');
     this.inputWorldName = document.getElementById('input-world-name');
     this.inputWorldSeed = document.getElementById('input-world-seed');
+    this.btnNewModeSurvival = document.getElementById('btn-new-mode-survival');
+    this.btnNewModeCreative = document.getElementById('btn-new-mode-creative');
+    this.selectedNewWorldMode = 'survival';
+
+    // Survival HUD & Vignettes & Death Screen
+    this.survivalHudEl = document.getElementById('survival-hud');
+    this.armorRowEl = document.getElementById('hud-armor-row');
+    this.heartsRowEl = document.getElementById('hud-hearts-row');
+    this.oxygenRowEl = document.getElementById('hud-oxygen-row');
+    this.hungerRowEl = document.getElementById('hud-hunger-row');
+    this.damageVignetteEl = document.getElementById('damage-vignette');
+    this.suffocationVignetteEl = document.getElementById('suffocation-vignette');
+
+    this.deathOverlayEl = document.getElementById('death-overlay');
+    this.deathReasonEl = document.getElementById('death-reason');
+    this.deathScoreEl = document.getElementById('death-score');
+    this.btnRespawn = document.getElementById('btn-respawn');
+    this.btnDeathMenu = document.getElementById('btn-death-menu');
 
     this.settingsOverlay = document.getElementById('settings-overlay');
     this.pcHint = document.getElementById('pc-lock-hint');
@@ -51,8 +139,6 @@ export class Hud {
     this.btnSettingsClose = document.getElementById('btn-settings-close');
 
     this.btnControlMode = document.getElementById('btn-control-mode');
-    this.btnGameMode = document.getElementById('btn-game-mode');
-    this.btnFlyMode = document.getElementById('btn-fly-mode');
     this.btnMemoryMode = document.getElementById('btn-memory-mode');
     this.btnGraphicsMode = document.getElementById('btn-graphics-mode');
     this.btnFogMode = document.getElementById('btn-fog-mode');
@@ -67,10 +153,12 @@ export class Hud {
     this.debugVisible = false;
     this.isPaused = false;
     this.inMainMenu = true;
-    this.settingsOrigin = 'menu'; // 'menu' | 'pause'
+    this.settingsOrigin = 'menu';
     this.hintsEnabled = true;
     this.iosPseudoFullscreen = false;
     this.toastTimer = null;
+    this._damageFlashTimeout = null;
+    this._lastVitalsSig = '';
 
     this.fpsFrames = 0;
     this.fpsLastTime = performance.now();
@@ -80,14 +168,35 @@ export class Hud {
     this._bindFullscreenEvents();
   }
 
-  _bindButtons() {
-    this.btnCamera?.addEventListener('click', (e) => {
+  _bindInstantHudTap(el, handler) {
+    if (!el) return;
+    let lastTrigger = 0;
+    const fire = (e) => {
       e.stopPropagation();
+      if (e.type === 'touchstart') e.preventDefault();
+      const now = performance.now();
+      if (now - lastTrigger < 120) return;
+      lastTrigger = now;
+      handler(e);
+    };
+    el.addEventListener('touchstart', fire, { passive: false });
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') fire(e);
+    });
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (performance.now() - lastTrigger < 320) return;
+      lastTrigger = performance.now();
+      handler(e);
+    });
+  }
+
+  _bindButtons() {
+    this._bindInstantHudTap(this.btnCamera, () => {
       this.callbacks.onCycleCamera?.();
     });
 
-    this.btnDebug?.addEventListener('click', (e) => {
-      e.stopPropagation();
+    this._bindInstantHudTap(this.btnDebug, () => {
       this.toggleDebug();
     });
 
@@ -101,15 +210,35 @@ export class Hud {
       });
     }
 
-    this.btnFullscreen?.addEventListener('click', (e) => {
-      e.stopPropagation();
+    this._bindInstantHudTap(this.btnFullscreen, () => {
       this.toggleFullscreen();
     });
 
-    this.btnPause?.addEventListener('click', (e) => {
-      e.stopPropagation();
+    this._bindInstantHudTap(this.btnPause, () => {
       if (!this.inMainMenu) this.togglePause();
     });
+
+    // Death screen buttons
+    this.btnRespawn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hideDeathScreen();
+      this.callbacks.onRespawn?.();
+    });
+
+    this.btnDeathMenu?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hideDeathScreen();
+      this.callbacks.onExitToMenu?.();
+    });
+
+    // New World gameMode selector
+    const selectNewMode = (mode) => {
+      this.selectedNewWorldMode = mode === 'creative' ? 'creative' : 'survival';
+      this.btnNewModeSurvival?.classList.toggle('active', this.selectedNewWorldMode === 'survival');
+      this.btnNewModeCreative?.classList.toggle('active', this.selectedNewWorldMode === 'creative');
+    };
+    this.btnNewModeSurvival?.addEventListener('click', (e) => { e.stopPropagation(); selectNewMode('survival'); });
+    this.btnNewModeCreative?.addEventListener('click', (e) => { e.stopPropagation(); selectNewMode('creative'); });
 
     // Main Menu navigation
     this.btnMenuPlay?.addEventListener('click', async (e) => {
@@ -140,7 +269,6 @@ export class Hud {
         if (Number.isFinite(num) && num !== 0) {
           parsedSeed = num | 0;
         } else {
-          // String seed hash
           let h = 2166136261 >>> 0;
           for (let i = 0; i < rawSeed.length; i++) {
             h ^= rawSeed.charCodeAt(i);
@@ -149,7 +277,11 @@ export class Hud {
           parsedSeed = (h | 0) || 133742;
         }
       }
-      this.callbacks.onCreateWorld?.({ name, seed: parsedSeed });
+      this.callbacks.onCreateWorld?.({
+        name,
+        seed: parsedSeed,
+        gameMode: this.selectedNewWorldMode,
+      });
     });
 
     // Pause menu
@@ -185,20 +317,10 @@ export class Hud {
       this.closeSettings();
     });
 
-    // Settings controls
+    // Settings controls (no Survival/Creative or Fly toggles here!)
     this.btnControlMode?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.callbacks.onToggleControlMode?.();
-    });
-
-    this.btnGameMode?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.callbacks.onToggleGameMode?.();
-    });
-
-    this.btnFlyMode?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.callbacks.onToggleFlyMode?.();
     });
 
     this.btnMemoryMode?.addEventListener('click', (e) => {
@@ -241,6 +363,121 @@ export class Hud {
     });
   }
 
+  triggerDamageFlash() {
+    if (!this.damageVignetteEl) return;
+    this.damageVignetteEl.classList.add('flash');
+    clearTimeout(this._damageFlashTimeout);
+    this._damageFlashTimeout = setTimeout(() => {
+      this.damageVignetteEl?.classList.remove('flash');
+    }, 260);
+  }
+
+  showDeathScreen(sourceType = 'generic', score = 0) {
+    if (!this.deathOverlayEl) return;
+    if (this.deathReasonEl) {
+      this.deathReasonEl.textContent = DEATH_REASON_TEXT[sourceType] || DEATH_REASON_TEXT.generic;
+    }
+    if (this.deathScoreEl) {
+      this.deathScoreEl.textContent = `Счёт: ${score | 0}`;
+    }
+    this.deathOverlayEl.classList.remove('hidden');
+    this._updateCrosshairVisibility(false);
+  }
+
+  hideDeathScreen() {
+    this.deathOverlayEl?.classList.add('hidden');
+  }
+
+  updateSurvivalVitals(player, armorPoints = 0) {
+    if (!this.survivalHudEl) return;
+    const hide = !player || this.inMainMenu || player.creativeMode;
+    this.survivalHudEl.classList.toggle('hidden', hide);
+
+    if (hide) {
+      this.damageVignetteEl?.classList.remove('low-health');
+      this.suffocationVignetteEl?.classList.add('hidden');
+      return;
+    }
+
+    const hp = Math.ceil(Math.max(0, Math.min(MAX_HEALTH, player.health)));
+    const abs = Math.ceil(Math.max(0, player.absorption || 0));
+    const food = Math.max(0, Math.min(MAX_FOOD, Math.round(player.foodLevel)));
+    const sat = player.saturation || 0;
+    const armor = Math.max(0, Math.min(20, armorPoints | 0));
+    const hurting = (player.hurtTimer || 0) > 0;
+    const poisoned = (player.hungerDebuffTimer || 0) > 0;
+    const showOxygen = player.headInWater || player.airTicks < MAX_AIR_TICKS;
+    const bubbles = showOxygen ? Math.ceil((Math.max(0, player.airTicks) / MAX_AIR_TICKS) * 10) : 10;
+
+    // Low-health pulsing red edge & sand/wall suffocation overlay
+    this.damageVignetteEl?.classList.toggle('low-health', hp > 0 && hp <= 4);
+    this.suffocationVignetteEl?.classList.toggle('hidden', !player.inWallSuffocating);
+
+    const sig = `${hp}|${abs}|${food}|${sat <= 0 ? 1 : 0}|${armor}|${hurting ? 1 : 0}|${poisoned ? 1 : 0}|${showOxygen ? 1 : 0}|${bubbles}`;
+    if (sig === this._lastVitalsSig) return;
+    this._lastVitalsSig = sig;
+
+    // 1. Armor Row (hidden when armor === 0)
+    if (this.armorRowEl) {
+      this.armorRowEl.classList.toggle('hidden', armor <= 0);
+      if (armor > 0) {
+        let html = '';
+        for (let i = 0; i < 10; i++) {
+          const pts = armor - i * 2;
+          const st = pts >= 2 ? 'full' : pts === 1 ? 'half' : 'empty';
+          html += `<span class="v-icon">${makeArmorSvg(st)}</span>`;
+        }
+        this.armorRowEl.innerHTML = html;
+      }
+    }
+
+    // 2. Hearts Row (10 base hearts + optional golden absorption hearts)
+    if (this.heartsRowEl) {
+      this.heartsRowEl.classList.toggle('vitals-shake', hp > 0 && hp <= 4);
+      this.heartsRowEl.classList.toggle('vitals-hurting', hurting);
+      let html = '';
+      for (let i = 0; i < 10; i++) {
+        const pts = hp - i * 2;
+        const st = pts >= 2 ? 'full' : pts === 1 ? 'half' : 'empty';
+        html += `<span class="v-icon">${makeHeartSvg(st, false)}</span>`;
+      }
+      if (abs > 0) {
+        const extraHearts = Math.ceil(abs / 2);
+        for (let i = 0; i < extraHearts; i++) {
+          const pts = abs - i * 2;
+          const st = pts >= 2 ? 'full' : 'half';
+          html += `<span class="v-icon">${makeHeartSvg(st, true)}</span>`;
+        }
+      }
+      this.heartsRowEl.innerHTML = html;
+    }
+
+    // 3. Oxygen Row (shown when underwater or regenerating air)
+    if (this.oxygenRowEl) {
+      this.oxygenRowEl.classList.toggle('hidden', !showOxygen);
+      if (showOxygen) {
+        let html = '';
+        for (let i = 0; i < 10; i++) {
+          const filled = i >= (10 - bubbles);
+          html += `<span class="v-icon">${makeBubbleSvg(filled)}</span>`;
+        }
+        this.oxygenRowEl.innerHTML = html;
+      }
+    }
+
+    // 4. Hunger Drumsticks Row (right-to-left)
+    if (this.hungerRowEl) {
+      this.hungerRowEl.classList.toggle('vitals-hunger-shake', sat <= 0 && food < 20);
+      let html = '';
+      for (let i = 9; i >= 0; i--) {
+        const pts = food - i * 2;
+        const st = pts >= 2 ? 'full' : pts === 1 ? 'half' : 'empty';
+        html += `<span class="v-icon">${makeDrumstickSvg(st, poisoned)}</span>`;
+      }
+      this.hungerRowEl.innerHTML = html;
+    }
+  }
+
   openSettings(origin = 'menu') {
     this.settingsOrigin = origin;
     this.settingsOverlay?.classList.remove('hidden');
@@ -260,12 +497,14 @@ export class Hud {
 
   showMainMenu(showWorlds = false) {
     this.inMainMenu = true;
+    this.hideDeathScreen();
     this.setPaused(true);
     this.pauseOverlay?.classList.add('hidden');
     this.settingsOverlay?.classList.add('hidden');
     this.mainMenuOverlay?.classList.remove('hidden');
     this.menuHome?.classList.toggle('hidden', showWorlds);
     this.menuWorlds?.classList.toggle('hidden', !showWorlds);
+    this.survivalHudEl?.classList.add('hidden');
     this._updateCrosshairVisibility(false);
   }
 
@@ -299,7 +538,8 @@ export class Hud {
 
       const title = document.createElement('div');
       title.className = 'world-card-title';
-      title.textContent = w.name || 'Безымянный мир';
+      const modeTag = w.gameMode === 'creative' ? '🧱 Креатив' : '⚔️ Выживание';
+      title.textContent = `${w.name || 'Безымянный мир'} · ${modeTag}`;
 
       const meta = document.createElement('div');
       meta.className = 'world-card-meta';
@@ -455,19 +695,8 @@ export class Hud {
     this._refreshHintVisibility();
   }
 
-  setFlyModeLabel(isFly) {
-    if (this.btnFlyMode) {
-      this.btnFlyMode.textContent = isFly ? 'Полёт (2×Space / F): ВКЛ' : 'Полёт (2×Space / F): ВЫКЛ';
-    }
-  }
-
-  setGameModeLabel(creativeMode) {
-    if (this.btnGameMode) {
-      this.btnGameMode.textContent = creativeMode
-        ? 'Режим игры: Креатив (∞ блоки)'
-        : 'Режим игры: Выживание (Крафт)';
-    }
-  }
+  setFlyModeLabel() {}
+  setGameModeLabel() {}
 
   setMemoryModeLabel(unlimited) {
     if (this.btnMemoryMode) {
@@ -580,6 +809,7 @@ export class Hud {
 
     this.debugPanel.textContent = [
       `FPS: ${this.currentFps} | XYZ: ${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}`,
+      `HP: ${player.health.toFixed(1)}/20 | Food: ${player.foodLevel}/20 (Sat ${player.saturation.toFixed(1)})`,
       `${timePart} | Light: Sky ${light.sky} / Block ${light.block}`,
       `Biome: ${biomeName}`,
       `Chunk: ${cx}, ${cz} | ${player.getFacingCardinal()} | ${modeLabel} | Chunks: ${world.chunks.size}`,

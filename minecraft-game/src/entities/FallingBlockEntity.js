@@ -50,7 +50,11 @@ export class FallingBlockManager {
   _canFallInto(blockId) {
     if (blockId === 0) return true;
     const def = BlockRegistry.get(blockId);
-    return def.isLiquid || def.isCross;
+    return Boolean(def.isLiquid || def.isCross || def.isTorch || def.isLadder || def.isCrop);
+  }
+
+  _isFragileBreakTarget(def) {
+    return Boolean(def && (def.isTorch || def.isCross || def.isLadder || def.isCrop || def.isBed || def.inset > 0));
   }
 
   _spawnFallingBlock(world, bx, by, bz, blockId) {
@@ -126,6 +130,17 @@ export class FallingBlockManager {
 
       const checkY = Math.floor(nextY);
       const targetId = world.getBlock(ent.x, checkY, ent.z);
+      const targetDef = BlockRegistry.get(targetId);
+
+      // Minecraft rule: falling sand/gravel entering a Torch, Plant, Crop, or Ladder breaks into an item drop
+      if (targetId !== 0 && !targetDef.isLiquid && this._isFragileBreakTarget(targetDef)) {
+        this.scene.remove(ent.mesh);
+        this.entities.splice(i, 1);
+        if (itemManager) {
+          itemManager.spawnDrop(ent.blockId, ent.x + 0.5, checkY + 0.35, ent.z + 0.5, 1);
+        }
+        continue;
+      }
 
       if (!this._canFallInto(targetId)) {
         // Land on the cell right above the solid obstacle
@@ -136,9 +151,9 @@ export class FallingBlockManager {
         this.scene.remove(ent.mesh);
         this.entities.splice(i, 1);
 
-        if (occupyDef.isCross || occupyDef.inset > 0) {
-          // Minecraft rule: sand falling onto a plant/cactus breaks into an item drop
-          if (dropItemsOnPlant && itemManager) {
+        if (this._isFragileBreakTarget(occupyDef) || this._isFragileBreakTarget(targetDef)) {
+          // Falling onto a fragile / inset block (cactus, torch, plant, bed) breaks into a drop
+          if ((dropItemsOnPlant || targetDef.isTorch || occupyDef.isTorch) && itemManager) {
             itemManager.spawnDrop(ent.blockId, ent.x + 0.5, landY + 0.25, ent.z + 0.5, 1);
           }
         } else if (landY >= 0 && landY < WORLD_HEIGHT) {

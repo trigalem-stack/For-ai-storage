@@ -7,12 +7,16 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#2d63b8">
-  <title>Minecraft Web Edition — Stage 5</title>
+  <title>Minecraft Web Edition — Stage 6</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <canvas id="game-canvas" aria-label="Minecraft 3D World"></canvas>
+
+  <!-- Vignettes for Damage & Wall/Sand Suffocation -->
+  <div id="damage-vignette" aria-hidden="true"></div>
+  <div id="suffocation-vignette" class="hidden" aria-hidden="true"></div>
 
   <!-- Crisp White Crosshair (hidden in F5 3rd-person camera modes) -->
   <div id="crosshair" aria-hidden="true"></div>
@@ -33,8 +37,11 @@
     </div>
   </div>
 
-  <!-- Top-Right Utility HUD -->
+  <!-- Top-Right Utility HUD (High-responsiveness mobile buttons) -->
   <div id="hud-top-right">
+    <button id="btn-touch-mouse" class="mc-hud-btn hidden" type="button" title="Виртуальная мышь">
+      <span aria-hidden="true">🖱️</span>
+    </button>
     <button id="btn-camera" class="mc-hud-btn" type="button" title="Сменить вид камеры (F5)">
       <span aria-hidden="true">🎥</span><span class="btn-sub">F5</span>
     </button>
@@ -52,13 +59,25 @@
 
   <!-- PC Pointer Lock Hint -->
   <div id="pc-lock-hint" class="hidden">
-    Клик по миру · <b>ЛКМ</b> копать · <b>ПКМ</b> ставить/открыть · <b>E</b> инвентарь · <b>Q</b> выбросить · <b>2×W</b> бег · <b>F</b> полёт
+    Клик по миру · <b>ЛКМ</b> копать · <b>ПКМ</b> ставить/есть · <b>E</b> инвентарь · <b>Q</b> выбросить · <b>2×W</b> бег
   </div>
 
   <!-- Status Toast -->
   <div id="hud-toast" class="hidden" role="status" aria-live="polite"></div>
 
-  <!-- 9-Slot Minecraft Hotbar + Inventory/Menu Button [•••] -->
+  <!-- Survival Vitals HUD (Armor, Hearts, Oxygen, Hunger right above Hotbar) -->
+  <div id="survival-hud" class="hidden" aria-label="Показатели выживания">
+    <div class="vitals-col vitals-left">
+      <div id="hud-armor-row" class="vitals-row hidden" aria-label="Броня"></div>
+      <div id="hud-hearts-row" class="vitals-row" aria-label="Здоровье"></div>
+    </div>
+    <div class="vitals-col vitals-right">
+      <div id="hud-oxygen-row" class="vitals-row hidden" aria-label="Кислород"></div>
+      <div id="hud-hunger-row" class="vitals-row" aria-label="Голод"></div>
+    </div>
+  </div>
+
+  <!-- 9-Slot Minecraft Hotbar + Inventory Button [•••] -->
   <div id="hotbar-wrapper">
     <div id="hotbar-item-name" class="hidden"></div>
     <div class="hotbar-row">
@@ -67,12 +86,13 @@
     </div>
   </div>
 
-  <!-- Stage 5 Unified Inventory / Crafting Table / Furnace / Chest / Recipe Book Modal -->
+  <!-- Stage 5 & 6 Unified Inventory / Crafting Table / Furnace / Chest / Recipe Book Modal -->
   <div id="inventory-overlay" class="hidden" role="dialog" aria-modal="true" aria-label="Инвентарь и крафт">
     <div class="inv-shell">
       <div id="inv-recipe-drawer" class="mc-modal inv-recipe-drawer hidden">
         <div class="palette-header">
           <h3>📖 Рецепты</h3>
+          <button id="btn-recipe-filter" class="mc-hud-btn inv-tool-btn" type="button" title="Показать только доступные">Все</button>
         </div>
         <div id="inv-recipe-list" class="inv-recipe-list"></div>
       </div>
@@ -81,10 +101,10 @@
         <div class="inv-header">
           <h2 id="inv-title">Инвентарь</h2>
           <div class="inv-toolbar">
-            <button id="btn-inv-recipes" class="mc-hud-btn inv-tool-btn" type="button" title="Книга рецептов">📖 Рецепты</button>
+            <button id="btn-inv-recipes" class="mc-hud-btn inv-tool-btn" type="button" title="Книга рецептов">📖</button>
             <button id="btn-inv-creative" class="mc-hud-btn inv-tool-btn hidden" type="button" title="Творческий каталог">✨ Блоки</button>
-            <button id="btn-inv-split" class="mc-hud-btn inv-tool-btn" type="button" title="Разделить стак пополам (или долгое нажатие)">½ Разделить</button>
-            <button id="btn-inv-drop" class="mc-hud-btn inv-tool-btn" type="button" title="Выбросить выбранный предмет (Q)">Выбросить</button>
+            <button id="btn-inv-split" class="mc-hud-btn inv-tool-btn" type="button" title="Разделить стак пополам">½</button>
+            <button id="btn-inv-drop" class="mc-hud-btn inv-tool-btn" type="button" title="Выбросить (Q)">Брос.</button>
             <button id="btn-inv-close" class="mc-hud-btn" type="button" title="Закрыть (E / Esc)">✕</button>
           </div>
         </div>
@@ -117,7 +137,7 @@
     </div>
   </div>
 
-  <!-- Mobile Multitouch Controls: Left Half = Dynamic Floating Joystick, Right Half = Camera + Big Action Buttons -->
+  <!-- Mobile Multitouch Controls: Left Half = Dynamic Floating Joystick, Right Half = Camera + Action Buttons -->
   <div id="mobile-controls" class="hidden">
     <div id="touch-move-zone" aria-label="Зона динамического джойстика"></div>
     <div id="touch-look-zone" aria-label="Зона обзора камеры"></div>
@@ -129,15 +149,41 @@
 
     <div id="touch-action-cluster">
       <div class="touch-col">
-        <button id="btn-touch-fly" class="mc-touch-btn mc-touch-small" type="button" title="Полёт (или 2×▲)">🕊️</button>
+        <button id="btn-touch-fly" class="mc-touch-btn mc-touch-small hidden" type="button" title="Полёт (или 2×▲)">🕊️</button>
         <button id="btn-touch-break" class="mc-touch-btn mc-touch-break" type="button" title="Ломать блок">⛏</button>
       </div>
       <div class="touch-col">
-        <button id="btn-touch-place" class="mc-touch-btn mc-touch-place" type="button" title="Поставить блок">🧱</button>
+        <button id="btn-touch-place" class="mc-touch-btn mc-touch-place" type="button" title="Поставить / Использовать">🧱</button>
       </div>
       <div class="touch-vert-pair">
-        <button id="btn-touch-jump" class="mc-touch-btn mc-touch-move" type="button" title="Прыжок / Всплыть / 2× Полёт">▲</button>
-        <button id="btn-touch-crouch" class="mc-touch-btn mc-touch-move" type="button" title="Присед / Нырнуть / Вниз">▼</button>
+        <button id="btn-touch-jump" class="mc-touch-btn mc-touch-move" type="button" title="Прыжок / Всплыть">▲</button>
+        <button id="btn-touch-crouch" class="mc-touch-btn mc-touch-move" type="button" title="Присед / Нырнуть">▼</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PojavLauncher-style Mobile Virtual Mouse Pointer & Action Pad -->
+  <div id="virtual-cursor" class="hidden" aria-hidden="true">
+    <svg viewBox="0 0 18 24" width="22" height="28">
+      <polygon points="1,1 1,21 6,16 10,23 13,22 9,15 16,15" fill="#ffffff" stroke="#111111" stroke-width="1.8" stroke-linejoin="miter"/>
+    </svg>
+  </div>
+  <div id="vm-action-bar" class="hidden" aria-label="Управление виртуальной мышью">
+    <button id="vm-btn-pri" class="vm-btn" type="button" title="Левый клик (Взять / Положить)">ЛКМ</button>
+    <button id="vm-btn-sec" class="vm-btn" type="button" title="Правый клик (Половина / 1 шт.)">ПКМ</button>
+    <button id="vm-btn-shift" class="vm-btn" type="button" title="Удержание Shift (Быстрый перенос)">⇧ Shift</button>
+    <button id="vm-btn-drop" class="vm-btn" type="button" title="Выбросить (Q)">Q Брос.</button>
+  </div>
+
+  <!-- Death Screen Overlay (Stage 6) -->
+  <div id="death-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="death-title">
+    <div class="death-card">
+      <h1 id="death-title">Вы погибли!</h1>
+      <p id="death-reason" class="death-reason"></p>
+      <p id="death-score" class="death-score">Счёт: 0</p>
+      <div class="death-actions">
+        <button id="btn-respawn" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">Возродиться</button>
+        <button id="btn-death-menu" class="mc-menu-btn mc-btn-lg" type="button">Главное меню</button>
       </div>
     </div>
   </div>
@@ -148,7 +194,7 @@
       <div class="mc-logo-badge">
         <div class="mc-cube-badge"></div>
         <h1 id="main-title">MINECRAFT WEB</h1>
-        <p class="mc-modal-sub">Этап 5 · Инвентарь · Верстак 3×3 · Инструменты · Броня · Печь · Сундук</p>
+        <p class="mc-modal-sub">Этап 6 · Здоровье · Броня · Голод · Фермерство · Урон · Возрождение</p>
       </div>
       <div class="mc-modal-actions">
         <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">▶ Играть (Миры)</button>
@@ -163,8 +209,12 @@
       </div>
 
       <div class="create-world-box">
-        <input id="input-world-name" class="mc-input" type="text" maxlength="32" placeholder="Название мира (например: Горы)">
+        <input id="input-world-name" class="mc-input" type="text" maxlength="32" placeholder="Название мира (например: Выживание)">
         <input id="input-world-seed" class="mc-input" type="text" maxlength="24" placeholder="Сид (необязательно)">
+        <div class="mode-picker-row" role="group" aria-label="Режим нового мира">
+          <button id="btn-new-mode-survival" type="button" class="mc-menu-btn mode-pick-btn active" data-mode="survival">⚔️ Выживание</button>
+          <button id="btn-new-mode-creative" type="button" class="mc-menu-btn mode-pick-btn" data-mode="creative">🧱 Креатив</button>
+        </div>
         <button id="btn-create-world" class="mc-menu-btn mc-menu-primary" type="button">+ Создать новый мир</button>
       </div>
 
@@ -200,9 +250,7 @@
         </div>
 
         <div class="settings-tab-panel hidden" data-tab-panel="controls">
-          <button id="btn-game-mode" class="mc-menu-btn" type="button">Режим игры: Выживание (Крафт)</button>
           <button id="btn-control-mode" class="mc-menu-btn" type="button">Управление: ПК (Мышь + WASD)</button>
-          <button id="btn-fly-mode" class="mc-menu-btn" type="button">Полёт (2×Space / F): ВЫКЛ</button>
 
           <label class="mc-slider-row" for="range-sensitivity">
             <span>Чувствительность камеры: <strong id="label-sensitivity">100%</strong></span>
@@ -212,16 +260,16 @@
           <div class="mc-help-box">
             <b>Телефон:</b><br>
             • Левая половина экрана — динамический джойстик (появляется под пальцем)<br>
-            • 2×быстрое движение вперёд с удержанием — бег; в воде под поверхностью — быстрое плавание (пролезает в 1 блок!)<br>
-            • Правая половина — обзор, короткий тап ставит блок, удержание ломает<br><br>
-            <b>ПК:</b> 2×W — бег, 2×Space / F — полёт, E — выбор блоков, СКМ — пипетка.
+            • 2×быстрое движение вперёд с удержанием — бег; 🖱️ — виртуальный курсор как в PojavLauncher<br>
+            • Зажатие 🍖 ест еду; тап/удержание правой половины — обзор, ставить, ломать<br><br>
+            <b>ПК:</b> 2×W — бег, E — инвентарь, Q — выбросить, F3/F5 — отладка/камера. (Полёт доступен в мирах режима Креатив!)
           </div>
         </div>
 
         <div class="settings-tab-panel hidden" data-tab-panel="other">
           <button id="btn-hint-mode" class="mc-menu-btn" type="button">Подсказки управления: ВКЛ</button>
           <div class="mc-help-box">
-            Все миры, постройки, инвентарь и настройки автоматически сохраняются локально в IndexedDB вашего устройства (100% оффлайн).
+            Режим мира (Выживание / Креатив) выбирается при создании мира. Все миры, здоровье, еда, грядки, сундуки и инвентарь автоматически сохраняются локально в IndexedDB (100% оффлайн).
           </div>
         </div>
       </div>

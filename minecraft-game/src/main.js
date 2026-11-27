@@ -7,6 +7,7 @@ import {
   DEFAULT_RENDER_DISTANCE_MOBILE,
   DEFAULT_RENDER_DISTANCE_PC,
   DEFAULT_WORLD_TIME,
+  EAT_DURATION_SEC,
   PLAYER_HALF_WIDTH,
   SLEEP_END_TICK,
   SLEEP_START_TICK,
@@ -16,6 +17,7 @@ import {
 import { FallingBlockManager } from './entities/FallingBlockEntity.js';
 import { ItemEntityManager } from './entities/ItemEntity.js';
 import { Inventory } from './items/Inventory.js';
+import { ITEM_IDS } from './items/ItemIds.js';
 import { ItemRegistry } from './items/ItemRegistry.js';
 import { aabbIntersectsBlock, collidesWithWorld } from './physics/AABBPhysics.js';
 import { FirstPersonHand } from './player/FirstPersonHand.js';
@@ -27,6 +29,7 @@ import { Hotbar } from './ui/Hotbar.js';
 import { Hud } from './ui/Hud.js';
 import { InventoryUI } from './ui/InventoryUI.js';
 import { MobileControls } from './ui/MobileControls.js';
+import { VirtualMouse } from './ui/VirtualMouse.js';
 import { BlockEntityManager } from './world/BlockEntityManager.js';
 import { MenuPanorama } from './world/MenuPanorama.js';
 import { BreakCrackOverlay, SelectionBox, raycastVoxel } from './world/Raycast.js';
@@ -115,15 +118,20 @@ class MinecraftGame {
 
     this.activeWorldId = null;
     this.activeWorldName = 'Мой мир';
+    this.currentWorldMode = 'survival';
     this.worldSeed = randomWorldSeed();
     this.spawnPoint = null;
+    this.bedSpawnPoint = null;
 
     this.currentTargetHit = null;
     this.creativeBreakTimer = 0;
     this.wasMiningHeld = false;
     this.miningBlockKey = '';
     this.miningElapsed = 0;
+    this.eatingElapsed = 0;
+    this.eatingSlotIndex = -1;
     this.isSleeping = false;
+    this.virtualMouse = null;
 
     this.lastFrameTime = performance.now();
     this.tickAccumulator = 0;
@@ -136,7 +144,7 @@ class MinecraftGame {
   }
 
   get gameMode() {
-    return this.settings.gameMode === 'creative' ? 'creative' : 'survival';
+    return this.currentWorldMode === 'creative' ? 'creative' : 'survival';
   }
 
   _applyPixelRatio() {
@@ -157,6 +165,7 @@ class MinecraftGame {
     this.playerModel.setHeldItem(held);
     this.playerModel.setArmor(this.inventory.armor);
     this.playerPreview?.syncEquipment(held, this.inventory.armor);
+    this.mobileControls?.setHeldFoodIndicator(ItemRegistry.isFood(held?.id));
   }
 
   _dropStackFromPlayer(stack) {
@@ -168,22 +177,23 @@ class MinecraftGame {
   }
 
   openInventoryModal(mode = 'inventory', blockPos = null) {
-    if (!this.inventoryUI || !this.player || this.hud?.inMainMenu || this.hud?.isPaused) return;
+    if (!this.inventoryUI || !this.player || this.player.isDead || this.hud?.inMainMenu || this.hud?.isPaused) return;
     if (document.pointerLockElement) {
       document.exitPointerLock?.();
     }
     this.player.setPaused(true);
     this.inventoryUI.open(mode, blockPos);
+    this.virtualMouse?.setGuiOpen(true);
   }
 
   togglePlayerInventory() {
-    if (!this.inventoryUI || !this.player || this.hud?.inMainMenu) return;
+    if (!this.inventoryUI || !this.player || this.player.isDead || this.hud?.inMainMenu) return;
     if (this.inventoryUI.isOpen) {
       this.inventoryUI.close();
       return;
     }
     if (this.hud?.isPaused) return;
-    this.openInventoryModal(this.gameMode === 'creative' ? 'inventory' : 'inventory');
+    this.openInventoryModal('inventory');
   }
 
   async init() {
@@ -215,15 +225,25 @@ class MinecraftGame {
       },
     });
 
+    this.virtualMouse = new VirtualMouse({
+      isTouchDevice,
+      onPointerMove: (x, y, hoveredEl) => this.inventoryUI?.updateVirtualPointer(x, y, hoveredEl),
+      onSlotVirtualClick: (zone, index, button, shiftKey, x, y) =>
+        this.inventoryUI?.handleVirtualSlotClick(zone, index, button, shiftKey, x, y),
+      onVirtualDrop: (zone, index) => this.inventoryUI?.handleVirtualDrop(zone, index),
+      onStatusToast: (msg) => this.hud?.showToast(msg),
+    });
+
     this.inventoryUI = new InventoryUI(this.atlas, this.inventory, this.blockEntities, {
       playerPreview: this.playerPreview,
       onDropStack: (stack) => this._dropStackFromPlayer(stack),
       onClose: () => {
+        this.virtualMouse?.setGuiOpen(false);
         this.player?.setPaused(false);
         this.hotbar?.render();
         this._syncHeldAndArmorVisuals();
         if (this.activeWorldId) this._scheduleSave();
-        if (!this.settings.touchMode && !this.hud?.isPaused && !this.hud?.inMainMenu) {
+        if (!this.settings.touchMode && !this.hud?.isPaused && !this.hud?.inMainMenu && !this.player?.isDead) {
           this._requestPointerLockSafe();
         }
       },
@@ -239,16 +259,19 @@ class MinecraftGame {
         this.hud.setPointerLocked(Boolean(this.player?.pointerLocked));
       },
       onResume: () => {
-        if (!this.settings.touchMode) {
+        if (!this.settings.touchMode && !this.player?.isDead) {
           this._requestPointerLockSafe();
         }
+      },
+      onRespawn: () => {
+        this.respawnPlayer();
       },
       onOpenWorldsManager: async () => {
         const list = await this.saveManager.listWorlds();
         this.hud.renderWorldsList(list, this.activeWorldId);
       },
-      onCreateWorld: async ({ name, seed }) => {
-        const meta = await this.saveManager.createWorld({ name, seed });
+      onCreateWorld: async ({ name, seed, gameMode }) => {
+        const meta = await this.saveManager.createWorld({ name, seed, gameMode });
         await this.enterWorld(meta.id);
       },
       onSelectWorld: async (worldId) => {
@@ -264,6 +287,7 @@ class MinecraftGame {
       },
       onExitToMenu: async () => {
         if (this.inventoryUI?.isOpen) this.inventoryUI.close();
+        this.virtualMouse?.setGuiOpen(false);
         await this.saveNow();
         this._unloadWorldFromEngine();
         this.hud.showMainMenu(true);
@@ -277,18 +301,6 @@ class MinecraftGame {
       },
       onToggleControlMode: () => {
         this.setTouchMode(!this.settings.touchMode);
-      },
-      onToggleGameMode: () => {
-        const nextCreative = this.gameMode !== 'creative';
-        this.settings.gameMode = nextCreative ? 'creative' : 'survival';
-        this.inventory.creativeMode = nextCreative;
-        this.hotbar.setCreativeMode(nextCreative);
-        this.hud.setGameModeLabel(nextCreative);
-        this.hud.showToast(nextCreative ? 'Режим: Креатив' : 'Режим: Выживание');
-        this.saveSettingsOnly();
-      },
-      onToggleFlyMode: () => {
-        this.player?.toggleFlyMode();
       },
       onToggleMemoryMode: () => {
         this.settings.unlimitedMemory = !this.settings.unlimitedMemory;
@@ -432,7 +444,7 @@ class MinecraftGame {
       this.fallingManager.scheduleStabilityCheck(wx, wy + 1, wz);
     }
 
-    // 2. If block was removed, detach any torches/ladders supported by this block (drops in BOTH modes)
+    // 2. If block was removed, detach any torches/ladders/crops/plants supported by this block (drops in BOTH modes)
     if (newId === 0 && oldId !== 0) {
       const checkSupportAttach = (tx, ty, tz, expectedMeta, targetBlockId) => {
         if (this.world.getBlock(tx, ty, tz) === targetBlockId &&
@@ -452,6 +464,15 @@ class MinecraftGame {
       checkSupportAttach(wx, wy, wz + 1, 3, BLOCK_IDS.LADDER);
       checkSupportAttach(wx, wy, wz - 1, 4, BLOCK_IDS.LADDER);
 
+      const aboveId = this.world.getBlock(wx, wy + 1, wz);
+      if (aboveId !== 0 && (BlockRegistry.isCrop(aboveId) || BlockRegistry.isCross(aboveId))) {
+        const drops = BlockRegistry.getHarvestDrops(aboveId, null);
+        this.world.setBlock(wx, wy + 1, wz, 0, true, false);
+        for (const d of drops) {
+          this.itemManager.spawnDrop(d.id, wx + 0.5, wy + 1.25, wz + 0.5, d.count);
+        }
+      }
+
       // 3. Spill chest/furnace contents and close modal if currently viewing it
       this.blockEntities.onBlockRemoved(wx, wy, wz, this.itemManager);
       if (this.inventoryUI?.isOpen && this.inventoryUI.activeBlockPos &&
@@ -459,6 +480,11 @@ class MinecraftGame {
           this.inventoryUI.activeBlockPos.y === wy &&
           this.inventoryUI.activeBlockPos.z === wz) {
         this.inventoryUI.close();
+      }
+    } else if (newId !== 0 && BlockRegistry.isSolid(newId) && wy > 0) {
+      // Placing a solid block directly onto farmland turns it back to dirt
+      if (this.world.getBlock(wx, wy - 1, wz) === BLOCK_IDS.FARMLAND) {
+        this.world.setBlock(wx, wy - 1, wz, BLOCK_IDS.DIRT, true, false);
       }
     }
 
@@ -476,14 +502,93 @@ class MinecraftGame {
     }
   }
 
+  _handlePlayerDeath(sourceType, score) {
+    if (!this.player) return;
+    if (this.inventoryUI?.isOpen) {
+      this.inventoryUI.close();
+    }
+    this.virtualMouse?.setGuiOpen(false);
+    if (document.pointerLockElement) {
+      document.exitPointerLock?.();
+    }
+    this.eatingElapsed = 0;
+    this.firstPersonHand?.setEatingActive(false);
+
+    if (this.gameMode !== 'creative') {
+      const dropped = this.inventory.extractAllForDeath();
+      for (const stack of dropped) {
+        this.itemManager.spawnDeathDrop(stack, this.player.x, this.player.y, this.player.z);
+      }
+      this.hotbar?.render();
+      this._syncHeldAndArmorVisuals();
+    }
+
+    this.hud?.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
+    this.hud?.showDeathScreen(sourceType, score);
+    this._scheduleSave();
+  }
+
+  _isBedSpotValid(spot) {
+    if (!spot || !this.world) return false;
+    const bx = Math.floor(spot.x);
+    const by = Math.floor(spot.y);
+    const bz = Math.floor(spot.z);
+    for (let dy = -1; dy <= 1; dy++) {
+      const id = this.world.getBlock(bx, by + dy, bz);
+      if (BlockRegistry.get(id).isBed) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  respawnPlayer() {
+    if (!this.player || !this.world) return;
+    let target = null;
+    if (this.bedSpawnPoint) {
+      if (this._isBedSpotValid(this.bedSpawnPoint)) {
+        target = { ...this.bedSpawnPoint };
+      } else {
+        this.hud?.showToast('Ваша кровать отсутствует или заблокирована');
+        this.bedSpawnPoint = null;
+      }
+    }
+    if (!target) {
+      target = this.spawnPoint
+        ? { ...this.spawnPoint }
+        : this.world.worldGen.findSafeSpawn();
+    }
+
+    this.world.preloadSpawnArea(target.x, target.z, 2);
+    let ry = Number.isFinite(target.y) ? target.y : this.world.getSurfaceHeightAt(target.x, target.z);
+    while (
+      ry < WORLD_HEIGHT - 3 &&
+      collidesWithWorld(this.world, target.x, ry, target.z, PLAYER_HALF_WIDTH, 1.8)
+    ) {
+      ry += 1;
+    }
+
+    this.player.respawn({ x: target.x, y: ry, z: target.z });
+    this.playerModel.setDead?.(false);
+    this.hud?.hideDeathScreen();
+    this.hud?.updateSurvivalVitals(this.player, this.inventory.getTotalArmorPoints());
+    this._syncHeldAndArmorVisuals();
+    if (!this.settings.touchMode) {
+      this._requestPointerLockSafe();
+    }
+    this.saveNow();
+  }
+
   async loadWorldIntoEngine(worldId) {
     this._unloadWorldFromEngine();
 
     const saved = await this.saveManager.loadWorld(worldId);
     this.activeWorldId = worldId;
     this.activeWorldName = saved?.name || 'Мой мир';
+    this.currentWorldMode = saved?.gameMode === 'creative' ? 'creative' : 'survival';
     this.worldSeed = Number.isFinite(saved?.worldSeed) ? saved.worldSeed : randomWorldSeed();
     this.spawnPoint = saved?.spawnPoint || null;
+    this.bedSpawnPoint = saved?.bedSpawnPoint || null;
 
     this.skyRenderer.setTime(
       Number.isFinite(saved?.worldTime) ? saved.worldTime : DEFAULT_WORLD_TIME,
@@ -509,10 +614,15 @@ class MinecraftGame {
     }
 
     const spawn = saved?.player ?? this.world.worldGen.findSafeSpawn();
+    const isCreative = this.currentWorldMode === 'creative';
 
     this.player = new PlayerController(this.camera, this.world, this.playerModel, this.firstPersonHand, {
       ...spawn,
+      ...(saved?.survival || {}),
+      creativeMode: isCreative,
+      flyMode: isCreative ? Boolean(saved?.player?.flyMode) : false,
       sensitivity: 0.0022 * (this.settings.sensitivity || 1.0),
+      getArmorPoints: () => this.inventory.getTotalArmorPoints(),
       onPlaceAction: () => this._handlePlaceBlock(),
       onPickBlock: () => this._handlePickBlock(),
       onCameraModeChange: (mode) => this.hud?.onCameraModeChanged(mode),
@@ -529,10 +639,24 @@ class MinecraftGame {
         this.mobileControls?.setFlyActive(active);
         this.hud?.showToast(active ? 'Режим полёта: ВКЛ' : 'Режим полёта: ВЫКЛ');
       },
+      onArmorDamage: (wear) => {
+        if (this.inventory.damageArmor(wear)) {
+          this.hotbar?.render();
+          this._syncHeldAndArmorVisuals();
+        }
+      },
+      onDamage: () => {
+        this.hud?.triggerDamageFlash();
+        this.hud?.updateSurvivalVitals(this.player, this.inventory.getTotalArmorPoints());
+      },
+      onDeath: (sourceType) => {
+        this._handlePlayerDeath(sourceType, this.player?.score || 0);
+      },
     });
 
     if (this.mobileControls) {
       this.mobileControls.player = this.player;
+      this.mobileControls.setCreativeMode(isCreative);
       this.mobileControls.setFlyActive(this.player.flyMode);
     }
 
@@ -551,22 +675,27 @@ class MinecraftGame {
       }
     }
 
-    this.inventory.creativeMode = this.gameMode === 'creative';
+    this.inventory.creativeMode = isCreative;
     if (saved?.inventory) {
       this.inventory.loadState(saved.inventory);
     } else if (saved?.hotbar) {
       this.inventory.clearAll();
       this.hotbar.loadState(saved.hotbar);
-    } else if (this.gameMode === 'creative') {
+    } else if (isCreative) {
       this.hotbar.resetStarterKit();
     } else {
       this.inventory.clearAll();
     }
+    this.hotbar.setCreativeMode(isCreative);
     this.hotbar.render();
     this._syncHeldAndArmorVisuals();
 
     this.skyRenderer.update(0.001, this.player.x, this.player.y, this.player.z, this.world);
     this.player.update(0.001);
+    this.hud?.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
+    if (this.player.isDead) {
+      this.hud?.showDeathScreen(this.player.deathSource || 'generic', this.player.deathScore || 0);
+    }
   }
 
   async enterWorld(worldId) {
@@ -591,6 +720,7 @@ class MinecraftGame {
     this.settings.touchMode = Boolean(enabled);
     this._applyPixelRatio();
     this.mobileControls?.setEnabled(this.settings.touchMode);
+    this.virtualMouse?.setTouchDevice(this.settings.touchMode);
     this.hud?.setTouchModeLabel(this.settings.touchMode);
     if (this.settings.touchMode && document.pointerLockElement) {
       document.exitPointerLock?.();
@@ -624,7 +754,11 @@ class MinecraftGame {
 
   _interactWithBed(hit) {
     if (this.isSleeping) return true;
-    this.spawnPoint = { x: hit.x + 0.5, y: hit.y + 0.6, z: hit.z + 0.5 };
+    const bx = hit.x + 0.5;
+    const by = hit.y + 0.6;
+    const bz = hit.z + 0.5;
+    this.bedSpawnPoint = { x: bx, y: by, z: bz };
+    this.spawnPoint = { x: bx, y: by, z: bz };
     const t = this.skyRenderer.worldTime;
 
     if (t >= SLEEP_START_TICK && t <= SLEEP_END_TICK) {
@@ -637,7 +771,7 @@ class MinecraftGame {
         this._scheduleSave();
       });
     } else {
-      this.hud.showToast('Спать можно только ночью');
+      this.hud.showToast('Точка возрождения установлена (спать можно ночью)');
       this._scheduleSave();
     }
     return true;
@@ -645,43 +779,91 @@ class MinecraftGame {
 
   _handlePlaceBlock() {
     const hit = this.currentTargetHit;
-    if (!hit || !this.world || !this.player) return false;
+    if (!this.world || !this.player || this.player.isDead) return false;
 
-    const targetDef = BlockRegistry.get(hit.blockId);
+    const slot = this.hotbar.getSelectedSlot();
 
-    // 1. Block interactions when NOT crouching (Bed, Crafting Table, Furnace, Chest)
-    if (!this.player.isCrouching) {
-      if (targetDef.isBed) {
-        return this._interactWithBed(hit);
+    if (hit) {
+      const targetDef = BlockRegistry.get(hit.blockId);
+
+      // 1. Block interactions when NOT crouching (Bed, Crafting Table, Furnace, Chest)
+      if (!this.player.isCrouching) {
+        if (targetDef.isBed) {
+          return this._interactWithBed(hit);
+        }
+        if (hit.blockId === BLOCK_IDS.CRAFTING_TABLE) {
+          this.openInventoryModal('crafting', hit);
+          return true;
+        }
+        if (hit.blockId === BLOCK_IDS.FURNACE || hit.blockId === BLOCK_IDS.FURNACE_LIT) {
+          this.openInventoryModal('furnace', hit);
+          return true;
+        }
+        if (hit.blockId === BLOCK_IDS.CHEST) {
+          this.openInventoryModal('chest', hit);
+          return true;
+        }
       }
-      if (hit.blockId === BLOCK_IDS.CRAFTING_TABLE) {
-        this.openInventoryModal('crafting', hit);
-        return true;
+
+      // 2. Touching Redstone Ore activates its glow
+      if (targetDef.redstoneGlow) {
+        this.world.triggerRedstoneGlow(hit.x, hit.y, hit.z);
       }
-      if (hit.blockId === BLOCK_IDS.FURNACE || hit.blockId === BLOCK_IDS.FURNACE_LIT) {
-        this.openInventoryModal('furnace', hit);
-        return true;
-      }
-      if (hit.blockId === BLOCK_IDS.CHEST) {
-        this.openInventoryModal('chest', hit);
-        return true;
+
+      if (slot && slot.id > 0) {
+        const heldDef = ItemRegistry.get(slot.id);
+
+        // 2a. Hoe tilling Dirt / Grass into Farmland
+        if (heldDef?.toolType === 'hoe') {
+          if (hit.blockId === BLOCK_IDS.GRASS || hit.blockId === BLOCK_IDS.DIRT) {
+            if (hit.y + 1 < WORLD_HEIGHT && this.world.getBlock(hit.x, hit.y + 1, hit.z) === 0) {
+              this.world.setBlock(hit.x, hit.y, hit.z, BLOCK_IDS.FARMLAND, true, true, 0);
+              if (this.gameMode !== 'creative') {
+                this.inventory.damageHeldTool(1);
+                this.hotbar.render();
+                this._syncHeldAndArmorVisuals();
+              }
+              this.firstPersonHand.triggerSwing();
+              this._scheduleSave();
+              return true;
+            }
+          }
+          return false;
+        }
+
+        // 2b. Planting Wheat Seeds on Farmland
+        if (slot.id === ITEM_IDS.WHEAT_SEEDS) {
+          if (hit.blockId === BLOCK_IDS.FARMLAND && hit.normal?.y === 1) {
+            const py = hit.y + 1;
+            if (py < WORLD_HEIGHT && this.world.getBlock(hit.x, py, hit.z) === 0) {
+              this.world.setBlock(hit.x, py, hit.z, BLOCK_IDS.WHEAT_0, true, true, 0);
+              if (this.gameMode !== 'creative') {
+                this.hotbar.consumeSelected(1);
+              }
+              this.firstPersonHand.triggerSwing();
+              this._scheduleSave();
+              return true;
+            }
+          }
+          return false;
+        }
       }
     }
 
-    // 2. Touching Redstone Ore activates its glow
-    if (targetDef.redstoneGlow) {
-      this.world.triggerRedstoneGlow(hit.x, hit.y, hit.z);
-    }
-
-    if (!hit.normal || (hit.normal.x === 0 && hit.normal.y === 0 && hit.normal.z === 0)) {
+    if (!slot || slot.id <= 0) return false;
+    if (ItemRegistry.isFood(slot.id)) {
+      // Eating is sustained while holding secondary action in _updateInteraction
       return false;
     }
 
-    const slot = this.hotbar.getSelectedSlot();
-    if (!slot || slot.id <= 0) return false;
+    if (!hit || !hit.normal || (hit.normal.x === 0 && hit.normal.y === 0 && hit.normal.z === 0)) {
+      return false;
+    }
 
     // Non-placeable items (tools, swords, armor, coal, sticks, ingots...) cannot be placed as blocks
     if (!ItemRegistry.isBlockId(slot.id)) return false;
+
+    const targetDef = BlockRegistry.get(hit.blockId);
 
     const px = targetDef.isCross ? hit.x : hit.x + hit.normal.x;
     const py = targetDef.isCross ? hit.y : hit.y + hit.normal.y;
@@ -786,8 +968,71 @@ class MinecraftGame {
     return true;
   }
 
+  _updateEating(dt) {
+    if (!this.player || this.player.isDead) {
+      this.eatingElapsed = 0;
+      this.firstPersonHand.setEatingActive(false);
+      return;
+    }
+
+    const secondaryHeld = this.player.isSecondaryHeld();
+    const heldStack = this.inventory.getHeldStack();
+    const slotIdx = this.inventory.selectedSlot;
+    const foodStats = heldStack && ItemRegistry.isFood(heldStack.id)
+      ? ItemRegistry.getFoodStats(heldStack.id)
+      : null;
+
+    if (
+      !secondaryHeld ||
+      !foodStats ||
+      !this.player.canEatFood(foodStats)
+    ) {
+      this.eatingElapsed = 0;
+      this.eatingSlotIndex = -1;
+      this.firstPersonHand.setEatingActive(false);
+      return;
+    }
+
+    if (this.eatingSlotIndex !== slotIdx) {
+      this.eatingSlotIndex = slotIdx;
+      this.eatingElapsed = 0;
+    }
+
+    this.firstPersonHand.setEatingActive(true);
+    this.eatingElapsed += dt;
+
+    if (this.eatingElapsed >= EAT_DURATION_SEC) {
+      const consumedId = heldStack.id;
+      this.player.applyFoodEffects(foodStats);
+
+      if (this.gameMode !== 'creative') {
+        this.inventory.consumeOneHeld();
+        if (consumedId === ITEM_IDS.MUSHROOM_STEW) {
+          this.inventory.addItem(ITEM_IDS.BOWL, 1);
+        }
+        this.hotbar.render();
+        this._syncHeldAndArmorVisuals();
+      }
+
+      this.hud?.updateSurvivalVitals(this.player, this.inventory.getTotalArmorPoints());
+      this.eatingElapsed = 0;
+      this.eatingSlotIndex = -1;
+      this.firstPersonHand.setEatingActive(false);
+      this.player.stopEating();
+      this._scheduleSave();
+    }
+  }
+
   _updateInteraction(dt) {
     if (!this.player || !this.world) return;
+
+    if (this.player.isDead) {
+      this.selectionBox.update(null, this.world);
+      this.breakOverlay.update(null, 0);
+      this.firstPersonHand.setMiningActive(false);
+      this.firstPersonHand.setEatingActive(false);
+      return;
+    }
 
     if (this.creativeBreakTimer > 0) {
       this.creativeBreakTimer = Math.max(0, this.creativeBreakTimer - dt);
@@ -798,6 +1043,8 @@ class MinecraftGame {
     const hit = raycastVoxel(this.world, origin, dir);
     this.currentTargetHit = hit;
     this.selectionBox.update(hit, this.world);
+
+    this._updateEating(dt);
 
     const miningHeld = this.player.isMiningHeld();
     if (!miningHeld || !hit) {
@@ -885,7 +1132,7 @@ class MinecraftGame {
   }
 
   _requestPointerLockSafe() {
-    if (this.settings.touchMode || this.hud?.isPaused || this.hud?.inMainMenu || this.inventoryUI?.isOpen) return;
+    if (this.settings.touchMode || this.hud?.isPaused || this.hud?.inMainMenu || this.inventoryUI?.isOpen || this.player?.isDead) return;
     try {
       const promise = this.canvas.requestPointerLock?.();
       if (promise && typeof promise.catch === 'function') {
@@ -974,12 +1221,15 @@ class MinecraftGame {
     }
     return this.saveManager.saveWorld(this.activeWorldId, {
       worldName: this.activeWorldName,
+      gameMode: this.currentWorldMode,
       worldSeed: this.worldSeed,
       worldTime: this.skyRenderer.worldTime,
       dayCount: this.skyRenderer.dayCount,
       spawnPoint: this.spawnPoint,
+      bedSpawnPoint: this.bedSpawnPoint,
       biomeName: this.world.getBiomeNameAt(this.player.x, this.player.z),
       player: this.player.getPose(),
+      survival: this.player.getSurvivalState(),
       hotbar: this.hotbar.exportState(),
       inventory: this.inventory.exportState(),
       blockEntities: this.blockEntities.exportState(),
@@ -1028,8 +1278,11 @@ class MinecraftGame {
           this._updateInteraction(dt);
         } else {
           this.breakOverlay.update(null, 0);
+          this.firstPersonHand.setEatingActive(false);
         }
       }
+
+      this.hud.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
 
       this.fallingManager.update(dt, this.world, this.itemManager, true);
       this.itemManager.update(dt, this.world, this.player, this.inventory);

@@ -149,7 +149,7 @@ export class SaveManager {
     return [...list].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   }
 
-  async createWorld({ name, seed }) {
+  async createWorld({ name, seed, gameMode = 'survival' }) {
     const list = await this.listWorlds();
     const id = `world_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
     const now = Date.now();
@@ -157,15 +157,28 @@ export class SaveManager {
     const cleanSeed = Number.isFinite(seed) && seed !== 0
       ? (seed | 0)
       : ((Math.floor(Math.random() * 0x7fffffff) + 1) | 0);
+    const cleanMode = gameMode === 'creative' ? 'creative' : 'survival';
 
     const worldData = {
-      version: 5,
+      version: 6,
       id,
       name: cleanName,
       worldSeed: cleanSeed,
+      gameMode: cleanMode,
       worldTime: 1000,
       dayCount: 1,
       spawnPoint: null,
+      bedSpawnPoint: null,
+      survival: {
+        health: 20,
+        absorption: 0,
+        foodLevel: 20,
+        saturation: 5.0,
+        exhaustion: 0,
+        airTicks: 300,
+        score: 0,
+        hungerDebuffTimer: 0,
+      },
       player: null,
       hotbar: null,
       inventory: null,
@@ -178,6 +191,7 @@ export class SaveManager {
       id,
       name: cleanName,
       seed: cleanSeed,
+      gameMode: cleanMode,
       createdAt: now,
       updatedAt: now,
       biomeName: '',
@@ -204,15 +218,21 @@ export class SaveManager {
     const name = state.worldName || existing?.name || 'Мой мир';
     const createdAt = existing?.createdAt || now;
     const mods = Array.isArray(state.modifiedBlocks) ? state.modifiedBlocks : [];
+    const gameMode = state.gameMode === 'creative' || state.gameMode === 'survival'
+      ? state.gameMode
+      : (existing?.gameMode || 'survival');
 
     const payload = {
-      version: 5,
+      version: 6,
       id: worldId,
       name,
       worldSeed: state.worldSeed,
+      gameMode,
       worldTime: Number.isFinite(state.worldTime) ? state.worldTime : (existing?.worldTime ?? 1000),
       dayCount: Number.isFinite(state.dayCount) ? state.dayCount : (existing?.dayCount ?? 1),
       spawnPoint: state.spawnPoint ?? existing?.spawnPoint ?? null,
+      bedSpawnPoint: state.bedSpawnPoint !== undefined ? state.bedSpawnPoint : (existing?.bedSpawnPoint ?? null),
+      survival: state.survival ?? existing?.survival ?? null,
       player: state.player,
       hotbar: state.hotbar || null,
       inventory: state.inventory ?? existing?.inventory ?? null,
@@ -229,6 +249,7 @@ export class SaveManager {
       id: worldId,
       name,
       seed: state.worldSeed,
+      gameMode,
       createdAt,
       updatedAt: now,
       biomeName: state.biomeName || existing?.biomeName || '',

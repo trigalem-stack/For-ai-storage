@@ -23,11 +23,21 @@ export const ARMOR_SLOTS = 4;
 export const CHEST_SIZE = 27;
 export const FURNACE_COOK_TICKS = 200; // 10 seconds at 20 TPS
 export const ITEM_DROP_PLAYER_DELAY = 1.5; // Seconds before player-thrown item is picked back up
+export const ITEM_DROP_DEATH_LIFETIME = 300.0; // 5 minutes (6000 ticks) for death drops
 export const TOOL_DURABILITY_WOOD = 59;
 export const TOOL_DURABILITY_STONE = 131;
 export const TOOL_DURABILITY_IRON = 250;
 export const TOOL_DURABILITY_GOLD = 32;
 export const TOOL_DURABILITY_DIAMOND = 1561;
+
+// Survival stats constants (Stage 6)
+export const MAX_HEALTH = 20;
+export const MAX_FOOD = 20;
+export const DEFAULT_SATURATION = 5.0;
+export const EXHAUSTION_THRESHOLD = 4.0;
+export const MAX_AIR_TICKS = 300; // 15 seconds at 20 TPS
+export const HURT_INVULN_TICKS = 10; // 0.5 seconds i-frames
+export const EAT_DURATION_SEC = 1.6; // 32 ticks eating animation
 
 // Lighting constants (Minecraft 0..15 channels)
 export const MAX_LIGHT_LEVEL = 15;
@@ -83,7 +93,7 @@ export const MIN_RENDER_DISTANCE = 2;
 export const MAX_RENDER_DISTANCE = 16;
 
 // Chunk meshing frame budget (ms)
-export const CHUNK_FRAME_BUDGET_MS = 2.6;
+export const CHUNK_FRAME_BUDGET_MS = 1.8;
 
 // Texture atlas layout: 16x16 grid of 32x32 padded cells (inner 16x16 + 8px edge padding)
 export const ATLAS_GRID_SIZE = 16;

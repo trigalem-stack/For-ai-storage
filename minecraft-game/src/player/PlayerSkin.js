@@ -221,6 +221,7 @@ export function createRightArmGeometry() {
 }
 
 const ARMOR_TIER_COLORS = {
+  leather: { base: 0xa46238, rim: 0x6c3d1e },
   iron: { base: 0xd0d4dc, rim: 0x9aa2b0 },
   gold: { base: 0xf4cc36, rim: 0xd29c1c },
   diamond: { base: 0x42dcd0, rim: 0x24a8a2 },
@@ -252,10 +253,14 @@ export class PlayerModel {
     });
 
     this.armorMaterials = {
+      leather: new THREE.MeshLambertMaterial({ color: ARMOR_TIER_COLORS.leather.base }),
       iron: new THREE.MeshLambertMaterial({ color: ARMOR_TIER_COLORS.iron.base }),
       gold: new THREE.MeshLambertMaterial({ color: ARMOR_TIER_COLORS.gold.base }),
       diamond: new THREE.MeshLambertMaterial({ color: ARMOR_TIER_COLORS.diamond.base }),
     };
+    this.hurtFlashTimer = 0;
+    this.isDead = false;
+    this._lastPoseTime = 0;
 
     this.root = new THREE.Group();
     this.bodyGroup = new THREE.Group();
@@ -515,36 +520,72 @@ export class PlayerModel {
     this.root.visible = visible;
   }
 
+  triggerHurtFlash(duration = 0.4) {
+    this.hurtFlashTimer = duration;
+  }
+
+  setDead(dead) {
+    this.isDead = Boolean(dead);
+    if (!this.isDead) {
+      this.bodyGroup.rotation.z = 0;
+    }
+  }
+
   setEnvironmentLight(skyLevel, blockLevel, sunIntensity, skyTint, torchTint) {
     const skyCurve = Math.pow(0.82, (1 - Math.min(1, Math.max(0, skyLevel / 15))) * 15);
     const sunCurve = Math.pow(Math.max(0.001, sunIntensity), 0.92);
     const blkEff = Math.min(1, Math.max(0, blockLevel / 15));
-    const blkCurve = Math.pow(0.8, (1 - blkEff) * 15);
+    const blkCurve = Math.pow(0.87, (1 - blkEff) * 15);
 
     const sr = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.r : 1);
     const sg = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.g : 1);
     const sb = Math.pow(Math.max(0.001, skyCurve), 1.8) * sunCurve * (skyTint ? skyTint.b : 1);
 
-    const br = Math.pow(Math.max(0.001, blkCurve), 2.0) * (torchTint ? torchTint.r : 1);
-    const bg = Math.pow(Math.max(0.001, blkCurve), 2.0) * (torchTint ? torchTint.g : 0.78);
-    const bb = Math.pow(Math.max(0.001, blkCurve), 2.0) * (torchTint ? torchTint.b : 0.48);
+    const br = Math.pow(Math.max(0.001, blkCurve), 1.32) * (torchTint ? torchTint.r : 1);
+    const bg = Math.pow(Math.max(0.001, blkCurve), 1.32) * (torchTint ? torchTint.g : 0.90);
+    const bb = Math.pow(Math.max(0.001, blkCurve), 1.32) * (torchTint ? torchTint.b : 0.72);
 
     const cr = Math.min(1, Math.max(0.07, sr, br));
     const cg = Math.min(1, Math.max(0.07, sg, bg));
     const cb = Math.min(1, Math.max(0.07, sb, bb));
 
-    this.material.color.setRGB(cr, cg, cb);
+    if (this.hurtFlashTimer > 0) {
+      this.material.color.setRGB(Math.min(1, cr + 0.45), cg * 0.35, cb * 0.35);
+      this.material.emissive.setRGB(0.55, 0.04, 0.04);
+    } else {
+      this.material.color.setRGB(cr, cg, cb);
+      this.material.emissive.setRGB(0, 0, 0);
+    }
     this.heldExtrudedMat.color.setRGB(cr, cg, cb);
     if (this.heldBlockMat) this.heldBlockMat.color.setRGB(cr, cg, cb);
     for (const [tier, mat] of Object.entries(this.armorMaterials)) {
       const col = new THREE.Color(ARMOR_TIER_COLORS[tier].base);
-      mat.color.setRGB(col.r * cr, col.g * cg, col.b * cb);
+      if (this.hurtFlashTimer > 0) {
+        mat.color.setRGB(Math.min(1, col.r * cr + 0.35), col.g * cg * 0.45, col.b * cb * 0.45);
+      } else {
+        mat.color.setRGB(col.r * cr, col.g * cg, col.b * cb);
+      }
     }
   }
 
-  updatePose({ x, y, z, yaw, pitch, walkPhase, moveBlend, swingProgress, isCrouching, isSwimming = false, time }) {
+  updatePose({ x, y, z, yaw, pitch, walkPhase, moveBlend, swingProgress, isCrouching, isSwimming = false, isDead = false, time }) {
+    const dt = Math.max(0, Math.min(0.1, time - this._lastPoseTime));
+    this._lastPoseTime = time;
+    this.isDead = Boolean(isDead);
+    if (this.hurtFlashTimer > 0) {
+      this.hurtFlashTimer = Math.max(0, this.hurtFlashTimer - dt);
+    }
+
     this.root.position.set(x, y, z);
     this.root.rotation.y = yaw + Math.PI;
+
+    if (isDead) {
+      this.bodyGroup.rotation.x = 0;
+      this.bodyGroup.rotation.z = -Math.PI * 0.48;
+      this.bodyGroup.position.set(0, 0.22, 0);
+      return;
+    }
+    this.bodyGroup.rotation.z = 0;
 
     const idleSway = Math.sin(time * 2.0) * 0.035;
 

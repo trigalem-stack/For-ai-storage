@@ -1265,7 +1265,116 @@ export class TextureAtlas {
       return shadeRgb([238, 238, 240], weave + (n - 0.5) * 14);
     });
 
-    // Stage 5 All 16x16 Item Pixel Sprites
+    // Stage 6 Farming, Ores & Building Block Tiles
+    const renderFarmland = (wet) => (x, y) => {
+      const n = pxHash(wet ? 3101 : 3102, x, y);
+      const furrow = (y % 4 === 1 || y % 4 === 2);
+      const base = wet ? [76, 48, 28] : [132, 92, 58];
+      return shadeRgb(base, (furrow ? -16 : 8) + (n - 0.5) * 18);
+    };
+    this.addTile('farmland_dry', renderFarmland(false));
+    this.addTile('farmland_wet', renderFarmland(true));
+
+    // Wheat stages 0..7 (from bright green sprouts to tall golden wheat ears)
+    for (let st = 0; st <= 7; st++) {
+      this.addTile(`wheat_stage_${st}`, (x, y) => {
+        const height = 2 + Math.floor((st / 7) * 13);
+        const topRow = 15 - height;
+        if (y < topRow) return [0, 0, 0, 0];
+        const stalk = x === 2 || x === 5 || x === 8 || x === 11 || x === 14;
+        const leaf = (st >= 2 && (x === 3 || x === 7 || x === 12) && y > topRow + 1);
+        if (!stalk && !leaf) return [0, 0, 0, 0];
+        const n = pxHash(3120 + st, x, y);
+        const goldenMix = Math.max(0, (st - 4) / 3);
+        const green = [88, 174, 48];
+        const gold = [218, 186, 62];
+        const r = green[0] + (gold[0] - green[0]) * goldenMix;
+        const g = green[1] + (gold[1] - green[1]) * goldenMix;
+        const b = green[2] + (gold[2] - green[2]) * goldenMix;
+        const headGlow = (st >= 5 && y <= topRow + 3) ? 20 : 0;
+        return [...shadeRgb([r, g, b], headGlow + (n - 0.5) * 22), 255];
+      });
+    }
+
+    // Hay Bale
+    this.addTile('hay_bale_top', (x, y) => {
+      const n = pxHash(3140, x, y);
+      const bundle = ((x >> 1) + (y >> 1)) % 2 === 0 ? 10 : -8;
+      return shadeRgb([214, 184, 58], bundle + (n - 0.5) * 24);
+    });
+    this.addTile('hay_bale_side', (x, y) => {
+      if (y === 4 || y === 5 || y === 11 || y === 12) {
+        return shadeRgb([178, 52, 42], (pxHash(3141, x, y) - 0.5) * 16);
+      }
+      const strand = pxHash(3142, x, y >> 2);
+      return shadeRgb([216, 184, 56], (strand - 0.5) * 32);
+    });
+
+    // Deepslate (dark textured horizontal slate layers)
+    this.addTile('deepslate', (x, y) => {
+      const n = pxHash(3150, x, y);
+      const band = (y % 3 === 0 ? -12 : y % 3 === 1 ? 8 : 0);
+      return shadeRgb([78, 80, 88], band + (n - 0.5) * 22);
+    });
+
+    // Copper Ore & Copper Block
+    const stoneRgb = hexToRgb('#7d7d7d');
+    this.addTile('copper_ore', (x, y) => {
+      const n = pxHash(3155, x, y);
+      const vein = (
+        ((x >= 3 && x <= 6 && y >= 3 && y <= 5) ||
+         (x >= 9 && x <= 12 && y >= 6 && y <= 9) ||
+         (x >= 4 && x <= 7 && y >= 10 && y <= 13))
+        && pxHash(3156, x, y) > 0.25
+      );
+      if (vein) {
+        return pxHash(3157, x, y) > 0.45 ? [224, 126, 78] : [78, 164, 134];
+      }
+      return shadeRgb(stoneRgb, (n - 0.5) * 24);
+    });
+    this.addTile('copper_block', (x, y) => {
+      if (x === 0 || y === 0) return [242, 168, 124];
+      if (x === 15 || y === 15) return [134, 72, 44];
+      const plate = x === 7 || y === 7 || x === 8 || y === 8;
+      return shadeRgb([196, 112, 72], (plate ? -18 : 0) + (pxHash(3158, x, y) - 0.5) * 16);
+    });
+
+    // Smooth Stone, Bricks, Bookshelf, Mossy Cobblestone
+    this.addTile('smooth_stone', (x, y) => {
+      if (x === 0 || y === 0) return [184, 186, 190];
+      if (x === 15 || y === 15) return [124, 126, 130];
+      return shadeRgb([158, 160, 164], (pxHash(3160, x, y) - 0.5) * 12);
+    });
+    this.addTile('bricks', (x, y) => {
+      const row = Math.floor(y / 4);
+      const mortarY = y % 4 === 0;
+      const offsetX = (row % 2) * 4;
+      const mortarX = (x + offsetX) % 8 === 0;
+      if (mortarY || mortarX) return shadeRgb([204, 198, 188], (pxHash(3161, x, y) - 0.5) * 12);
+      const brickTint = ((row * 5 + Math.floor((x + offsetX) / 8)) % 3 - 1) * 12;
+      return shadeRgb([156, 78, 60], brickTint + (pxHash(3162, x, y) - 0.5) * 18);
+    });
+    this.addTile('bookshelf', (x, y) => {
+      if (y <= 1 || y >= 14 || x === 0 || x === 15 || y === 7 || y === 8) {
+        return shadeRgb([164, 130, 80], (pxHash(3163, x, y) - 0.5) * 18);
+      }
+      const bookCols = [[166, 46, 46], [52, 124, 174], [64, 146, 72], [204, 166, 62], [134, 72, 146]];
+      const c = bookCols[(x * 3 + (y > 8 ? 2 : 0)) % bookCols.length];
+      if (y === 2 || y === 9) return shadeRgb(c, -26);
+      return shadeRgb(c, (pxHash(3164, x, y) - 0.5) * 14);
+    });
+    this.addTile('mossy_cobblestone', (x, y) => {
+      const n = pxHash(3165, x, y);
+      const cell = ((Math.floor(x / 4) * 7 + Math.floor(y / 3) * 13) % 5);
+      const seam = (x % 4 === 0 && (y + cell) % 3 === 0) || (y % 4 === 0 && (x + cell) % 5 === 0);
+      if (seam || n > 0.66) {
+        return shadeRgb([78, 124, 58], (n - 0.5) * 28);
+      }
+      const cellShade = (cell - 2) * 11;
+      return shadeRgb([120, 122, 120], cellShade + (n - 0.5) * 18);
+    });
+
+    // Stage 5 & 6 All 16x16 Item Pixel Sprites
     registerAllItemSprites(this);
   }
 }

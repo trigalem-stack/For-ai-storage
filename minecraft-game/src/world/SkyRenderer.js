@@ -32,7 +32,7 @@ export class SkyRenderer {
 
     this.sunIntensity = 1.0;
     this.skyTint = new THREE.Color('#ffffff');
-    this.torchTint = new THREE.Color('#ffc478');
+    this.torchTint = new THREE.Color('#fff3dc');
     this.fogColor = new THREE.Color('#a4d4ff');
 
     this._sunDir = new THREE.Vector3(0, 1, 0);
