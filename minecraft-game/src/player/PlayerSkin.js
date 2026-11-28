@@ -125,8 +125,155 @@ export function createSteveSkinCanvas() {
   return canvas;
 }
 
-export function createSteveSkinTexture() {
-  const canvas = createSteveSkinCanvas();
+export const SKIN_PRESETS = [
+  { id: 'steve', name: 'Стив' },
+  { id: 'alex', name: 'Алекс' },
+  { id: 'knight', name: 'Рыцарь' },
+];
+
+export function createAlexSkinCanvas() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 64, 64);
+
+  const fillTextured = (rx, ry, rw, rh, baseHex, variance = 10, seed = 1) => {
+    for (let y = 0; y < rh; y++) {
+      for (let x = 0; x < rw; x++) {
+        const d = Math.round((pxNoise(seed, rx + x, ry + y) - 0.5) * variance * 2);
+        setRect(ctx, rx + x, ry + y, 1, 1, shadeHex(baseHex, d));
+      }
+    }
+  };
+
+  // Head
+  fillTextured(8, 0, 8, 8, '#cf6a28', 12, 101);
+  fillTextured(16, 0, 8, 8, '#ecc19f', 8, 102);
+  fillTextured(0, 8, 8, 8, '#f0c7a8', 8, 103);
+  fillTextured(8, 8, 8, 8, '#f4cbb0', 8, 104);
+  fillTextured(16, 8, 8, 8, '#f0c7a8', 8, 105);
+  fillTextured(24, 8, 8, 8, '#c86022', 12, 106);
+
+  // Ginger hair
+  fillTextured(8, 8, 8, 2, '#cf6a28', 10, 111);
+  setRect(ctx, 8, 10, 2, 1, '#cf6a28');
+  setRect(ctx, 14, 10, 2, 1, '#cf6a28');
+  fillTextured(0, 8, 8, 3, '#c86022', 10, 112);
+  fillTextured(16, 8, 8, 3, '#c86022', 10, 113);
+  setRect(ctx, 0, 11, 3, 2, '#c86022');
+  setRect(ctx, 21, 11, 3, 2, '#c86022');
+
+  // Green eyes & warm smile
+  setRect(ctx, 9, 12, 1, 1, '#ffffff');
+  setRect(ctx, 10, 12, 1, 1, '#2f7a3e');
+  setRect(ctx, 13, 12, 1, 1, '#2f7a3e');
+  setRect(ctx, 14, 12, 1, 1, '#ffffff');
+  setRect(ctx, 11, 13, 2, 1, '#deaa88');
+  setRect(ctx, 11, 14, 2, 1, '#c9786b');
+
+  // Green Tunic Torso
+  fillTextured(20, 16, 8, 4, '#5a943c', 9, 121);
+  fillTextured(28, 16, 8, 4, '#4e3927', 8, 122);
+  fillTextured(16, 20, 4, 12, '#4e8234', 9, 123);
+  fillTextured(20, 20, 8, 12, '#5ea040', 10, 124);
+  fillTextured(28, 20, 4, 12, '#4e8234', 9, 125);
+  fillTextured(32, 20, 8, 12, '#548e39', 10, 126);
+  setRect(ctx, 20, 29, 8, 1, '#5d3e24');
+  setRect(ctx, 23, 29, 2, 1, '#d8aa45'); // belt buckle
+
+  // Arms
+  const paintArm = (baseX, baseY, s) => {
+    fillTextured(baseX + 4, baseY, 4, 4, '#5ea040', 8, s);
+    fillTextured(baseX + 8, baseY, 4, 4, '#ecc19f', 8, s + 1);
+    fillTextured(baseX, baseY + 4, 16, 4, '#548f38', 9, s + 2);
+    fillTextured(baseX, baseY + 8, 16, 8, '#f0c5a5', 8, s + 3);
+  };
+  paintArm(40, 16, 130);
+  paintArm(32, 48, 140);
+
+  // Brown trousers + boots
+  const paintLeg = (baseX, baseY, s) => {
+    fillTextured(baseX + 4, baseY, 4, 4, '#4e3826', 6, s);
+    fillTextured(baseX + 8, baseY, 4, 4, '#3a2c22', 6, s + 1);
+    fillTextured(baseX, baseY + 4, 16, 10, '#5a412d', 8, s + 2);
+    fillTextured(baseX, baseY + 14, 16, 2, '#3d3028', 6, s + 3);
+  };
+  paintLeg(0, 16, 150);
+  paintLeg(16, 48, 160);
+  return canvas;
+}
+
+export function createKnightSkinCanvas() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 64, 64);
+
+  const fillTextured = (rx, ry, rw, rh, baseHex, variance = 10, seed = 1) => {
+    for (let y = 0; y < rh; y++) {
+      for (let x = 0; x < rw; x++) {
+        const d = Math.round((pxNoise(seed, rx + x, ry + y) - 0.5) * variance * 2);
+        setRect(ctx, rx + x, ry + y, 1, 1, shadeHex(baseHex, d));
+      }
+    }
+  };
+
+  // Steel helm head
+  fillTextured(8, 0, 8, 8, '#8d96a6', 10, 201);
+  fillTextured(16, 0, 8, 8, '#5a6270', 8, 202);
+  fillTextured(0, 8, 8, 8, '#7b8494', 9, 203);
+  fillTextured(8, 8, 8, 8, '#8891a2', 9, 204);
+  fillTextured(16, 8, 8, 8, '#7b8494', 9, 205);
+  fillTextured(24, 8, 8, 8, '#6a7282', 9, 206);
+  // Gold crest & dark visor slit with glowing eyes
+  setRect(ctx, 11, 0, 2, 8, '#e3b33a');
+  setRect(ctx, 11, 8, 2, 3, '#e3b33a');
+  setRect(ctx, 9, 11, 6, 3, '#20242c');
+  setRect(ctx, 10, 12, 1, 1, '#7cd4ff');
+  setRect(ctx, 13, 12, 1, 1, '#7cd4ff');
+
+  // Tabard & steel breastplate
+  fillTextured(20, 16, 8, 4, '#8b94a4', 8, 211);
+  fillTextured(28, 16, 8, 4, '#363d48', 6, 212);
+  fillTextured(16, 20, 4, 12, '#757e8e', 8, 213);
+  fillTextured(20, 20, 8, 12, '#2d4d88', 9, 214);
+  fillTextured(28, 20, 4, 12, '#757e8e', 8, 215);
+  fillTextured(32, 20, 8, 12, '#7b2929', 9, 216); // red cape on back
+  setRect(ctx, 23, 21, 2, 6, '#e3b33a'); // gold emblem
+  setRect(ctx, 21, 23, 6, 2, '#e3b33a');
+  setRect(ctx, 20, 29, 8, 1, '#4b3622');
+
+  const paintArm = (baseX, baseY, s) => {
+    fillTextured(baseX + 4, baseY, 4, 4, '#8d96a6', 8, s);
+    fillTextured(baseX + 8, baseY, 4, 4, '#555c68', 7, s + 1);
+    fillTextured(baseX, baseY + 4, 16, 5, '#818a9b', 9, s + 2);
+    fillTextured(baseX, baseY + 9, 16, 7, '#5c6473', 8, s + 3);
+  };
+  paintArm(40, 16, 220);
+  paintArm(32, 48, 230);
+
+  const paintLeg = (baseX, baseY, s) => {
+    fillTextured(baseX + 4, baseY, 4, 4, '#474f5c', 6, s);
+    fillTextured(baseX + 8, baseY, 4, 4, '#313640', 6, s + 1);
+    fillTextured(baseX, baseY + 4, 16, 10, '#5a6372', 8, s + 2);
+    fillTextured(baseX, baseY + 14, 16, 2, '#3a404a', 7, s + 3);
+  };
+  paintLeg(0, 16, 240);
+  paintLeg(16, 48, 250);
+  return canvas;
+}
+
+export function createSkinCanvas(presetId = 'steve') {
+  if (presetId === 'alex') return createAlexSkinCanvas();
+  if (presetId === 'knight') return createKnightSkinCanvas();
+  return createSteveSkinCanvas();
+}
+
+export function createSkinTextureFromCanvas(canvas) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
@@ -134,6 +281,60 @@ export function createSteveSkinTexture() {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
   return texture;
+}
+
+export function createSteveSkinTexture(presetId = 'steve') {
+  return createSkinTextureFromCanvas(createSkinCanvas(presetId));
+}
+
+export function createSkinTextureFromSpec(skinSpec, onReady = null) {
+  const spec = skinSpec || { preset: 'steve', customDataUrl: null };
+  const tex = createSteveSkinTexture(spec.preset || 'steve');
+  if (spec.customDataUrl) {
+    applySkinSpecToTexture(tex, spec).then(() => {
+      if (onReady) onReady(tex);
+    });
+  } else if (onReady) {
+    onReady(tex);
+  }
+  return tex;
+}
+
+export function applySkinSpecToTexture(texture, skinSpec) {
+  const spec = skinSpec || { preset: 'steve', customDataUrl: null };
+  if (spec.customDataUrl && typeof Image !== 'undefined') {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, 64, 64);
+        if (img.width === 64 && img.height === 32) {
+          // Legacy 64x32 Minecraft skin -> mirror leg/arm to bottom half
+          ctx.drawImage(img, 0, 0, 64, 32, 0, 0, 64, 32);
+          ctx.drawImage(img, 0, 16, 16, 16, 16, 48, 16, 16);
+          ctx.drawImage(img, 40, 16, 16, 16, 32, 48, 16, 16);
+        } else {
+          ctx.drawImage(img, 0, 0, 64, 64);
+        }
+        texture.image = canvas;
+        texture.needsUpdate = true;
+        resolve(texture);
+      };
+      img.onerror = () => {
+        texture.image = createSkinCanvas(spec.preset || 'steve');
+        texture.needsUpdate = true;
+        resolve(texture);
+      };
+      img.src = spec.customDataUrl;
+    });
+  }
+  texture.image = createSkinCanvas(spec.preset || 'steve');
+  texture.needsUpdate = true;
+  return Promise.resolve(texture);
 }
 
 /**
@@ -516,6 +717,12 @@ export class PlayerModel {
     if (mesh) this.heldMount.add(mesh);
   }
 
+  setSkinTexture(tex) {
+    if (!tex) return;
+    this.material.map = tex;
+    this.material.needsUpdate = true;
+  }
+
   setVisible(visible) {
     this.root.visible = visible;
   }
@@ -701,16 +908,28 @@ export class InventoryPlayerPreview {
   }
 
   syncEquipment(heldStack, armorSlots) {
+    const sig = `${heldStack?.id || 0}:${armorSlots?.helmet?.id || 0}:${armorSlots?.chestplate?.id || 0}:${armorSlots?.leggings?.id || 0}:${armorSlots?.boots?.id || 0}`;
+    if (sig === this._eqSig) return;
+    this._eqSig = sig;
     this.model.setHeldItem(heldStack);
     this.model.setArmor(armorSlots);
+    this._dirty = true;
+  }
+
+  invalidate() {
+    this._dirty = true;
+  }
+
+  setSkinTexture(skinTexture) {
+    this.model?.setSkinTexture?.(skinTexture);
     this._dirty = true;
   }
 
   renderToTarget(renderer, time) {
     if (!this.targetCanvas || !this.targetCtx || !renderer?.domElement) return;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    // Throttle Paper-Doll 3D re-renders to <=20Hz unless look/equipment just changed (zero lag!)
-    if (!this._dirty && now - this._lastRenderAt < 50) return;
+    // Throttle Paper-Doll 3D re-renders so open inventory feels silky smooth
+    if (!this._dirty && now - this._lastRenderAt < 80) return;
     if (this._dirty && now - this._lastRenderAt < 28) return;
     this._dirty = false;
     this._lastRenderAt = now;

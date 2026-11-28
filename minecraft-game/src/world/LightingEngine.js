@@ -1,6 +1,5 @@
 import { BlockRegistry } from '../blocks/BlockRegistry.js';
 import { CHUNK_SIZE, MAX_LIGHT_LEVEL, REDSTONE_GLOW_LEVEL, WORLD_HEIGHT } from '../constants.js';
-import { chunkKey } from './Chunk.js';
 
 const QUEUE_CAP = 131072; // Power-of-2 ring buffer capacity (no shift/alloc overhead)
 const QUEUE_MASK = QUEUE_CAP - 1;
@@ -208,7 +207,7 @@ export class LightingEngine {
     const topBorderY = Math.min(WORLD_HEIGHT - 1, startScanY + 2);
     for (let p = 0; p < 4; p++) {
       const bp = borderPairs[p];
-      const neighbor = world.chunks.get(chunkKey(bp.ncx, bp.ncz));
+      const neighbor = world.getChunk ? world.getChunk(bp.ncx, bp.ncz) : world.chunks.get(`${bp.ncx},${bp.ncz}`);
       if (!neighbor || !neighbor.isGenerated) continue;
 
       const nbBaseX = bp.ncx * CHUNK_SIZE;

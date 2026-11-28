@@ -373,10 +373,16 @@ export class Hotbar {
       ui.btn.classList.toggle('selected', i === this.inventory.selectedSlot);
 
       const slot = this.inventory.slots[i];
+      const sig = slot && slot.id > 0 && slot.count > 0
+        ? `${slot.id}:${slot.count}:${slot.durability || 0}:${slot.maxDurability || 0}`
+        : 'empty';
+      if (ui.lastSig === sig) continue;
+      ui.lastSig = sig;
+
       if (slot && slot.id > 0 && slot.count > 0) {
         ui.icon.src = this.atlas.getItemIconDataURL(slot.id);
         ui.icon.classList.remove('hidden');
-        const showCount = !this.inventory.creativeMode && slot.count > 1;
+        const showCount = slot.count > 1;
         ui.count.textContent = showCount ? String(slot.count) : '';
         ui.count.classList.toggle('hidden', !showCount);
 

@@ -86,6 +86,13 @@ export class MobileControls {
     }
   }
 
+  setTouchScale(scale = 1.0) {
+    const s = Math.max(0.7, Math.min(1.4, Number(scale) || 1.0));
+    if (typeof document !== 'undefined' && document.documentElement?.style) {
+      document.documentElement.style.setProperty('--touch-scale', String(s));
+    }
+  }
+
   setHeldFoodIndicator(isFood, modeTag = '') {
     if (!this.btnPlace) return;
     if (modeTag === 'bow') {

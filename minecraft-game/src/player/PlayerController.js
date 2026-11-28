@@ -3,6 +3,7 @@ import { BLOCK_IDS, BlockRegistry } from '../blocks/BlockRegistry.js';
 import {
   BASE_FOV,
   CAMERA_MODES,
+  CREATIVE_VOID_Y,
   CROUCH_SPEED,
   EAT_DURATION_SEC,
   EXHAUSTION_THRESHOLD,
@@ -501,7 +502,7 @@ export class PlayerController {
   }
 
   damage(amount, sourceType = 'generic') {
-    if (this.creativeMode || this.isDead || amount <= 0) return false;
+    if ((this.creativeMode && sourceType !== 'void') || this.isDead || amount <= 0) return false;
     if (sourceType !== 'void' && sourceType !== 'starve' && this.hurtTimer > 0) {
       return false;
     }
@@ -924,7 +925,7 @@ export class PlayerController {
           false
         );
         this.x = res.x;
-        this.y = Math.max(1.0, Math.min(WORLD_HEIGHT + 32, res.y));
+        this.y = Math.max(-58.0, Math.min(WORLD_HEIGHT + 64, res.y));
         this.z = res.z;
         this.onGround = false;
         this.vy = 0;
@@ -1211,6 +1212,15 @@ export class PlayerController {
       this.airTicks = MAX_AIR_TICKS;
       this.fallDistance = 0;
       this.fireTicks = 0;
+    }
+
+    // Creative void protection: below Y=-64 even creative mode takes void damage (Java 1.21 parity)
+    if (this.creativeMode && !this.isDead && this.y < CREATIVE_VOID_Y) {
+      this.voidTimer += dt;
+      if (this.voidTimer >= 0.5) {
+        this.voidTimer = 0;
+        this.damage(8, 'void');
+      }
     }
 
     // Smooth camera eye-height transition

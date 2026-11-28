@@ -45,6 +45,9 @@ export class InventoryUI {
     this._creativeCatalogEl = null;
     this._creativeScrollbarEl = null;
     this._creativeThumbEl = null;
+    this.creativeSearch = '';
+    this._dollRect = null;
+    this._dollRectAt = 0;
 
     this.overlay = document.getElementById('inventory-overlay');
     this.windowEl = document.getElementById('inventory-window');
@@ -178,8 +181,13 @@ export class InventoryUI {
 
   _updatePaperDollLook(clientX, clientY) {
     if (this.playerPreview && this.playerCanvas && this.mode === 'inventory') {
-      const rect = this.playerCanvas.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
+      const now = performance.now();
+      if (!this._dollRect || now - this._dollRectAt > 400) {
+        this._dollRect = this.playerCanvas.getBoundingClientRect();
+        this._dollRectAt = now;
+      }
+      const rect = this._dollRect;
+      if (rect && rect.width > 0 && rect.height > 0) {
         const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
         const ny = ((clientY - rect.top) / rect.height) * 2 - 1;
         this.playerPreview.setLookTarget(nx, ny);
@@ -305,6 +313,7 @@ export class InventoryUI {
     }
 
     this.overlay?.classList.remove('hidden');
+    this._dollRect = null;
     this.renderLayout();
     this.render();
     this.onOpen?.(mode);
@@ -475,6 +484,7 @@ export class InventoryUI {
       e.stopPropagation();
       if (performance.now() - this._lastTouchEventAt < 950) return;
       this._handleSlotMouseDown(zone, index, e);
+      this._updateCursorGhost(e.clientX, e.clientY);
     });
 
     btn.addEventListener('mouseenter', (e) => {
@@ -1169,7 +1179,7 @@ export class InventoryUI {
     this.render();
   }
 
-  _getCreativeCatalogEntries(category) {
+  _getCreativeCatalogEntries(category, query = '') {
     const blocks = BlockRegistry.getPlaceableBlocks();
     const items = ItemRegistry.getAllItems();
     const natureSet = new Set([
@@ -1190,22 +1200,26 @@ export class InventoryUI {
         id === 348    // ENDER_PEARL
       );
     };
+    let list;
     if (category === 'blocks') {
-      return blocks.filter((b) => !natureSet.has(b.id) && b.id !== 76).map((b) => ({ id: b.id, name: b.name }));
-    }
-    if (category === 'nature') {
-      return blocks.filter((b) => natureSet.has(b.id)).map((b) => ({ id: b.id, name: b.name }));
-    }
-    if (category === 'combat') {
-      return [
+      list = blocks.filter((b) => !natureSet.has(b.id) && b.id !== 76).map((b) => ({ id: b.id, name: b.name }));
+    } else if (category === 'nature') {
+      list = blocks.filter((b) => natureSet.has(b.id)).map((b) => ({ id: b.id, name: b.name }));
+    } else if (category === 'combat') {
+      list = [
         ...blocks.filter((b) => b.id === 76).map((b) => ({ id: b.id, name: b.name })),
         ...items.filter((it) => isCombatOrTool(it.id)).map((it) => ({ id: it.id, name: it.name })),
       ];
+    } else if (category === 'items') {
+      list = items.filter((it) => !isCombatOrTool(it.id)).map((it) => ({ id: it.id, name: it.name }));
+    } else {
+      list = [...blocks.map((b) => ({ id: b.id, name: b.name })), ...items.map((it) => ({ id: it.id, name: it.name }))];
     }
-    if (category === 'items') {
-      return items.filter((it) => !isCombatOrTool(it.id)).map((it) => ({ id: it.id, name: it.name }));
+    const q = (query || '').trim().toLowerCase();
+    if (q) {
+      list = list.filter((e) => (e.name || '').toLowerCase().includes(q));
     }
-    return [...blocks.map((b) => ({ id: b.id, name: b.name })), ...items.map((it) => ({ id: it.id, name: it.name }))];
+    return list;
   }
 
   _syncCreativeThumb() {
@@ -1375,9 +1389,15 @@ export class InventoryUI {
         ['all', 'Все'],
         ['blocks', 'Блоки'],
         ['nature', 'Природа'],
-        ['combat', 'Оружие и инстр.'],
-        ['items', 'Еда и ресурсы'],
+        ['combat', 'Оружие'],
+        ['items', 'Предметы'],
       ];
+
+      const searchInput = document.createElement('input');
+      searchInput.type = 'search';
+      searchInput.className = 'inv-creative-search';
+      searchInput.placeholder = 'Поиск предметов...';
+      searchInput.value = this.creativeSearch;
 
       const body = document.createElement('div');
       body.className = 'inv-creative-body';
@@ -1397,7 +1417,7 @@ export class InventoryUI {
 
       const fillCatalog = () => {
         catalog.innerHTML = '';
-        const list = this._getCreativeCatalogEntries(this.creativeCategory);
+        const list = this._getCreativeCatalogEntries(this.creativeCategory, this.creativeSearch);
         for (const entry of list) {
           const btn = document.createElement('button');
           btn.type = 'button';
@@ -1465,8 +1485,15 @@ export class InventoryUI {
         this._scrollbarDrag = null;
       }, { passive: true });
 
+      searchInput.addEventListener('input', (e) => {
+        e.stopPropagation();
+        this.creativeSearch = searchInput.value;
+        fillCatalog();
+      });
+      searchInput.addEventListener('keydown', (e) => e.stopPropagation());
+
       body.append(catalog, scrollbar);
-      shell.append(tabs, body);
+      shell.append(tabs, searchInput, body);
       this.topSectionEl.appendChild(shell);
       fillCatalog();
     }
@@ -1490,6 +1517,12 @@ export class InventoryUI {
 
     const isDragHighlighted = Boolean(this._drag?.active && this._drag.evenActive && this._drag.visitedKeys?.has(`${zone}:${index}`));
     ui.btn.classList.toggle('drag-preview', isDragHighlighted);
+
+    const sig = stack && stack.id > 0 && stack.count > 0
+      ? `${stack.id}:${stack.count}:${stack.durability || 0}:${stack.maxDurability || 0}`
+      : 'empty';
+    if (ui.lastSig === sig) return;
+    ui.lastSig = sig;
 
     if (stack && stack.id > 0 && stack.count > 0) {
       ui.icon.src = this.atlas.getItemIconDataURL(stack.id);
@@ -1718,8 +1751,9 @@ export class InventoryUI {
 
   _updateCursorGhost(x, y) {
     if (!this.cursorGhostEl || !this.cursorStack) return;
-    this.cursorGhostEl.style.left = `${x + 12}px`;
-    this.cursorGhostEl.style.top = `${y - 8}px`;
+    // Positioned cleanly top-left above pointer tip & above VirtualMouse (#virtual-cursor z-index: 95)
+    this.cursorGhostEl.style.left = `${x - 26}px`;
+    this.cursorGhostEl.style.top = `${y - 26}px`;
   }
 
   _showTooltip(stack, x, y) {

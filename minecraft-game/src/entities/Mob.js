@@ -6,55 +6,69 @@ import {
   CREEPER_CANCEL_RANGE,
   CREEPER_FUSE_SEC,
   CREEPER_IGNITE_RANGE,
+  ENDERMAN_STARE_HOLD_SEC,
+  MOB_FOLLOW_RANGE,
   WORLD_HEIGHT,
 } from '../constants.js';
 
 export const MOB_SPECS = {
   pig: {
-    id: 'pig', name: 'Pig', hostile: false, maxHp: 10, halfWidth: 0.42, height: 0.9,
+    id: 'pig', name: 'Pig', hostile: false, maxHp: 10, halfWidth: 0.42, height: 0.9, eyeHeight: 0.64,
     speed: 2.3, attackDamage: 0, burnInSunlight: false, xpMin: 1, xpMax: 3,
   },
   cow: {
-    id: 'cow', name: 'Cow', hostile: false, maxHp: 10, halfWidth: 0.44, height: 1.38,
+    id: 'cow', name: 'Cow', hostile: false, maxHp: 10, halfWidth: 0.44, height: 1.38, eyeHeight: 1.02,
     speed: 2.2, attackDamage: 0, burnInSunlight: false, xpMin: 1, xpMax: 3,
   },
   sheep: {
-    id: 'sheep', name: 'Sheep', hostile: false, maxHp: 8, halfWidth: 0.42, height: 1.28,
+    id: 'sheep', name: 'Sheep', hostile: false, maxHp: 8, halfWidth: 0.42, height: 1.28, eyeHeight: 0.95,
     speed: 2.3, attackDamage: 0, burnInSunlight: false, xpMin: 1, xpMax: 3,
   },
   chicken: {
-    id: 'chicken', name: 'Chicken', hostile: false, maxHp: 4, halfWidth: 0.25, height: 0.72,
+    id: 'chicken', name: 'Chicken', hostile: false, maxHp: 4, halfWidth: 0.25, height: 0.72, eyeHeight: 0.58,
     speed: 2.6, attackDamage: 0, burnInSunlight: false, xpMin: 1, xpMax: 3,
   },
   zombie: {
-    id: 'zombie', name: 'Zombie', hostile: true, maxHp: 20, halfWidth: 0.32, height: 1.92,
+    id: 'zombie', name: 'Zombie', hostile: true, maxHp: 20, halfWidth: 0.32, height: 1.92, eyeHeight: 1.68,
     speed: 2.6, attackDamage: 3, burnInSunlight: true, xpMin: 5, xpMax: 5,
   },
   skeleton: {
-    id: 'skeleton', name: 'Skeleton', hostile: true, maxHp: 20, halfWidth: 0.32, height: 1.95,
+    id: 'skeleton', name: 'Skeleton', hostile: true, maxHp: 20, halfWidth: 0.32, height: 1.95, eyeHeight: 1.70,
     speed: 2.75, attackDamage: 3, burnInSunlight: true, xpMin: 5, xpMax: 5,
   },
   spider: {
-    id: 'spider', name: 'Spider', hostile: true, maxHp: 16, halfWidth: 0.65, height: 0.9,
+    id: 'spider', name: 'Spider', hostile: true, maxHp: 16, halfWidth: 0.65, height: 0.9, eyeHeight: 0.50,
     speed: 3.7, attackDamage: 2, burnInSunlight: false, xpMin: 5, xpMax: 5,
   },
   creeper: {
-    id: 'creeper', name: 'Creeper', hostile: true, maxHp: 20, halfWidth: 0.32, height: 1.7,
+    id: 'creeper', name: 'Creeper', hostile: true, maxHp: 20, halfWidth: 0.32, height: 1.7, eyeHeight: 1.45,
     speed: 2.65, attackDamage: 0, burnInSunlight: false, xpMin: 5, xpMax: 5,
   },
   enderman: {
-    id: 'enderman', name: 'Enderman', hostile: true, maxHp: 40, halfWidth: 0.34, height: 2.85,
+    id: 'enderman', name: 'Enderman', hostile: true, maxHp: 40, halfWidth: 0.34, height: 2.85, eyeHeight: 2.52,
     speed: 4.5, attackDamage: 5, burnInSunlight: false, xpMin: 5, xpMax: 5,
   },
 };
 
+const SHARED_BOX_GEOMS = new Map();
+
+function _getSharedBoxGeom(w, h, d) {
+  const key = `${w}:${h}:${d}`;
+  let geom = SHARED_BOX_GEOMS.get(key);
+  if (!geom) {
+    geom = new THREE.BoxGeometry(w, h, d);
+    SHARED_BOX_GEOMS.set(key, geom);
+  }
+  return geom;
+}
+
 function _makeBoxPart(parts, disposables, w, h, d, color, x, y, z, emissive = false) {
-  const geom = new THREE.BoxGeometry(w, h, d);
+  const geom = _getSharedBoxGeom(w, h, d);
   const mat = new THREE.MeshBasicMaterial({ color, fog: true });
   const baseColor = new THREE.Color(color);
   const mesh = new THREE.Mesh(geom, mat);
   mesh.position.set(x, y, z);
-  disposables.push(geom, mat);
+  disposables.push(mat);
   parts.push({ mesh, mat, baseColor, emissive });
   return mesh;
 }
@@ -299,6 +313,18 @@ function buildMobVisual(type, sheared = false) {
   return { root, bodyGroup, parts, disposables, legs, headPivot, leftArm, rightArm, woolMesh };
 }
 
+function _wrapAngle(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+function _rotateTowards(current, target, maxStep) {
+  const diff = _wrapAngle(target - current);
+  if (Math.abs(diff) <= maxStep) return target;
+  return current + Math.sign(diff) * maxStep;
+}
+
 export class Mob {
   constructor(scene, type, x, y, z, extras = {}) {
     const spec = MOB_SPECS[type] || MOB_SPECS.pig;
@@ -309,9 +335,11 @@ export class Mob {
     this.hp = extras.hp !== undefined ? Math.max(1, Math.min(spec.maxHp, extras.hp)) : spec.maxHp;
     this.halfWidth = spec.halfWidth;
     this.height = spec.height;
+    this.eyeHeight = spec.eyeHeight !== undefined ? spec.eyeHeight : spec.height * 0.85;
     this.speed = spec.speed;
     this.attackDamage = spec.attackDamage;
     this.burnInSunlight = spec.burnInSunlight;
+    this.followRange = MOB_FOLLOW_RANGE;
 
     this.x = x;
     this.y = y;
@@ -320,6 +348,8 @@ export class Mob {
     this.vy = 0;
     this.vz = 0;
     this.yaw = extras.yaw !== undefined ? extras.yaw : Math.random() * Math.PI * 2;
+    this.headYaw = 0;
+    this.headPitch = 0;
     this.onGround = false;
     this.inWater = false;
     this.fallStartY = y;
@@ -338,8 +368,14 @@ export class Mob {
     this.wanderYaw = this.yaw;
     this.wanderTimer = 1 + Math.random() * 3;
     this.idlePauseTimer = 0;
+    this.idleLookPhase = Math.random() * 6.28;
     this.panicTimer = 0;
     this.aggro = Boolean(extras.aggro);
+    this.aggroMemoryTimer = this.aggro ? 8.0 : 0;
+    this.losTimer = Math.random() * 0.22;
+    this.hasLOS = false;
+    this.stareTimer = 0;
+    this.spiderLeapCooldown = 0;
 
     // Mob-specific states
     this.sheared = Boolean(extras.sheared);
@@ -354,10 +390,49 @@ export class Mob {
     this.portalParticleTimer = 0;
     this.wasKilledByPlayer = false;
 
+    // Light & flash cache
+    this._lastLx = 999999;
+    this._lastLy = -1;
+    this._lastLz = 999999;
+    this._lastSunB = -1;
+    this._lastCFlag = -1;
+    this._lastRFlag = -1;
+
     this.visual = buildMobVisual(this.type, this.sheared);
     this.visual.root.position.set(x, y, z);
     this.visual.root.rotation.y = this.yaw;
     scene.add(this.visual.root);
+  }
+
+  hasLineOfSight(world, tx, ty, tz) {
+    if (!world) return true;
+    const ox = this.x;
+    const oy = this.y + this.eyeHeight;
+    const oz = this.z;
+    const dx = tx - ox;
+    const dy = ty - oy;
+    const dz = tz - oz;
+    const dist = Math.hypot(dx, dy, dz);
+    if (dist < 0.6) return true;
+    const steps = Math.min(48, Math.max(2, Math.ceil(dist / 0.45)));
+    let prevBx = -999999;
+    let prevBy = -999999;
+    let prevBz = -999999;
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      const bx = Math.floor(ox + dx * t);
+      const by = Math.floor(oy + dy * t);
+      const bz = Math.floor(oz + dz * t);
+      if (bx === prevBx && by === prevBy && bz === prevBz) continue;
+      prevBx = bx;
+      prevBy = by;
+      prevBz = bz;
+      const id = world.getBlock(bx, by, bz);
+      if (id !== 0 && BlockRegistry.isSolid(id)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   setSheared(sheared) {
@@ -381,8 +456,10 @@ export class Mob {
     }
     if (!this.hostile) {
       this.panicTimer = 4.2;
+      this.idlePauseTimer = 0;
     } else if (byPlayer) {
       this.aggro = true;
+      this.aggroMemoryTimer = 16.0;
     }
 
     const dLen = Math.hypot(dirX, dirZ);
@@ -488,6 +565,7 @@ export class Mob {
     onShootArrow = null,
     onExplode = null,
     onDie = null,
+    onMobSound = null,
   }) {
     if (!this.alive) return;
 
@@ -593,46 +671,97 @@ export class Mob {
     let moveDirX = 0;
     let moveDirZ = 0;
     let moveSpeed = this.speed;
+    let desiredBodyYaw = this.yaw;
+    let lookYaw = this.yaw;
+    let lookPitch = 0;
+    this.spiderLeapCooldown = Math.max(0, this.spiderLeapCooldown - dt);
 
-    const playerAlive = player && !player.isDead && player.gameMode !== 'creative';
+    const playerAlive = Boolean(player && !player.isDead && !player.creativeMode && player.gameMode !== 'creative');
     const px = player ? player.position.x : 0;
     const py = player ? player.position.y : 0;
     const pz = player ? player.position.z : 0;
     const dxToPlayer = px - this.x;
-    const dyToPlayer = (py + 0.9) - (this.y + this.height * 0.6);
+    const dyToPlayer = (py + 1.4) - (this.y + this.eyeHeight);
     const dzToPlayer = pz - this.z;
     const distToPlayer = Math.hypot(dxToPlayer, dzToPlayer);
     const dist3D = Math.hypot(dxToPlayer, dyToPlayer, dzToPlayer);
 
-    // Enderman stare aggro check
-    if (this.type === 'enderman' && playerAlive && !this.aggro && dist3D < 28) {
-      const look = player.getLookDirection();
-      const eye = player.getEyeOrigin();
-      const ex = this.x - eye.x;
-      const ey = (this.y + this.height - 0.35) - eye.y;
-      const ez = this.z - eye.z;
-      const eLen = Math.hypot(ex, ey, ez);
-      if (eLen > 1.2) {
-        const dot = (look.x * ex + look.y * ey + look.z * ez) / eLen;
-        if (dot > 0.975) {
+    if (!playerAlive) {
+      this.aggro = false;
+      this.aggroMemoryTimer = 0;
+      this.stareTimer = 0;
+      this.hasLOS = false;
+      this.isIgnited = false;
+    } else if (this.hostile) {
+      // Throttled line-of-sight raycast (prevents chasing/shooting blindly through cave walls)
+      this.losTimer -= dt;
+      const maxCheckDist = this.type === 'enderman' ? 30 : this.followRange + 2;
+      if (this.losTimer <= 0) {
+        this.losTimer = 0.22 + Math.random() * 0.08;
+        this.hasLOS = dist3D <= maxCheckDist && this.hasLineOfSight(world, px, py + 1.45, pz);
+      }
+
+      // Enderman strict gaze cone + LOS + 0.22s hold + pumpkin protection
+      if (this.type === 'enderman' && !this.aggro && dist3D < 28) {
+        const helmet = player.inventory?.armor?.helmet || player.armor?.helmet || player.armor?.[0];
+        const wearingPumpkin = helmet && (helmet.id === BLOCK_IDS.PUMPKIN || helmet.id === ITEM_IDS.CARVED_PUMPKIN);
+        if (!wearingPumpkin) {
+          const look = player.getLookDirection();
+          const eye = player.getEyeOrigin();
+          const ex = this.x - eye.x;
+          const ey = (this.y + this.eyeHeight) - eye.y;
+          const ez = this.z - eye.z;
+          const eLen = Math.hypot(ex, ey, ez);
+          if (eLen > 1.2) {
+            const proj = look.x * ex + look.y * ey + look.z * ez;
+            const dot = proj / eLen;
+            const perpDist = Math.sqrt(Math.max(0, eLen * eLen - proj * proj));
+            if (proj > 0 && dot > 0.995 && perpDist <= 0.48 && this.hasLineOfSight(world, eye.x, eye.y, eye.z)) {
+              this.stareTimer += dt;
+              if (this.stareTimer >= ENDERMAN_STARE_HOLD_SEC) {
+                this.aggro = true;
+                this.aggroMemoryTimer = 18.0;
+                onMobSound?.('enderman_scream', this);
+              }
+            } else {
+              this.stareTimer = Math.max(0, this.stareTimer - dt * 2.5);
+            }
+          }
+        }
+      } else if (this.type !== 'enderman') {
+        const skyHere = world ? world.getSkyLight(bx, Math.min(WORLD_HEIGHT - 1, by + 1), bz) : 15;
+        const spiderCanAcquire = this.type !== 'spider' || !isDaylight || skyHere < 12;
+        if (spiderCanAcquire && dist3D <= this.followRange && this.hasLOS) {
           this.aggro = true;
+          this.aggroMemoryTimer = 5.0;
+        }
+      }
+
+      if (this.aggro) {
+        if (this.hasLOS && dist3D <= (this.type === 'enderman' ? 32 : this.followRange + 4)) {
+          this.aggroMemoryTimer = Math.max(this.aggroMemoryTimer, this.type === 'enderman' ? 14.0 : 4.5);
+        } else {
+          this.aggroMemoryTimer -= dt;
+          if (this.aggroMemoryTimer <= 0 || dist3D > 34) {
+            this.aggro = false;
+          }
         }
       }
     }
 
-    // Spider daytime neutrality
     const spiderHostileNow = this.type === 'spider' ? (!isDaylight || this.aggro) : true;
-    const isAggro = playerAlive && this.hostile && spiderHostileNow && (
-      (this.type === 'enderman' ? (this.aggro && dist3D < 32) : dist3D < 20)
-    );
+    const isAggro = playerAlive && this.hostile && this.aggro && spiderHostileNow;
 
     if (isAggro && distToPlayer > 0.05) {
       const nx = dxToPlayer / distToPlayer;
       const nz = dzToPlayer / distToPlayer;
-      this.yaw = Math.atan2(nx, nz);
+      const targetYaw = Math.atan2(nx, nz);
+      lookYaw = targetYaw;
+      lookPitch = Math.max(-0.65, Math.min(0.65, -Math.atan2(dyToPlayer, distToPlayer)));
 
       if (this.type === 'creeper') {
-        if (dist3D <= CREEPER_IGNITE_RANGE) {
+        if (dist3D <= CREEPER_IGNITE_RANGE && this.hasLOS) {
+          if (!this.isIgnited) onMobSound?.('creeper_fuse', this);
           this.isIgnited = true;
         } else if (dist3D > CREEPER_CANCEL_RANGE) {
           this.isIgnited = false;
@@ -643,6 +772,7 @@ export class Mob {
           this.fuseTimer += dt;
           moveDirX = 0;
           moveDirZ = 0;
+          desiredBodyYaw = targetYaw;
           if (this.fuseTimer >= CREEPER_FUSE_SEC) {
             this.alive = false;
             onExplode?.(this, CREEPER_EXPLOSION_POWER);
@@ -651,33 +781,47 @@ export class Mob {
         } else {
           moveDirX = nx;
           moveDirZ = nz;
+          desiredBodyYaw = targetYaw;
         }
       } else if (this.type === 'skeleton') {
         this.arrowCooldown -= dt;
+        desiredBodyYaw = targetYaw;
         if (dist3D > 11.5) {
           moveDirX = nx;
           moveDirZ = nz;
         } else if (dist3D < 5.5) {
-          moveDirX = -nx * 0.7;
-          moveDirZ = -nz * 0.7;
+          moveDirX = -nx * 0.65;
+          moveDirZ = -nz * 0.65;
         } else {
-          // Strafe
+          // Strafe smoothly while aiming bow at target
           moveDirX = -nz * this.strafeDir * 0.55;
           moveDirZ = nx * this.strafeDir * 0.55;
         }
-        if (this.arrowCooldown <= 0 && dist3D < 18) {
+        if (this.arrowCooldown <= 0 && dist3D < 18 && this.hasLOS) {
           this.arrowCooldown = 1.9 + Math.random() * 0.8;
           this.strafeDir *= -1;
           onShootArrow?.(this, player);
+          onMobSound?.('bow_shoot', this);
         }
       } else {
         moveDirX = nx;
         moveDirZ = nz;
+        desiredBodyYaw = targetYaw;
 
-        // Enderman occasional flanking teleport if stuck/distant
+        // Spider pounce leap when within medium range on ground
+        if (this.type === 'spider' && this.onGround && dist3D > 2.2 && dist3D < 4.5 && this.spiderLeapCooldown <= 0 && this.hasLOS) {
+          this.vy = 5.4;
+          this.vx += nx * 4.2;
+          this.vz += nz * 4.2;
+          this.onGround = false;
+          this.spiderLeapCooldown = 2.4;
+        }
+
+        // Enderman occasional flanking teleport if distant
         if (this.type === 'enderman' && dist3D > 10 && Math.random() < dt * 0.35) {
           if (this._tryTeleport(world, px, pz, 2.2, 5.0)) {
             particleManager?.spawnPortal(this.x, this.y, this.z, 8);
+            onMobSound?.('enderman_tp', this);
           }
         }
 
@@ -687,6 +831,7 @@ export class Mob {
           this.attackCooldown = 1.0;
           player.applyDamage(this.attackDamage, this.type);
           particleManager?.spawnHit(px, py + 0.9, pz, 5);
+          onMobSound?.('player_hurt', this);
         }
       }
     } else {
@@ -699,8 +844,10 @@ export class Mob {
         moveSpeed *= 1.55;
         moveDirX = Math.sin(this.wanderYaw);
         moveDirZ = Math.cos(this.wanderYaw);
+        desiredBodyYaw = this.wanderYaw;
+        lookYaw = this.wanderYaw;
         if (Math.random() < dt * 1.4) {
-          this.wanderYaw += (Math.random() - 0.5) * 2.4;
+          this.wanderYaw += (Math.random() - 0.5) * 2.2;
         }
       } else {
         this.wanderTimer -= dt;
@@ -717,12 +864,21 @@ export class Mob {
         if (this.idlePauseTimer <= 0) {
           moveDirX = Math.sin(this.wanderYaw);
           moveDirZ = Math.cos(this.wanderYaw);
-          this.yaw = this.wanderYaw;
+          desiredBodyYaw = this.wanderYaw;
+          lookYaw = this.wanderYaw;
         } else {
           this.idlePauseTimer -= dt;
+          this.idleLookPhase += dt * 1.4;
+          lookYaw = this.yaw + Math.sin(this.idleLookPhase) * 0.42;
         }
       }
     }
+
+    // Smoothly align body orientation to desiredBodyYaw
+    this.yaw = _rotateTowards(this.yaw, desiredBodyYaw, dt * 10.5);
+    const targetHeadYaw = Math.max(-0.95, Math.min(0.95, _wrapAngle(lookYaw - this.yaw)));
+    this.headYaw = _rotateTowards(this.headYaw, targetHeadYaw, dt * 14.0);
+    this.headPitch += (lookPitch - this.headPitch) * Math.min(1, dt * 12.0);
 
     // Apply steering blend into horizontal velocity (preserves knockback)
     const targetVx = moveDirX * moveSpeed;
@@ -742,7 +898,7 @@ export class Mob {
     }
 
     // Axis-separated AABB terrain movement + auto-jump over 1-block steps
-    this._moveAndCollide(dt, world, moveDirX, moveDirZ);
+    this._moveAndCollide(dt, world, moveDirX, moveDirZ, isAggro);
 
     // Sync visual transform, animations, Creeper swell, and voxel lighting
     this._syncVisual(dt);
@@ -768,7 +924,7 @@ export class Mob {
     return false;
   }
 
-  _moveAndCollide(dt, world, wishX, wishZ) {
+  _moveAndCollide(dt, world, wishX, wishZ, isAggro = false) {
     let hitWall = false;
     const nextX = this.x + this.vx * dt;
     if (!this._collides(world, nextX, this.y, this.z)) {
@@ -788,13 +944,14 @@ export class Mob {
 
     // Jump when walking into a 1-block obstacle, or Spider wall-climbing
     if (hitWall && (Math.abs(wishX) > 0.05 || Math.abs(wishZ) > 0.05)) {
-      if (this.type === 'spider') {
-        this.vy = Math.max(this.vy, 4.4);
+      if (this.type === 'spider' && isAggro) {
+        this.vy = Math.max(this.vy, 4.6);
       } else if (this.onGround || this.inWater) {
         this.vy = 7.6;
         this.onGround = false;
-      } else {
+      } else if (!isAggro) {
         this.wanderYaw += Math.PI * 0.7;
+        this.yaw = _rotateTowards(this.yaw, this.wanderYaw, 0.35);
       }
     }
 
@@ -805,9 +962,6 @@ export class Mob {
     } else {
       if (this.vy < 0) {
         this.y = Math.floor(nextY) + 1;
-        if (this.y < 1 && !this._collides(world, this.x, this.y, this.z)) {
-          // fine
-        }
         // Check fall damage
         const fallen = this.fallStartY - this.y;
         if (fallen > 3.5 && !this.inWater && this.type !== 'chicken') {
@@ -828,14 +982,27 @@ export class Mob {
     this.visual.root.position.set(this.x, this.y, this.z);
     this.visual.root.rotation.y = this.yaw;
 
-    const hSpeed = Math.hypot(this.vx, this.vz);
-    if (hSpeed > 0.2) {
-      this.walkPhase += dt * hSpeed * 3.1;
-    } else {
-      this.walkPhase *= 0.85;
+    if (this.visual.headPivot) {
+      this.visual.headPivot.rotation.y = this.headYaw;
+      this.visual.headPivot.rotation.x = this.headPitch;
     }
 
-    const swing = Math.sin(this.walkPhase) * Math.min(0.85, hSpeed * 0.25);
+    // Forward-projected velocity so knockback doesn't spin legs backwards
+    const fwdX = Math.sin(this.yaw);
+    const fwdZ = Math.cos(this.yaw);
+    const signedFwd = this.vx * fwdX + this.vz * fwdZ;
+    const strafeMag = Math.abs(-this.vx * fwdZ + this.vz * fwdX);
+    const animSpeed = this.hurtCooldown > 0.1
+      ? Math.max(0, signedFwd)
+      : (Math.abs(signedFwd) + (this.type === 'skeleton' ? strafeMag * 0.45 : 0));
+
+    if (animSpeed > 0.25) {
+      this.walkPhase += dt * animSpeed * 3.1;
+    } else {
+      this.walkPhase *= 0.82;
+    }
+
+    const swing = Math.sin(this.walkPhase) * Math.min(0.85, animSpeed * 0.25);
     const legs = this.visual.legs;
     for (let i = 0; i < legs.length; i++) {
       legs[i].rotation.x = (i % 2 === 0 ? 1 : -1) * swing;
@@ -864,16 +1031,36 @@ export class Mob {
     const bx = Math.floor(this.x);
     const by = Math.max(0, Math.min(WORLD_HEIGHT - 1, Math.floor(this.y + this.height * 0.5)));
     const bz = Math.floor(this.z);
+    const sunInt = skyInfo ? skyInfo.sunIntensity : 1.0;
+    const sunB = Math.round(sunInt * 20);
+    const creeperBlink = this.type === 'creeper' && this.isIgnited && (Math.floor((this.fuseTimer * 16) % 2) === 0);
+    const redFlash = this.hitFlashTimer > 0 || isDying;
+    const cFlag = creeperBlink ? 1 : 0;
+    const rFlag = redFlash ? 1 : 0;
+
+    if (
+      bx === this._lastLx &&
+      by === this._lastLy &&
+      bz === this._lastLz &&
+      sunB === this._lastSunB &&
+      cFlag === this._lastCFlag &&
+      rFlag === this._lastRFlag
+    ) {
+      return;
+    }
+    this._lastLx = bx;
+    this._lastLy = by;
+    this._lastLz = bz;
+    this._lastSunB = sunB;
+    this._lastCFlag = cFlag;
+    this._lastRFlag = rFlag;
+
     const skyLvl = world ? world.getSkyLight(bx, by, bz) : 15;
     const blkLvl = world ? world.getBlockLight(bx, by, bz) : 0;
 
-    const sunInt = skyInfo ? skyInfo.sunIntensity : 1.0;
     const skyL = Math.pow(0.82, 15 - skyLvl) * sunInt;
     const blkL = Math.pow(0.87, 15 - blkLvl);
     const lum = Math.max(0.11, Math.min(1.0, Math.max(skyL, blkL)));
-
-    const creeperBlink = this.type === 'creeper' && this.isIgnited && (Math.floor((this.fuseTimer * 16) % 2) === 0);
-    const redFlash = this.hitFlashTimer > 0 || isDying;
 
     for (const part of this.visual.parts) {
       if (part.emissive) {

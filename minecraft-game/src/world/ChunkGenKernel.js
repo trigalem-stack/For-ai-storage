@@ -195,22 +195,23 @@ export function createChunkGeneratorKernel(cfg) {
     }
 
     sampleClimate(wx, wz) {
-      const temp = this.tempNoise.fbm2D(wx * 0.0021, wz * 0.0021, 3, 0.5, 2.0);
-      const humid = this.humidNoise.fbm2D(wx * 0.0023 + 51.7, wz * 0.0023 - 37.2, 3, 0.5, 2.0);
-      const cont = this.contNoise.fbm2D(wx * 0.0031 - 19.4, wz * 0.0031 + 83.1, 4, 0.5, 2.0);
-      const erosion = this.erosionNoise.fbm2D(wx * 0.0036 + 11.2, wz * 0.0036 + 44.5, 3, 0.5, 2.0);
-      const weird = this.weirdNoise.fbm2D(wx * 0.0052, wz * 0.0052, 2, 0.5, 2.0);
+      // Continental-scale biome noise (~500-1100+ blocks across, avoiding rapid 150-block biome thrashing)
+      const temp = this.tempNoise.fbm2D(wx * 0.00072, wz * 0.00072, 2, 0.45, 2.0);
+      const humid = this.humidNoise.fbm2D(wx * 0.00078 + 51.7, wz * 0.00078 - 37.2, 2, 0.45, 2.0);
+      const cont = this.contNoise.fbm2D(wx * 0.00095 - 19.4, wz * 0.00095 + 83.1, 2, 0.45, 2.0);
+      const erosion = this.erosionNoise.fbm2D(wx * 0.00105 + 11.2, wz * 0.00105 + 44.5, 2, 0.45, 2.0);
+      const weird = this.weirdNoise.fbm2D(wx * 0.0016, wz * 0.0016, 2, 0.45, 2.0);
 
       let biome = BI.PLAINS;
-      if (erosion < -0.21 || (cont > 0.24 && weird > 0.22)) {
+      if (erosion < -0.18 || (cont > 0.22 && weird > 0.20)) {
         biome = BI.MOUNTAINS;
-      } else if (temp > 0.19 && humid < 0.06) {
+      } else if (temp > 0.16 && humid < 0.08) {
         biome = BI.DESERT;
-      } else if (temp < -0.19) {
+      } else if (temp < -0.16) {
         biome = BI.SNOWY_TAIGA;
-      } else if (cont < -0.04 && humid > 0.10) {
+      } else if (cont < -0.04 && humid > 0.09) {
         biome = BI.SWAMP;
-      } else if (humid > 0.17) {
+      } else if (humid > 0.15) {
         biome = BI.BIRCH_FOREST;
       } else if (humid > -0.04) {
         biome = BI.FOREST;
@@ -251,15 +252,15 @@ export function createChunkGeneratorKernel(cfg) {
 
       let h = avgBase + hills * avgAmp + ridge * 24.0 * avgRidgeW;
 
-      // Meandering river carving at SEA_LEVEL
-      const riverDist = Math.abs(this.riverNoise.fbm2D(wx * 0.0026 + 9.3, wz * 0.0026 - 14.8, 3, 0.5, 2.0));
+      // Meandering macro river carving at SEA_LEVEL
+      const riverDist = Math.abs(this.riverNoise.fbm2D(wx * 0.00085 + 9.3, wz * 0.00085 - 14.8, 3, 0.5, 2.0));
       let isRiver = false;
-      if (riverDist < 0.052) {
-        const t = 1 - riverDist / 0.052; // 0 at bank, 1 at center
+      if (riverDist < 0.045) {
+        const t = 1 - riverDist / 0.045; // 0 at bank, 1 at center
         const smooth = t * t * (3 - 2 * t);
         const riverBed = 57.5 + this.detailNoise.noise2D(wx * 0.05, wz * 0.05) * 1.4;
         h = lerp(h, riverBed, smooth * 0.92);
-        if (riverDist < 0.036) isRiver = true;
+        if (riverDist < 0.030) isRiver = true;
       }
 
       const height = Math.max(8, Math.min(WORLD_HEIGHT - 12, Math.round(h)));
@@ -296,11 +297,13 @@ export function createChunkGeneratorKernel(cfg) {
     return ctx;
   }
 
-  function getTerrainHeight(seed, wx, wz) {
+  function getTerrainHeight(seed, wx, wz, worldType = 'default') {
+    if (worldType === 'superflat') return 3;
     return getCtx(seed).getColumnData(wx, wz).height;
   }
 
-  function getBiomeAt(seed, wx, wz) {
+  function getBiomeAt(seed, wx, wz, worldType = 'default') {
+    if (worldType === 'superflat') return BI.PLAINS;
     return getCtx(seed).getColumnData(wx, wz).biome;
   }
 
@@ -530,7 +533,25 @@ export function createChunkGeneratorKernel(cfg) {
     }
   }
 
-  function generateChunkData(seed, cx, cz) {
+  function generateChunkData(seed, cx, cz, worldType = 'default') {
+    if (worldType === 'superflat') {
+      const blocks = new Uint8Array(CHUNK_VOLUME);
+      const biomes = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+      biomes.fill(BI.PLAINS);
+      const slice = CHUNK_SIZE * CHUNK_SIZE;
+      blocks.fill(B.BEDROCK, 0, slice);
+      blocks.fill(B.DIRT, slice, slice * 3);
+      blocks.fill(B.GRASS, slice * 3, slice * 4);
+      return {
+        blocks,
+        biomes,
+        fluidSprings: new Uint16Array(0),
+        fluidWakes: new Uint16Array(0),
+        minY: 0,
+        maxY: 3,
+      };
+    }
+
     const ctx = getCtx(seed);
     const blocks = new Uint8Array(CHUNK_VOLUME);
     const biomes = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
@@ -1003,12 +1024,13 @@ export function createChunkGeneratorKernel(cfg) {
 
     // 6.5. Stage 7 Fluid Features: Surface Lava Pools, Underground Water Basins, and Embedded Rock Springs
     const springIndices = [];
+    const wakeIndices = [];
     const isWallRock = (id) =>
       id === B.STONE || id === B.DEEPSLATE || id === B.GRANITE || id === B.DIORITE ||
       id === B.ANDESITE || id === B.DIRT || id === B.SANDSTONE || id === B.COBBLESTONE;
 
-    // 6.5a Surface Lava Pools (rare ~4% of dry chunks outside spawn area, enclosed by stone rim)
-    if (B.LAVA && (Math.abs(cx) > 1 || Math.abs(cz) > 1) && chunkRand() < 0.045) {
+    // 6.5a Surface Lava Pools (truly rare Minecraft-authentic ~1 per ~220 dry chunks outside spawn area)
+    if (B.LAVA && (Math.abs(cx) > 3 || Math.abs(cz) > 3) && chunkRand() < 0.0045) {
       const px = 4 + Math.floor(chunkRand() * 8);
       const pz = 4 + Math.floor(chunkRand() * 8);
       const colIdx = pz * CHUNK_SIZE + px;
@@ -1075,6 +1097,7 @@ export function createChunkGeneratorKernel(cfg) {
               if (lx <= 0 || lx >= 15 || lz <= 0 || lz >= 15) continue;
               if (dx * dx + dz * dz <= 4 && getBlockSafe(blocks, lx, baseWy, lz) === B.AIR && isWallRock(getBlockSafe(blocks, lx, baseWy - 1, lz))) {
                 setBlockSafe(blocks, lx, baseWy, lz, B.WATER);
+                wakeIndices.push((baseWy * CHUNK_SIZE + lz) * CHUNK_SIZE + lx);
               }
             }
           }
@@ -1083,13 +1106,13 @@ export function createChunkGeneratorKernel(cfg) {
     }
 
     // 6.5c Embedded Mountain Water Springs & Deep Cave Lava Springs (never floating in open sky!)
-    for (let attempt = 0; attempt < 18 && springIndices.length < 2; attempt++) {
+    for (let attempt = 0; attempt < 18 && springIndices.length < 3; attempt++) {
       const lx = 1 + Math.floor(chunkRand() * 14);
       const lz = 1 + Math.floor(chunkRand() * 14);
       const colH = heightMap[lz * CHUNK_SIZE + lx];
-      const useLava = B.LAVA && attempt >= 10;
-      const minSy = useLava ? 12 : (biomes[lz * CHUNK_SIZE + lx] === BI.MOUNTAINS ? SEA_LEVEL + 6 : 16);
-      const maxSy = useLava ? Math.min(34, colH - 6) : Math.min(WORLD_HEIGHT - 8, colH - 2);
+      const useLava = B.LAVA && attempt >= 12;
+      const minSy = useLava ? 10 : (biomes[lz * CHUNK_SIZE + lx] === BI.MOUNTAINS ? SEA_LEVEL + 6 : 16);
+      const maxSy = useLava ? Math.min(24, colH - 12) : Math.min(WORLD_HEIGHT - 8, colH - 2);
       if (maxSy <= minSy) continue;
 
       const sy = minSy + Math.floor(chunkRand() * (maxSy - minSy));
@@ -1114,6 +1137,27 @@ export function createChunkGeneratorKernel(cfg) {
       }
     }
 
+    // 6.5d Wake natural water/lava cells touching open air (e.g. cave walls, sea edges) so water flows sideways naturally
+    for (let z = 0; z < CHUNK_SIZE; z++) {
+      for (let x = 0; x < CHUNK_SIZE; x++) {
+        const h = heightMap[z * CHUNK_SIZE + x];
+        if (h >= SEA_LEVEL) continue;
+        for (let y = h + 1; y <= SEA_LEVEL; y++) {
+          const idx = (y * CHUNK_SIZE + z) * CHUNK_SIZE + x;
+          if (blocks[idx] !== B.WATER) continue;
+          const touchesOpen =
+            (x > 0 && blocks[idx - 1] === B.AIR) ||
+            (x < 15 && blocks[idx + 1] === B.AIR) ||
+            (z > 0 && blocks[idx - CHUNK_SIZE] === B.AIR) ||
+            (z < 15 && blocks[idx + CHUNK_SIZE] === B.AIR) ||
+            (y > 0 && blocks[idx - slice] === B.AIR);
+          if (touchesOpen) {
+            wakeIndices.push(idx);
+          }
+        }
+      }
+    }
+
     // 7. Compute tight non-air vertical bounds
     let minY = WORLD_HEIGHT - 1;
     let maxY = 0;
@@ -1133,6 +1177,7 @@ export function createChunkGeneratorKernel(cfg) {
       blocks,
       biomes,
       fluidSprings: new Uint16Array(springIndices),
+      fluidWakes: new Uint16Array(wakeIndices),
       minY: minY <= maxY ? minY : 0,
       maxY: minY <= maxY ? maxY : 0,
     };

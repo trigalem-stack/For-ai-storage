@@ -1,4 +1,4 @@
-const CACHE_NAME = 'minecraft-web-stage8-v1';
+const CACHE_NAME = 'minecraft-web-stage9-v1';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const CORE_ASSETS = [
   './vendor/three.module.min.js',
   './src/main.js',
   './src/constants.js',
+  './src/audio/SoundManager.js',
   './src/blocks/BlockRegistry.js',
   './src/items/ItemIds.js',
   './src/items/ItemRegistry.js',

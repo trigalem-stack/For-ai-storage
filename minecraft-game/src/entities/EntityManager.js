@@ -46,6 +46,11 @@ export class EntityManager {
     this.primedTnts = [];
     this.spawnTimer = 1.2;
     this._initialPassiveDone = false;
+    this.soundManager = null;
+  }
+
+  setSoundManager(soundManager) {
+    this.soundManager = soundManager || null;
   }
 
   spawnMob(type, x, y, z, extras = {}) {
@@ -257,7 +262,7 @@ export class EntityManager {
       if (!chunk || !chunk.isGenerated) return null;
 
       if (!preferUnderground) {
-        for (let y = WORLD_HEIGHT - 4; y >= 48; y--) {
+        for (let y = WORLD_HEIGHT - 4; y >= 2; y--) {
           const floor = world.getBlock(sx, y - 1, sz);
           const b1 = world.getBlock(sx, y, sz);
           const b2 = world.getBlock(sx, y + 1, sz);
@@ -336,8 +341,10 @@ export class EntityManager {
     particleManager = null,
     fallingManager = null,
     blockEntityManager = null,
+    soundManager = null,
   }) {
     if (!world || !player) return;
+    const activeSound = soundManager || this.soundManager;
     const isDaylight = skyInfo ? skyInfo.sunIntensity > 0.36 : true;
 
     this.spawnTimer -= dt;
@@ -375,8 +382,12 @@ export class EntityManager {
         isDaylight,
         particleManager,
         itemManager,
+        onMobSound: (kind, m) => {
+          activeSound?.playMobSound?.(kind, m);
+        },
         onShootArrow: (shooter, target) => this._shootSkeletonArrow(shooter, target),
         onExplode: (creeper, power) => {
+          activeSound?.playExplosion?.();
           triggerExplosion({
             world,
             x: creeper.x,
@@ -439,6 +450,7 @@ export class EntityManager {
         const pow = tnt.getPower();
         tnt.dispose(this.scene);
         this.primedTnts.splice(i, 1);
+        activeSound?.playExplosion?.();
         triggerExplosion({
           world,
           x: tx,
@@ -460,6 +472,7 @@ export class EntityManager {
       const orb = this.xpOrbs[i];
       const keep = orb.update(dt, world, player, (val) => {
         player.addXp?.(val);
+        activeSound?.playXpOrb?.();
       });
       if (!keep || !orb.alive) {
         orb.dispose(this.scene);

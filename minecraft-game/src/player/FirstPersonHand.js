@@ -367,6 +367,12 @@ export class FirstPersonHand {
     }
   }
 
+  setSkinTexture(tex) {
+    if (!tex) return;
+    this.armMaterial.map = tex;
+    this.armMaterial.needsUpdate = true;
+  }
+
   render(renderer) {
     renderer.clearDepth();
     renderer.render(this.scene, this.camera);
@@ -395,9 +401,15 @@ export class FirstPersonHand {
     this.crosshairH.geometry.dispose();
     this.crosshairMat.dispose();
     for (const [id, mesh] of this.heldCache.entries()) {
-      if (id < 256) mesh.geometry.dispose();
+      if (id < 256 || mesh.geometry) mesh.geometry?.dispose?.();
     }
     this.heldCache.clear();
+    if (this.bowStageCache) {
+      for (const mesh of this.bowStageCache.values()) {
+        mesh?.geometry?.dispose?.();
+      }
+      this.bowStageCache.clear();
+    }
     this.blockMaterial.dispose();
     this.extrudedMaterial.dispose();
   }

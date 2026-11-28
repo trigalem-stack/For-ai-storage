@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#2d63b8">
-  <title>Minecraft Web Edition — Stage 8</title>
+  <title>Minecraft Web Edition — Stage 9</title>
   <style>
 :root {
   color-scheme: only light;
@@ -344,8 +344,10 @@ body.webgl-crosshair #crosshair::after {
   right: 2px;
   bottom: 1px;
   font-size: 11px;
-  font-weight: 700;
-  color: #fff;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #141414;
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -594,18 +596,182 @@ body.webgl-crosshair #crosshair::after {
 }
 
 /* Modals: Main Menu, World Manager, Tabbed Settings, Pause */
-#main-menu-overlay,
-#settings-overlay,
-#pause-overlay {
+#main-menu-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 16, 26, 0.74);
-  backdrop-filter: blur(5px);
+  background: rgba(12, 18, 28, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) max(12px, var(--safe-left));
   z-index: 45;
+}
+
+#settings-overlay,
+#pause-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 16, 26, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) max(12px, var(--safe-left));
+  z-index: 45;
+}
+
+/* Authentic Minecraft Title Stage over 3D Panorama */
+.mc-title-stage {
+  width: min(460px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.mc-title-banner {
+  position: relative;
+  text-align: center;
+  padding: 10px 18px;
+}
+
+.mc-block-logo {
+  margin: 0;
+  font-size: clamp(34px, 7vw, 56px);
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #f3f5f8;
+  text-shadow:
+    0 3px 0 #70747d,
+    0 6px 0 #3f434a,
+    0 9px 14px rgba(0, 0, 0, 0.65);
+}
+
+.mc-edition-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  color: #dfe6f2;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.85);
+}
+
+.mc-splash {
+  position: absolute;
+  right: -12px;
+  bottom: -8px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #ffff42;
+  text-shadow: 2px 2px 0 #3a3a00;
+  transform: rotate(-11deg);
+  animation: mcSplashPulse 1.1s ease-in-out infinite alternate;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@keyframes mcSplashPulse {
+  0% { transform: rotate(-11deg) scale(0.95); }
+  100% { transform: rotate(-11deg) scale(1.07); }
+}
+
+.mc-title-buttons {
+  width: min(370px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mc-title-btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mc-title-footer {
+  font-size: 11px;
+  color: rgba(240, 245, 255, 0.84);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.mc-skins-card {
+  width: min(410px, 94vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skin-preview-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(14, 18, 24, 0.65);
+  border: 2px solid #16191f;
+}
+
+#skin-menu-canvas {
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #1d2532;
+}
+
+.skin-active-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #e4eaf2;
+}
+
+.skin-preset-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.skin-preset-btn.active {
+  background: #4c9a2a;
+  border-color: #ffffff;
+}
+
+.skin-upload-label {
+  display: block;
+  text-align: center;
+}
+
+.worlds-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.world-import-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-picker-row-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.world-badge-hardcore {
+  color: #ff6b6b;
+  font-weight: 800;
+}
+
+.world-badge-flat {
+  color: #f6d55c;
+}
+
+.settings-tabs-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+#touch-action-cluster {
+  transform: scale(var(--touch-scale, 1));
+  transform-origin: bottom right;
 }
 
 .mc-modal {
@@ -1389,6 +1555,24 @@ body.webgl-crosshair #crosshair::after {
   width: 100%;
 }
 
+.inv-creative-search {
+  width: 100%;
+  height: 28px;
+  padding: 4px 8px;
+  background: #2c2f36;
+  color: #ffffff;
+  border: 2px solid #16181d;
+  border-bottom-color: #606572;
+  border-right-color: #606572;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.inv-creative-search::placeholder {
+  color: #a4acb8;
+}
+
 .inv-creative-catalog {
   flex: 1 1 auto;
   max-height: 246px;
@@ -1542,7 +1726,7 @@ body.webgl-crosshair #crosshair::after {
   width: 32px;
   height: 32px;
   pointer-events: none;
-  z-index: 94;
+  z-index: 96;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1778,8 +1962,7 @@ body.webgl-crosshair #crosshair::after {
 #death-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(135, 16, 16, 0.56);
-  backdrop-filter: blur(3px);
+  background: rgba(135, 16, 16, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2234,7 +2417,7 @@ body.webgl-crosshair #crosshair::after {
     <button id="vm-btn-drop" class="vm-btn" type="button" title="Выбросить (Q)">Q Брос.</button>
   </div>
 
-  <!-- Death Screen Overlay (Stage 6) -->
+  <!-- Death Screen Overlay (Stage 6 & 9 Hardcore) -->
   <div id="death-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="death-title">
     <div class="death-card">
       <h1 id="death-title">Вы погибли!</h1>
@@ -2242,6 +2425,7 @@ body.webgl-crosshair #crosshair::after {
       <p id="death-score" class="death-score">Счёт: 0</p>
       <div class="death-actions">
         <button id="btn-respawn" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">Возродиться</button>
+        <button id="btn-death-spectate" class="mc-menu-btn mc-btn-lg hidden" type="button">Осмотреть мир</button>
         <button id="btn-death-menu" class="mc-menu-btn mc-btn-lg" type="button">Главное меню</button>
       </div>
     </div>
@@ -2249,30 +2433,67 @@ body.webgl-crosshair #crosshair::after {
 
   <!-- Main Menu & World Manager -->
   <div id="main-menu-overlay" role="dialog" aria-modal="true" aria-labelledby="main-title">
-    <div id="menu-home" class="mc-modal mc-main-card">
-      <div class="mc-logo-badge">
-        <div class="mc-cube-badge"></div>
-        <h1 id="main-title">MINECRAFT WEB</h1>
-        <p class="mc-modal-sub">Этап 8 · Мобы · Бой · Луки · Динамит · Опыт · Частицы</p>
+    <div id="menu-home" class="mc-title-stage">
+      <div class="mc-title-banner">
+        <h1 id="main-title" class="mc-block-logo">MINECRAFT</h1>
+        <div class="mc-edition-sub">WEB EDITION · 100% ОФФЛАЙН</div>
+        <div id="menu-splash" class="mc-splash">3D Мир · Мобы · Звук · Скины!</div>
       </div>
-      <div class="mc-modal-actions">
-        <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">▶ Играть (Миры)</button>
-        <button id="btn-menu-settings" class="mc-menu-btn mc-btn-lg" type="button">⚙ Настройки</button>
+
+      <div class="mc-title-buttons">
+        <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">Одиночная игра (Миры)</button>
+        <div class="mc-title-btn-row">
+          <button id="btn-menu-settings" class="mc-menu-btn mc-btn-lg" type="button">Настройки...</button>
+          <button id="btn-menu-skins" class="mc-menu-btn mc-btn-lg" type="button">Скин игрока</button>
+        </div>
       </div>
+      <div class="mc-title-footer">Minecraft Web Edition v9 · Локальное хранение в IndexedDB</div>
+    </div>
+
+    <div id="menu-skins" class="mc-modal mc-skins-card hidden">
+      <div class="palette-header">
+        <h2>Выбор скина</h2>
+        <button id="btn-skins-back" class="mc-menu-btn mc-back-btn" type="button">← Назад</button>
+      </div>
+      <div class="skin-preview-box">
+        <canvas id="skin-menu-canvas" width="96" height="96"></canvas>
+        <div id="skin-active-label" class="skin-active-label">Текущий скин: Стив</div>
+      </div>
+      <div class="skin-preset-row">
+        <button type="button" class="mc-menu-btn skin-preset-btn active" data-skin="steve">Стив</button>
+        <button type="button" class="mc-menu-btn skin-preset-btn" data-skin="alex">Алекс</button>
+        <button type="button" class="mc-menu-btn skin-preset-btn" data-skin="knight">Рыцарь</button>
+      </div>
+      <label class="mc-menu-btn mc-menu-primary skin-upload-label" for="input-skin-upload">
+        📁 Загрузить свой PNG-скин (64×64)
+        <input id="input-skin-upload" type="file" accept="image/png,image/*" class="hidden">
+      </label>
     </div>
 
     <div id="menu-worlds" class="mc-modal mc-worlds-card hidden">
       <div class="palette-header">
-        <h2>Мои миры</h2>
-        <button id="btn-worlds-back" class="mc-menu-btn mc-back-btn" type="button">← Назад</button>
+        <h2>Выбор мира</h2>
+        <div class="worlds-header-actions">
+          <label class="mc-menu-btn mc-back-btn world-import-btn" for="input-import-world" title="Импортировать мир .mcworld.json">
+            ⬆ Импорт
+            <input id="input-import-world" type="file" accept=".json,.mcworld.json" class="hidden">
+          </label>
+          <button id="btn-worlds-back" class="mc-menu-btn mc-back-btn" type="button">← Назад</button>
+        </div>
       </div>
 
       <div class="create-world-box">
-        <input id="input-world-name" class="mc-input" type="text" maxlength="32" placeholder="Название мира (например: Выживание)">
-        <input id="input-world-seed" class="mc-input" type="text" maxlength="24" placeholder="Сид (необязательно)">
-        <div class="mode-picker-row" role="group" aria-label="Режим нового мира">
+        <input id="input-world-name" class="mc-input" type="text" maxlength="32" placeholder="Название мира (например: Мой Мир)">
+        <input id="input-world-seed" class="mc-input" type="text" maxlength="24" placeholder="Ключ генерации (сид, необязательно)">
+        <div class="mode-picker-row mode-picker-row-3" role="group" aria-label="Режим нового мира">
           <button id="btn-new-mode-survival" type="button" class="mc-menu-btn mode-pick-btn active" data-mode="survival">⚔️ Выживание</button>
+          <button id="btn-new-mode-hardcore" type="button" class="mc-menu-btn mode-pick-btn" data-mode="hardcore">☠️ Хардкор</button>
           <button id="btn-new-mode-creative" type="button" class="mc-menu-btn mode-pick-btn" data-mode="creative">🧱 Креатив</button>
+        </div>
+        <div class="mode-picker-row mode-picker-row-3" role="group" aria-label="Тип мира и опции">
+          <button id="btn-world-type-default" type="button" class="mc-menu-btn mode-pick-btn active" data-world-type="default">🌍 Обычный</button>
+          <button id="btn-world-type-superflat" type="button" class="mc-menu-btn mode-pick-btn" data-world-type="superflat">🏜️ Суперплоский</button>
+          <button id="btn-bonus-chest" type="button" class="mc-menu-btn mode-pick-btn" title="Начальный сундук со снаряжением у спавна">🎁 Бонус-сундук: ВЫКЛ</button>
         </div>
         <button id="btn-create-world" class="mc-menu-btn mc-menu-primary" type="button">+ Создать новый мир</button>
       </div>
@@ -2289,8 +2510,9 @@ body.webgl-crosshair #crosshair::after {
         <button id="btn-settings-close" class="mc-menu-btn mc-menu-primary mc-back-btn" type="button">Готово</button>
       </div>
 
-      <div class="settings-tabs" role="tablist">
+      <div class="settings-tabs settings-tabs-4" role="tablist">
         <button type="button" class="settings-tab-btn active" data-tab="graphics">Графика</button>
+        <button type="button" class="settings-tab-btn" data-tab="audio">Звук</button>
         <button type="button" class="settings-tab-btn" data-tab="controls">Управление</button>
         <button type="button" class="settings-tab-btn" data-tab="other">Интерфейс</button>
       </div>
@@ -2307,9 +2529,37 @@ body.webgl-crosshair #crosshair::after {
           <button id="btn-graphics-mode" class="mc-menu-btn" type="button">Разрешение: Улучшенное (чёткий PixelRatio)</button>
           <button id="btn-memory-mode" class="mc-menu-btn" type="button">Память мира: Бесконечная (∞)</button>
 
+          <label class="mc-slider-row" for="range-res-scale">
+            <span>Масштаб рендера (Resolution): <strong id="label-res-scale">100%</strong></span>
+            <input id="range-res-scale" type="range" min="0.5" max="1.25" step="0.05" value="1.0">
+          </label>
+
           <label class="mc-slider-row" for="range-render-dist">
             <span>Дальность прорисовки: <strong id="label-render-dist">6 чанков</strong></span>
-            <input id="range-render-dist" type="range" min="2" max="16" step="1" value="6">
+            <input id="range-render-dist" type="range" min="2" max="12" step="1" value="6">
+          </label>
+        </div>
+
+        <div class="settings-tab-panel hidden" data-tab-panel="audio">
+          <label class="mc-slider-row" for="range-audio-master">
+            <span>Общая громкость: <strong id="label-audio-master">80%</strong></span>
+            <input id="range-audio-master" type="range" min="0" max="100" step="5" value="80">
+          </label>
+          <label class="mc-slider-row" for="range-audio-music">
+            <span>Музыка: <strong id="label-audio-music">45%</strong></span>
+            <input id="range-audio-music" type="range" min="0" max="100" step="5" value="45">
+          </label>
+          <label class="mc-slider-row" for="range-audio-blocks">
+            <span>Блоки и шаги: <strong id="label-audio-blocks">85%</strong></span>
+            <input id="range-audio-blocks" type="range" min="0" max="100" step="5" value="85">
+          </label>
+          <label class="mc-slider-row" for="range-audio-hostile">
+            <span>Враги и взрывы: <strong id="label-audio-hostile">85%</strong></span>
+            <input id="range-audio-hostile" type="range" min="0" max="100" step="5" value="85">
+          </label>
+          <label class="mc-slider-row" for="range-audio-ui">
+            <span>Интерфейс и подбор: <strong id="label-audio-ui">80%</strong></span>
+            <input id="range-audio-ui" type="range" min="0" max="100" step="5" value="80">
           </label>
         </div>
 
@@ -2319,6 +2569,11 @@ body.webgl-crosshair #crosshair::after {
           <label class="mc-slider-row" for="range-sensitivity">
             <span>Чувствительность камеры: <strong id="label-sensitivity">100%</strong></span>
             <input id="range-sensitivity" type="range" min="0.4" max="2.2" step="0.1" value="1.0">
+          </label>
+
+          <label class="mc-slider-row" for="range-touch-scale">
+            <span>Размер кнопок (Touch): <strong id="label-touch-scale">100%</strong></span>
+            <input id="range-touch-scale" type="range" min="0.75" max="1.35" step="0.05" value="1.0">
           </label>
 
           <div class="mc-help-box">
@@ -2333,7 +2588,7 @@ body.webgl-crosshair #crosshair::after {
         <div class="settings-tab-panel hidden" data-tab-panel="other">
           <button id="btn-hint-mode" class="mc-menu-btn" type="button">Подсказки управления: ВКЛ</button>
           <div class="mc-help-box">
-            Режим мира (Выживание / Креатив) выбирается при создании мира. Все миры, здоровье, еда, грядки, сундуки и инвентарь автоматически сохраняются локально в IndexedDB (100% оффлайн).
+            Миры поддерживают режимы Выживание, Хардкор (1 жизнь) и Креатив, Обычную и Суперплоскую генерацию, а также экспорт и импорт в .mcworld.json. Все данные сохраняются локально в IndexedDB (100% оффлайн).
           </div>
         </div>
       </div>
@@ -18573,6 +18828,251 @@ void main() {
   };
   var BlockRegistry = new BlockRegistryImpl();
 
+  // src/audio/SoundManager.js
+  function resolveSoundMaterial(matOrId) {
+    if (typeof matOrId === "string") return matOrId;
+    if (typeof matOrId === "number" && matOrId > 0) {
+      if (matOrId === BLOCK_IDS.GLASS || matOrId === BLOCK_IDS.ICE) return "glass";
+      if (matOrId === BLOCK_IDS.WATER) return "water";
+      if (matOrId === BLOCK_IDS.SAND || matOrId === BLOCK_IDS.GRAVEL) return "sand";
+      if (matOrId === BLOCK_IDS.GRASS || matOrId === BLOCK_IDS.DIRT || matOrId === BLOCK_IDS.LEAVES || matOrId === BLOCK_IDS.FARMLAND) return "grass";
+      const def = BlockRegistry.get(matOrId);
+      if (def?.tool === "axe") return "wood";
+    }
+    return "stone";
+  }
+  var SoundManager = class {
+    constructor(initialAudio = {}) {
+      this.ctx = null;
+      this.masterGain = null;
+      this.volumes = {
+        master: Number.isFinite(initialAudio.master) ? initialAudio.master : 80,
+        music: Number.isFinite(initialAudio.music) ? initialAudio.music : 45,
+        blocks: Number.isFinite(initialAudio.blocks) ? initialAudio.blocks : 85,
+        hostile: Number.isFinite(initialAudio.hostile) ? initialAudio.hostile : 85,
+        ui: Number.isFinite(initialAudio.ui) ? initialAudio.ui : 80
+      };
+      this._noiseBuffer = null;
+      this._lastStepAt = 0;
+      this._musicTimer = 4 + Math.random() * 6;
+      this._ambientIndex = 0;
+    }
+    setVolumes(audio = {}) {
+      for (const key of ["master", "music", "blocks", "hostile", "ui"]) {
+        if (Number.isFinite(audio[key])) {
+          this.volumes[key] = Math.max(0, Math.min(100, Math.round(audio[key])));
+        }
+      }
+      if (this.masterGain && this.ctx) {
+        this.masterGain.gain.setTargetAtTime(this.volumes.master / 100, this.ctx.currentTime, 0.02);
+      }
+    }
+    setChannelVolume(channel, value) {
+      if (!["master", "music", "blocks", "hostile", "ui"].includes(channel)) return;
+      this.setVolumes({ [channel]: value });
+    }
+    _ensureCtx() {
+      if (this.ctx) {
+        if (this.ctx.state === "suspended") {
+          this.ctx.resume().catch(() => {
+          });
+        }
+        return this.ctx;
+      }
+      const AudioCtx = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
+      if (!AudioCtx) return null;
+      try {
+        this.ctx = new AudioCtx();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = this.volumes.master / 100;
+        this.masterGain.connect(this.ctx.destination);
+        return this.ctx;
+      } catch {
+        this.ctx = null;
+        return null;
+      }
+    }
+    unlock() {
+      this._ensureCtx();
+    }
+    _gain(category) {
+      const cat = this.volumes[category] ?? 80;
+      return Math.max(0, Math.min(1, this.volumes.master / 100 * (cat / 100)));
+    }
+    _getNoiseBuffer(ctx) {
+      if (this._noiseBuffer) return this._noiseBuffer;
+      const len = Math.floor(ctx.sampleRate * 0.5);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        ch[i] = Math.random() * 2 - 1;
+      }
+      this._noiseBuffer = buf;
+      return buf;
+    }
+    _tone(freqStart, freqEnd, duration, type, category, gainScale = 0.16, delay = 0) {
+      const g = this._gain(category) * gainScale;
+      if (g <= 2e-3) return;
+      const ctx = this._ensureCtx();
+      if (!ctx || ctx.state !== "running") return;
+      const now = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      const amp = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freqStart, now);
+      if (freqEnd !== freqStart) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), now + duration);
+      }
+      amp.gain.setValueAtTime(1e-4, now);
+      amp.gain.linearRampToValueAtTime(g, now + 8e-3);
+      amp.gain.exponentialRampToValueAtTime(1e-4, now + duration);
+      osc.connect(amp);
+      amp.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    }
+    _noise(duration, filterType, freq, q, category, gainScale = 0.16, delay = 0) {
+      const g = this._gain(category) * gainScale;
+      if (g <= 2e-3) return;
+      const ctx = this._ensureCtx();
+      if (!ctx || ctx.state !== "running") return;
+      const now = ctx.currentTime + delay;
+      const src = ctx.createBufferSource();
+      src.buffer = this._getNoiseBuffer(ctx);
+      const filter = ctx.createBiquadFilter();
+      filter.type = filterType;
+      filter.frequency.setValueAtTime(freq, now);
+      filter.Q.setValueAtTime(q, now);
+      const amp = ctx.createGain();
+      amp.gain.setValueAtTime(g, now);
+      amp.gain.exponentialRampToValueAtTime(1e-4, now + duration);
+      src.connect(filter);
+      filter.connect(amp);
+      amp.connect(this.masterGain);
+      src.start(now);
+      src.stop(now + duration + 0.02);
+    }
+    playClick() {
+      this._tone(680, 480, 0.045, "triangle", "ui", 0.12);
+    }
+    playUiClick() {
+      this.playClick();
+    }
+    playPickup() {
+      this._tone(580, 960, 0.08, "sine", "ui", 0.11);
+    }
+    playXpOrb() {
+      this._tone(740 + Math.random() * 240, 1280, 0.075, "sine", "ui", 0.1);
+    }
+    playLevelUp() {
+      const notes = [523.25, 659.25, 783.99, 1046.5];
+      notes.forEach((f, idx) => {
+        this._tone(f, f * 1.01, 0.18, "triangle", "ui", 0.11, idx * 0.075);
+      });
+    }
+    playSplash() {
+      this._noise(0.18, "bandpass", 720, 1.4, "blocks", 0.18);
+    }
+    playBlockBreak(materialOrId = "stone") {
+      const material = resolveSoundMaterial(materialOrId);
+      if (material === "glass") {
+        this._noise(0.14, "highpass", 2600, 1.2, "blocks", 0.2);
+        this._tone(1850, 920, 0.09, "triangle", "blocks", 0.1);
+      } else if (material === "wood") {
+        this._tone(210, 115, 0.075, "triangle", "blocks", 0.16);
+        this._noise(0.07, "bandpass", 650, 1.6, "blocks", 0.14);
+      } else if (material === "grass" || material === "sand") {
+        this._noise(0.11, "bandpass", material === "sand" ? 1400 : 880, 1, "blocks", 0.17);
+      } else {
+        this._tone(165, 85, 0.07, "square", "blocks", 0.09);
+        this._noise(0.09, "lowpass", 1100, 1.2, "blocks", 0.16);
+      }
+    }
+    playBlockPlace(materialOrId = "stone") {
+      const material = resolveSoundMaterial(materialOrId);
+      if (material === "wood") {
+        this._tone(250, 170, 0.055, "triangle", "blocks", 0.14);
+      } else if (material === "grass" || material === "sand") {
+        this._noise(0.075, "bandpass", 760, 1.1, "blocks", 0.12);
+      } else {
+        this._tone(210, 130, 0.05, "triangle", "blocks", 0.13);
+      }
+    }
+    playFootstep(materialOrId = "grass") {
+      const material = resolveSoundMaterial(materialOrId);
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      if (now - this._lastStepAt < 260) return;
+      this._lastStepAt = now;
+      if (material === "water") {
+        this._noise(0.08, "bandpass", 580, 1.5, "blocks", 0.08);
+      } else if (material === "stone") {
+        this._tone(145, 90, 0.04, "triangle", "blocks", 0.055);
+      } else {
+        this._noise(0.055, "lowpass", 620, 1, "blocks", 0.065);
+      }
+    }
+    playStep(materialOrId = "grass") {
+      this.playFootstep(materialOrId);
+    }
+    playHit() {
+      this._noise(0.06, "bandpass", 1200, 1.4, "hostile", 0.13);
+      this._tone(240, 110, 0.06, "triangle", "hostile", 0.12);
+    }
+    playHurt(heavy = false) {
+      this._tone(heavy ? 150 : 195, 78, heavy ? 0.14 : 0.09, "sawtooth", "hostile", heavy ? 0.18 : 0.14);
+    }
+    playEat() {
+      this._noise(0.075, "bandpass", 920 + Math.random() * 240, 1.5, "blocks", 0.12);
+    }
+    playBurp() {
+      this._tone(180, 120, 0.18, "sawtooth", "blocks", 0.11);
+    }
+    playBowShoot() {
+      this.playMobSound("bow_shoot");
+    }
+    playExplosion() {
+      this._noise(0.55, "lowpass", 420, 0.8, "hostile", 0.36);
+      this._tone(95, 28, 0.42, "sawtooth", "hostile", 0.24);
+    }
+    playMobSound(kind) {
+      if (kind === "creeper_fuse") {
+        this._noise(0.45, "highpass", 1800, 2.2, "hostile", 0.14);
+      } else if (kind === "enderman_scream") {
+        this._tone(420, 185, 0.32, "sawtooth", "hostile", 0.14);
+      } else if (kind === "enderman_tp") {
+        this._tone(640, 220, 0.14, "sine", "hostile", 0.11);
+      } else if (kind === "bow_shoot") {
+        this._tone(420, 190, 0.09, "triangle", "hostile", 0.12);
+        this._noise(0.08, "highpass", 1700, 1.8, "hostile", 0.08);
+      } else if (kind === "player_hurt" || kind === "mob_hurt") {
+        this._tone(195, 95, 0.09, "sawtooth", "hostile", 0.14);
+      }
+    }
+    updateMusic(dt) {
+      if (this._gain("music") <= 5e-3) return;
+      const ctx = this.ctx;
+      if (!ctx || ctx.state !== "running") return;
+      this._musicTimer -= dt;
+      if (this._musicTimer > 0) return;
+      this._musicTimer = 18 + Math.random() * 10;
+      const chords = [
+        [261.63, 329.63, 392],
+        // C major
+        [220, 261.63, 329.63],
+        // A minor
+        [174.61, 220, 261.63],
+        // F major
+        [196, 246.94, 293.66]
+        // G major
+      ];
+      const chord = chords[this._ambientIndex % chords.length];
+      this._ambientIndex++;
+      for (let i = 0; i < chord.length; i++) {
+        this._tone(chord[i], chord[i] * 0.996, 2.8, "sine", "music", 0.045, i * 0.35);
+      }
+    }
+  };
+
   // src/constants.js
   var CHUNK_SIZE = 16;
   var WORLD_HEIGHT = 128;
@@ -18614,6 +19114,8 @@ void main() {
   var MOB_DESPAWN_DIST = 76;
   var PASSIVE_MOB_CAP = 16;
   var HOSTILE_MOB_CAP = 20;
+  var MOB_FOLLOW_RANGE = 16;
+  var ENDERMAN_STARE_HOLD_SEC = 0.22;
   var MELEE_REACH = 3.2;
   var BOW_CHARGE_SEC = 1;
   var ARROW_BASE_DAMAGE = 9;
@@ -18625,6 +19127,7 @@ void main() {
   var TNT_FUSE_TICKS = 80;
   var XP_MAGNET_RANGE = 6.5;
   var XP_PICKUP_RANGE = 1.35;
+  var CREATIVE_VOID_Y = -64;
   var PLAYER_WIDTH = 0.6;
   var PLAYER_HALF_WIDTH = PLAYER_WIDTH * 0.5;
   var PLAYER_HEIGHT = 1.8;
@@ -19794,6 +20297,7 @@ void main() {
       maxHp: 10,
       halfWidth: 0.42,
       height: 0.9,
+      eyeHeight: 0.64,
       speed: 2.3,
       attackDamage: 0,
       burnInSunlight: false,
@@ -19807,6 +20311,7 @@ void main() {
       maxHp: 10,
       halfWidth: 0.44,
       height: 1.38,
+      eyeHeight: 1.02,
       speed: 2.2,
       attackDamage: 0,
       burnInSunlight: false,
@@ -19820,6 +20325,7 @@ void main() {
       maxHp: 8,
       halfWidth: 0.42,
       height: 1.28,
+      eyeHeight: 0.95,
       speed: 2.3,
       attackDamage: 0,
       burnInSunlight: false,
@@ -19833,6 +20339,7 @@ void main() {
       maxHp: 4,
       halfWidth: 0.25,
       height: 0.72,
+      eyeHeight: 0.58,
       speed: 2.6,
       attackDamage: 0,
       burnInSunlight: false,
@@ -19846,6 +20353,7 @@ void main() {
       maxHp: 20,
       halfWidth: 0.32,
       height: 1.92,
+      eyeHeight: 1.68,
       speed: 2.6,
       attackDamage: 3,
       burnInSunlight: true,
@@ -19859,6 +20367,7 @@ void main() {
       maxHp: 20,
       halfWidth: 0.32,
       height: 1.95,
+      eyeHeight: 1.7,
       speed: 2.75,
       attackDamage: 3,
       burnInSunlight: true,
@@ -19872,6 +20381,7 @@ void main() {
       maxHp: 16,
       halfWidth: 0.65,
       height: 0.9,
+      eyeHeight: 0.5,
       speed: 3.7,
       attackDamage: 2,
       burnInSunlight: false,
@@ -19885,6 +20395,7 @@ void main() {
       maxHp: 20,
       halfWidth: 0.32,
       height: 1.7,
+      eyeHeight: 1.45,
       speed: 2.65,
       attackDamage: 0,
       burnInSunlight: false,
@@ -19898,6 +20409,7 @@ void main() {
       maxHp: 40,
       halfWidth: 0.34,
       height: 2.85,
+      eyeHeight: 2.52,
       speed: 4.5,
       attackDamage: 5,
       burnInSunlight: false,
@@ -19905,13 +20417,23 @@ void main() {
       xpMax: 5
     }
   };
+  var SHARED_BOX_GEOMS = /* @__PURE__ */ new Map();
+  function _getSharedBoxGeom(w, h, d) {
+    const key = `${w}:${h}:${d}`;
+    let geom = SHARED_BOX_GEOMS.get(key);
+    if (!geom) {
+      geom = new qi(w, h, d);
+      SHARED_BOX_GEOMS.set(key, geom);
+    }
+    return geom;
+  }
   function _makeBoxPart(parts, disposables, w, h, d, color, x, y, z, emissive = false) {
-    const geom = new qi(w, h, d);
+    const geom = _getSharedBoxGeom(w, h, d);
     const mat = new jn({ color, fog: true });
     const baseColor = new bt(color);
     const mesh = new Ce(geom, mat);
     mesh.position.set(x, y, z);
-    disposables.push(geom, mat);
+    disposables.push(mat);
     parts.push({ mesh, mat, baseColor, emissive });
     return mesh;
   }
@@ -20131,6 +20653,16 @@ void main() {
     }
     return { root, bodyGroup, parts, disposables, legs, headPivot, leftArm, rightArm, woolMesh };
   }
+  function _wrapAngle(a) {
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a < -Math.PI) a += Math.PI * 2;
+    return a;
+  }
+  function _rotateTowards(current, target, maxStep) {
+    const diff = _wrapAngle(target - current);
+    if (Math.abs(diff) <= maxStep) return target;
+    return current + Math.sign(diff) * maxStep;
+  }
   var Mob = class {
     constructor(scene, type, x, y, z, extras = {}) {
       const spec = MOB_SPECS[type] || MOB_SPECS.pig;
@@ -20141,9 +20673,11 @@ void main() {
       this.hp = extras.hp !== void 0 ? Math.max(1, Math.min(spec.maxHp, extras.hp)) : spec.maxHp;
       this.halfWidth = spec.halfWidth;
       this.height = spec.height;
+      this.eyeHeight = spec.eyeHeight !== void 0 ? spec.eyeHeight : spec.height * 0.85;
       this.speed = spec.speed;
       this.attackDamage = spec.attackDamage;
       this.burnInSunlight = spec.burnInSunlight;
+      this.followRange = MOB_FOLLOW_RANGE;
       this.x = x;
       this.y = y;
       this.z = z;
@@ -20151,6 +20685,8 @@ void main() {
       this.vy = 0;
       this.vz = 0;
       this.yaw = extras.yaw !== void 0 ? extras.yaw : Math.random() * Math.PI * 2;
+      this.headYaw = 0;
+      this.headPitch = 0;
       this.onGround = false;
       this.inWater = false;
       this.fallStartY = y;
@@ -20166,8 +20702,14 @@ void main() {
       this.wanderYaw = this.yaw;
       this.wanderTimer = 1 + Math.random() * 3;
       this.idlePauseTimer = 0;
+      this.idleLookPhase = Math.random() * 6.28;
       this.panicTimer = 0;
       this.aggro = Boolean(extras.aggro);
+      this.aggroMemoryTimer = this.aggro ? 8 : 0;
+      this.losTimer = Math.random() * 0.22;
+      this.hasLOS = false;
+      this.stareTimer = 0;
+      this.spiderLeapCooldown = 0;
       this.sheared = Boolean(extras.sheared);
       this.woolRegrowTimer = 0;
       this.milkCooldown = 0;
@@ -20179,10 +20721,46 @@ void main() {
       this.teleportCooldown = 0;
       this.portalParticleTimer = 0;
       this.wasKilledByPlayer = false;
+      this._lastLx = 999999;
+      this._lastLy = -1;
+      this._lastLz = 999999;
+      this._lastSunB = -1;
+      this._lastCFlag = -1;
+      this._lastRFlag = -1;
       this.visual = buildMobVisual(this.type, this.sheared);
       this.visual.root.position.set(x, y, z);
       this.visual.root.rotation.y = this.yaw;
       scene.add(this.visual.root);
+    }
+    hasLineOfSight(world, tx2, ty2, tz) {
+      if (!world) return true;
+      const ox2 = this.x;
+      const oy2 = this.y + this.eyeHeight;
+      const oz = this.z;
+      const dx2 = tx2 - ox2;
+      const dy2 = ty2 - oy2;
+      const dz = tz - oz;
+      const dist = Math.hypot(dx2, dy2, dz);
+      if (dist < 0.6) return true;
+      const steps = Math.min(48, Math.max(2, Math.ceil(dist / 0.45)));
+      let prevBx = -999999;
+      let prevBy = -999999;
+      let prevBz = -999999;
+      for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const bx2 = Math.floor(ox2 + dx2 * t);
+        const by2 = Math.floor(oy2 + dy2 * t);
+        const bz = Math.floor(oz + dz * t);
+        if (bx2 === prevBx && by2 === prevBy && bz === prevBz) continue;
+        prevBx = bx2;
+        prevBy = by2;
+        prevBz = bz;
+        const id2 = world.getBlock(bx2, by2, bz);
+        if (id2 !== 0 && BlockRegistry.isSolid(id2)) {
+          return false;
+        }
+      }
+      return true;
     }
     setSheared(sheared) {
       this.sheared = Boolean(sheared);
@@ -20203,8 +20781,10 @@ void main() {
       }
       if (!this.hostile) {
         this.panicTimer = 4.2;
+        this.idlePauseTimer = 0;
       } else if (byPlayer) {
         this.aggro = true;
+        this.aggroMemoryTimer = 16;
       }
       const dLen = Math.hypot(dirX, dirZ);
       if (dLen > 1e-4 && knockback > 0) {
@@ -20302,7 +20882,8 @@ void main() {
       itemManager = null,
       onShootArrow = null,
       onExplode = null,
-      onDie = null
+      onDie = null,
+      onMobSound = null
     }) {
       if (!this.alive) return;
       if (this.dying) {
@@ -20395,37 +20976,88 @@ void main() {
       let moveDirX = 0;
       let moveDirZ = 0;
       let moveSpeed = this.speed;
-      const playerAlive = player && !player.isDead && player.gameMode !== "creative";
+      let desiredBodyYaw = this.yaw;
+      let lookYaw = this.yaw;
+      let lookPitch = 0;
+      this.spiderLeapCooldown = Math.max(0, this.spiderLeapCooldown - dt);
+      const playerAlive = Boolean(player && !player.isDead && !player.creativeMode && player.gameMode !== "creative");
       const px2 = player ? player.position.x : 0;
       const py2 = player ? player.position.y : 0;
       const pz = player ? player.position.z : 0;
       const dxToPlayer = px2 - this.x;
-      const dyToPlayer = py2 + 0.9 - (this.y + this.height * 0.6);
+      const dyToPlayer = py2 + 1.4 - (this.y + this.eyeHeight);
       const dzToPlayer = pz - this.z;
       const distToPlayer = Math.hypot(dxToPlayer, dzToPlayer);
       const dist3D = Math.hypot(dxToPlayer, dyToPlayer, dzToPlayer);
-      if (this.type === "enderman" && playerAlive && !this.aggro && dist3D < 28) {
-        const look = player.getLookDirection();
-        const eye = player.getEyeOrigin();
-        const ex2 = this.x - eye.x;
-        const ey2 = this.y + this.height - 0.35 - eye.y;
-        const ez = this.z - eye.z;
-        const eLen = Math.hypot(ex2, ey2, ez);
-        if (eLen > 1.2) {
-          const dot = (look.x * ex2 + look.y * ey2 + look.z * ez) / eLen;
-          if (dot > 0.975) {
+      if (!playerAlive) {
+        this.aggro = false;
+        this.aggroMemoryTimer = 0;
+        this.stareTimer = 0;
+        this.hasLOS = false;
+        this.isIgnited = false;
+      } else if (this.hostile) {
+        this.losTimer -= dt;
+        const maxCheckDist = this.type === "enderman" ? 30 : this.followRange + 2;
+        if (this.losTimer <= 0) {
+          this.losTimer = 0.22 + Math.random() * 0.08;
+          this.hasLOS = dist3D <= maxCheckDist && this.hasLineOfSight(world, px2, py2 + 1.45, pz);
+        }
+        if (this.type === "enderman" && !this.aggro && dist3D < 28) {
+          const helmet = player.inventory?.armor?.helmet || player.armor?.helmet || player.armor?.[0];
+          const wearingPumpkin = helmet && (helmet.id === BLOCK_IDS.PUMPKIN || helmet.id === ITEM_IDS.CARVED_PUMPKIN);
+          if (!wearingPumpkin) {
+            const look = player.getLookDirection();
+            const eye = player.getEyeOrigin();
+            const ex2 = this.x - eye.x;
+            const ey2 = this.y + this.eyeHeight - eye.y;
+            const ez = this.z - eye.z;
+            const eLen = Math.hypot(ex2, ey2, ez);
+            if (eLen > 1.2) {
+              const proj = look.x * ex2 + look.y * ey2 + look.z * ez;
+              const dot = proj / eLen;
+              const perpDist = Math.sqrt(Math.max(0, eLen * eLen - proj * proj));
+              if (proj > 0 && dot > 0.995 && perpDist <= 0.48 && this.hasLineOfSight(world, eye.x, eye.y, eye.z)) {
+                this.stareTimer += dt;
+                if (this.stareTimer >= ENDERMAN_STARE_HOLD_SEC) {
+                  this.aggro = true;
+                  this.aggroMemoryTimer = 18;
+                  onMobSound?.("enderman_scream", this);
+                }
+              } else {
+                this.stareTimer = Math.max(0, this.stareTimer - dt * 2.5);
+              }
+            }
+          }
+        } else if (this.type !== "enderman") {
+          const skyHere = world ? world.getSkyLight(bx2, Math.min(WORLD_HEIGHT - 1, by2 + 1), bz) : 15;
+          const spiderCanAcquire = this.type !== "spider" || !isDaylight || skyHere < 12;
+          if (spiderCanAcquire && dist3D <= this.followRange && this.hasLOS) {
             this.aggro = true;
+            this.aggroMemoryTimer = 5;
+          }
+        }
+        if (this.aggro) {
+          if (this.hasLOS && dist3D <= (this.type === "enderman" ? 32 : this.followRange + 4)) {
+            this.aggroMemoryTimer = Math.max(this.aggroMemoryTimer, this.type === "enderman" ? 14 : 4.5);
+          } else {
+            this.aggroMemoryTimer -= dt;
+            if (this.aggroMemoryTimer <= 0 || dist3D > 34) {
+              this.aggro = false;
+            }
           }
         }
       }
       const spiderHostileNow = this.type === "spider" ? !isDaylight || this.aggro : true;
-      const isAggro = playerAlive && this.hostile && spiderHostileNow && (this.type === "enderman" ? this.aggro && dist3D < 32 : dist3D < 20);
+      const isAggro = playerAlive && this.hostile && this.aggro && spiderHostileNow;
       if (isAggro && distToPlayer > 0.05) {
         const nx2 = dxToPlayer / distToPlayer;
         const nz = dzToPlayer / distToPlayer;
-        this.yaw = Math.atan2(nx2, nz);
+        const targetYaw = Math.atan2(nx2, nz);
+        lookYaw = targetYaw;
+        lookPitch = Math.max(-0.65, Math.min(0.65, -Math.atan2(dyToPlayer, distToPlayer)));
         if (this.type === "creeper") {
-          if (dist3D <= CREEPER_IGNITE_RANGE) {
+          if (dist3D <= CREEPER_IGNITE_RANGE && this.hasLOS) {
+            if (!this.isIgnited) onMobSound?.("creeper_fuse", this);
             this.isIgnited = true;
           } else if (dist3D > CREEPER_CANCEL_RANGE) {
             this.isIgnited = false;
@@ -20435,6 +21067,7 @@ void main() {
             this.fuseTimer += dt;
             moveDirX = 0;
             moveDirZ = 0;
+            desiredBodyYaw = targetYaw;
             if (this.fuseTimer >= CREEPER_FUSE_SEC) {
               this.alive = false;
               onExplode?.(this, CREEPER_EXPLOSION_POWER);
@@ -20443,30 +21076,42 @@ void main() {
           } else {
             moveDirX = nx2;
             moveDirZ = nz;
+            desiredBodyYaw = targetYaw;
           }
         } else if (this.type === "skeleton") {
           this.arrowCooldown -= dt;
+          desiredBodyYaw = targetYaw;
           if (dist3D > 11.5) {
             moveDirX = nx2;
             moveDirZ = nz;
           } else if (dist3D < 5.5) {
-            moveDirX = -nx2 * 0.7;
-            moveDirZ = -nz * 0.7;
+            moveDirX = -nx2 * 0.65;
+            moveDirZ = -nz * 0.65;
           } else {
             moveDirX = -nz * this.strafeDir * 0.55;
             moveDirZ = nx2 * this.strafeDir * 0.55;
           }
-          if (this.arrowCooldown <= 0 && dist3D < 18) {
+          if (this.arrowCooldown <= 0 && dist3D < 18 && this.hasLOS) {
             this.arrowCooldown = 1.9 + Math.random() * 0.8;
             this.strafeDir *= -1;
             onShootArrow?.(this, player);
+            onMobSound?.("bow_shoot", this);
           }
         } else {
           moveDirX = nx2;
           moveDirZ = nz;
+          desiredBodyYaw = targetYaw;
+          if (this.type === "spider" && this.onGround && dist3D > 2.2 && dist3D < 4.5 && this.spiderLeapCooldown <= 0 && this.hasLOS) {
+            this.vy = 5.4;
+            this.vx += nx2 * 4.2;
+            this.vz += nz * 4.2;
+            this.onGround = false;
+            this.spiderLeapCooldown = 2.4;
+          }
           if (this.type === "enderman" && dist3D > 10 && Math.random() < dt * 0.35) {
             if (this._tryTeleport(world, px2, pz, 2.2, 5)) {
               particleManager?.spawnPortal(this.x, this.y, this.z, 8);
+              onMobSound?.("enderman_tp", this);
             }
           }
           const reach = this.type === "spider" ? 1.85 : 1.75;
@@ -20474,6 +21119,7 @@ void main() {
             this.attackCooldown = 1;
             player.applyDamage(this.attackDamage, this.type);
             particleManager?.spawnHit(px2, py2 + 0.9, pz, 5);
+            onMobSound?.("player_hurt", this);
           }
         }
       } else {
@@ -20484,8 +21130,10 @@ void main() {
           moveSpeed *= 1.55;
           moveDirX = Math.sin(this.wanderYaw);
           moveDirZ = Math.cos(this.wanderYaw);
+          desiredBodyYaw = this.wanderYaw;
+          lookYaw = this.wanderYaw;
           if (Math.random() < dt * 1.4) {
-            this.wanderYaw += (Math.random() - 0.5) * 2.4;
+            this.wanderYaw += (Math.random() - 0.5) * 2.2;
           }
         } else {
           this.wanderTimer -= dt;
@@ -20502,12 +21150,19 @@ void main() {
           if (this.idlePauseTimer <= 0) {
             moveDirX = Math.sin(this.wanderYaw);
             moveDirZ = Math.cos(this.wanderYaw);
-            this.yaw = this.wanderYaw;
+            desiredBodyYaw = this.wanderYaw;
+            lookYaw = this.wanderYaw;
           } else {
             this.idlePauseTimer -= dt;
+            this.idleLookPhase += dt * 1.4;
+            lookYaw = this.yaw + Math.sin(this.idleLookPhase) * 0.42;
           }
         }
       }
+      this.yaw = _rotateTowards(this.yaw, desiredBodyYaw, dt * 10.5);
+      const targetHeadYaw = Math.max(-0.95, Math.min(0.95, _wrapAngle(lookYaw - this.yaw)));
+      this.headYaw = _rotateTowards(this.headYaw, targetHeadYaw, dt * 14);
+      this.headPitch += (lookPitch - this.headPitch) * Math.min(1, dt * 12);
       const targetVx = moveDirX * moveSpeed;
       const targetVz = moveDirZ * moveSpeed;
       const steerRate = this.onGround ? Math.min(1, dt * 8) : Math.min(1, dt * 3);
@@ -20521,7 +21176,7 @@ void main() {
       } else {
         this.vy -= 26 * dt;
       }
-      this._moveAndCollide(dt, world, moveDirX, moveDirZ);
+      this._moveAndCollide(dt, world, moveDirX, moveDirZ, isAggro);
       this._syncVisual(dt);
       this._updateLightingAndFlash(world, skyInfo, false);
     }
@@ -20542,7 +21197,7 @@ void main() {
       }
       return false;
     }
-    _moveAndCollide(dt, world, wishX, wishZ) {
+    _moveAndCollide(dt, world, wishX, wishZ, isAggro = false) {
       let hitWall = false;
       const nextX = this.x + this.vx * dt;
       if (!this._collides(world, nextX, this.y, this.z)) {
@@ -20559,13 +21214,14 @@ void main() {
         this.vz = 0;
       }
       if (hitWall && (Math.abs(wishX) > 0.05 || Math.abs(wishZ) > 0.05)) {
-        if (this.type === "spider") {
-          this.vy = Math.max(this.vy, 4.4);
+        if (this.type === "spider" && isAggro) {
+          this.vy = Math.max(this.vy, 4.6);
         } else if (this.onGround || this.inWater) {
           this.vy = 7.6;
           this.onGround = false;
-        } else {
+        } else if (!isAggro) {
           this.wanderYaw += Math.PI * 0.7;
+          this.yaw = _rotateTowards(this.yaw, this.wanderYaw, 0.35);
         }
       }
       const nextY = this.y + this.vy * dt;
@@ -20575,8 +21231,6 @@ void main() {
       } else {
         if (this.vy < 0) {
           this.y = Math.floor(nextY) + 1;
-          if (this.y < 1 && !this._collides(world, this.x, this.y, this.z)) {
-          }
           const fallen = this.fallStartY - this.y;
           if (fallen > 3.5 && !this.inWater && this.type !== "chicken") {
             const dmg = Math.floor(fallen - 3);
@@ -20594,13 +21248,21 @@ void main() {
     _syncVisual(dt) {
       this.visual.root.position.set(this.x, this.y, this.z);
       this.visual.root.rotation.y = this.yaw;
-      const hSpeed = Math.hypot(this.vx, this.vz);
-      if (hSpeed > 0.2) {
-        this.walkPhase += dt * hSpeed * 3.1;
-      } else {
-        this.walkPhase *= 0.85;
+      if (this.visual.headPivot) {
+        this.visual.headPivot.rotation.y = this.headYaw;
+        this.visual.headPivot.rotation.x = this.headPitch;
       }
-      const swing = Math.sin(this.walkPhase) * Math.min(0.85, hSpeed * 0.25);
+      const fwdX = Math.sin(this.yaw);
+      const fwdZ = Math.cos(this.yaw);
+      const signedFwd = this.vx * fwdX + this.vz * fwdZ;
+      const strafeMag = Math.abs(-this.vx * fwdZ + this.vz * fwdX);
+      const animSpeed = this.hurtCooldown > 0.1 ? Math.max(0, signedFwd) : Math.abs(signedFwd) + (this.type === "skeleton" ? strafeMag * 0.45 : 0);
+      if (animSpeed > 0.25) {
+        this.walkPhase += dt * animSpeed * 3.1;
+      } else {
+        this.walkPhase *= 0.82;
+      }
+      const swing = Math.sin(this.walkPhase) * Math.min(0.85, animSpeed * 0.25);
       const legs = this.visual.legs;
       for (let i = 0; i < legs.length; i++) {
         legs[i].rotation.x = (i % 2 === 0 ? 1 : -1) * swing;
@@ -20624,14 +21286,26 @@ void main() {
       const bx2 = Math.floor(this.x);
       const by2 = Math.max(0, Math.min(WORLD_HEIGHT - 1, Math.floor(this.y + this.height * 0.5)));
       const bz = Math.floor(this.z);
+      const sunInt = skyInfo ? skyInfo.sunIntensity : 1;
+      const sunB = Math.round(sunInt * 20);
+      const creeperBlink = this.type === "creeper" && this.isIgnited && Math.floor(this.fuseTimer * 16 % 2) === 0;
+      const redFlash = this.hitFlashTimer > 0 || isDying;
+      const cFlag = creeperBlink ? 1 : 0;
+      const rFlag = redFlash ? 1 : 0;
+      if (bx2 === this._lastLx && by2 === this._lastLy && bz === this._lastLz && sunB === this._lastSunB && cFlag === this._lastCFlag && rFlag === this._lastRFlag) {
+        return;
+      }
+      this._lastLx = bx2;
+      this._lastLy = by2;
+      this._lastLz = bz;
+      this._lastSunB = sunB;
+      this._lastCFlag = cFlag;
+      this._lastRFlag = rFlag;
       const skyLvl = world ? world.getSkyLight(bx2, by2, bz) : 15;
       const blkLvl = world ? world.getBlockLight(bx2, by2, bz) : 0;
-      const sunInt = skyInfo ? skyInfo.sunIntensity : 1;
       const skyL = Math.pow(0.82, 15 - skyLvl) * sunInt;
       const blkL = Math.pow(0.87, 15 - blkLvl);
       const lum = Math.max(0.11, Math.min(1, Math.max(skyL, blkL)));
-      const creeperBlink = this.type === "creeper" && this.isIgnited && Math.floor(this.fuseTimer * 16 % 2) === 0;
-      const redFlash = this.hitFlashTimer > 0 || isDying;
       for (const part of this.visual.parts) {
         if (part.emissive) {
           part.mat.color.copy(part.baseColor);
@@ -21038,6 +21712,10 @@ void main() {
       this.primedTnts = [];
       this.spawnTimer = 1.2;
       this._initialPassiveDone = false;
+      this.soundManager = null;
+    }
+    setSoundManager(soundManager) {
+      this.soundManager = soundManager || null;
     }
     spawnMob(type, x, y, z, extras = {}) {
       const mob = new Mob(this.scene, type, x, y, z, extras);
@@ -21222,7 +21900,7 @@ void main() {
         const chunk = world.getChunk(cx2, cz);
         if (!chunk || !chunk.isGenerated) return null;
         if (!preferUnderground) {
-          for (let y = WORLD_HEIGHT - 4; y >= 48; y--) {
+          for (let y = WORLD_HEIGHT - 4; y >= 2; y--) {
             const floor = world.getBlock(sx2, y - 1, sz);
             const b1 = world.getBlock(sx2, y, sz);
             const b2 = world.getBlock(sx2, y + 1, sz);
@@ -21291,9 +21969,11 @@ void main() {
       itemManager = null,
       particleManager = null,
       fallingManager = null,
-      blockEntityManager = null
+      blockEntityManager = null,
+      soundManager = null
     }) {
       if (!world || !player) return;
+      const activeSound = soundManager || this.soundManager;
       const isDaylight = skyInfo ? skyInfo.sunIntensity > 0.36 : true;
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
@@ -21325,8 +22005,12 @@ void main() {
           isDaylight,
           particleManager,
           itemManager,
+          onMobSound: (kind, m) => {
+            activeSound?.playMobSound?.(kind, m);
+          },
           onShootArrow: (shooter, target) => this._shootSkeletonArrow(shooter, target),
           onExplode: (creeper, power) => {
+            activeSound?.playExplosion?.();
             triggerExplosion({
               world,
               x: creeper.x,
@@ -21384,6 +22068,7 @@ void main() {
           const pow = tnt.getPower();
           tnt.dispose(this.scene);
           this.primedTnts.splice(i, 1);
+          activeSound?.playExplosion?.();
           triggerExplosion({
             world,
             x: tx2,
@@ -21403,6 +22088,7 @@ void main() {
         const orb = this.xpOrbs[i];
         const keep = orb.update(dt, world, player, (val) => {
           player.addXp?.(val);
+          activeSound?.playXpOrb?.();
         });
         if (!keep || !orb.alive) {
           orb.dispose(this.scene);
@@ -21811,17 +22497,19 @@ void main() {
       return id2 === BLOCK_IDS.AIR || id2 === sameFluidId || BlockRegistry.isWashable(id2);
     }
     _writeFluidBlock(world, wx2, wy2, wz, newId, newMeta, lightQueue, dirtyChunks) {
+      if (world.isBlockLoaded && !world.isBlockLoaded(wx2, wy2, wz)) return false;
       const oldId = world.getBlock(wx2, wy2, wz);
       const oldMeta = world.getBlockMeta(wx2, wy2, wz);
       if (oldId === newId && oldMeta === newMeta) return false;
-      if (oldId !== 0 && oldId !== BLOCK_IDS.WATER && oldId !== BLOCK_IDS.LAVA && BlockRegistry.isWashable(oldId)) {
-        this.onWashBlock?.(wx2, wy2, wz, oldId, oldMeta);
-      }
       const oldOp = BlockRegistry.opacityTable[oldId];
       const newOp = BlockRegistry.opacityTable[newId];
       const oldEmit = BlockRegistry.emissionTable[oldId];
       const newEmit = BlockRegistry.emissionTable[newId];
-      world._setBlockFast(wx2, wy2, wz, newId, newMeta, dirtyChunks);
+      const wrote = world._setBlockFast(wx2, wy2, wz, newId, newMeta, dirtyChunks);
+      if (!wrote) return false;
+      if (oldId !== 0 && oldId !== BLOCK_IDS.WATER && oldId !== BLOCK_IDS.LAVA && BlockRegistry.isWashable(oldId)) {
+        this.onWashBlock?.(wx2, wy2, wz, oldId, oldMeta);
+      }
       if (oldOp !== newOp || oldEmit !== newEmit) {
         lightQueue.push([wx2, wy2, wz, oldId, newId]);
       }
@@ -21840,6 +22528,7 @@ void main() {
       for (let d = 0; d < 4; d++) {
         const nx2 = wx2 + HORIZ_DIRS[d][0];
         const nz = wz + HORIZ_DIRS[d][1];
+        if (world.isBlockLoaded && !world.isBlockLoaded(nx2, wy2, nz)) continue;
         const nid = world.getBlock(nx2, wy2, nz);
         if (nid === fluidId && (world.getBlockMeta(nx2, wy2, nz) & 7) === 0 && (world.getBlockMeta(nx2, wy2, nz) & FLUID_FALLING_BIT) === 0) {
           continue;
@@ -21876,6 +22565,7 @@ void main() {
         if (d === opp) continue;
         const nx2 = wx2 + HORIZ_DIRS[d][0];
         const nz = wz + HORIZ_DIRS[d][1];
+        if (world.isBlockLoaded && !world.isBlockLoaded(nx2, wy2, nz)) continue;
         const nid = world.getBlock(nx2, wy2, nz);
         if (!this._canFluidEnter(nid) && nid !== fluidId) continue;
         const belowId = wy2 > 0 ? world.getBlock(nx2, wy2 - 1, nz) : BLOCK_IDS.BEDROCK;
@@ -22007,6 +22697,10 @@ void main() {
         if ((dirMask & 1 << d) === 0) continue;
         const nx2 = wx2 + HORIZ_DIRS[d][0];
         const nz = wz + HORIZ_DIRS[d][1];
+        if (world.isBlockLoaded && !world.isBlockLoaded(nx2, wy2, nz)) {
+          this.schedule(wx2, wy2, wz, delay);
+          continue;
+        }
         const nid = world.getBlock(nx2, wy2, nz);
         if (nid === otherFluidId) {
           if (isWater) {
@@ -22086,6 +22780,9 @@ void main() {
       }
       for (const chunk of dirtyChunks) {
         chunk.dirty = true;
+        if (world.dirtyChunks) {
+          world.dirtyChunks.add(chunk);
+        }
       }
       return processed;
     }
@@ -23100,8 +23797,125 @@ void main() {
     paintLeg(16, 48, 80);
     return canvas;
   }
-  function createSteveSkinTexture() {
-    const canvas = createSteveSkinCanvas();
+  function createAlexSkinCanvas() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, 64, 64);
+    const fillTextured = (rx2, ry2, rw, rh, baseHex, variance = 10, seed = 1) => {
+      for (let y = 0; y < rh; y++) {
+        for (let x = 0; x < rw; x++) {
+          const d = Math.round((pxNoise(seed, rx2 + x, ry2 + y) - 0.5) * variance * 2);
+          setRect(ctx, rx2 + x, ry2 + y, 1, 1, shadeHex(baseHex, d));
+        }
+      }
+    };
+    fillTextured(8, 0, 8, 8, "#cf6a28", 12, 101);
+    fillTextured(16, 0, 8, 8, "#ecc19f", 8, 102);
+    fillTextured(0, 8, 8, 8, "#f0c7a8", 8, 103);
+    fillTextured(8, 8, 8, 8, "#f4cbb0", 8, 104);
+    fillTextured(16, 8, 8, 8, "#f0c7a8", 8, 105);
+    fillTextured(24, 8, 8, 8, "#c86022", 12, 106);
+    fillTextured(8, 8, 8, 2, "#cf6a28", 10, 111);
+    setRect(ctx, 8, 10, 2, 1, "#cf6a28");
+    setRect(ctx, 14, 10, 2, 1, "#cf6a28");
+    fillTextured(0, 8, 8, 3, "#c86022", 10, 112);
+    fillTextured(16, 8, 8, 3, "#c86022", 10, 113);
+    setRect(ctx, 0, 11, 3, 2, "#c86022");
+    setRect(ctx, 21, 11, 3, 2, "#c86022");
+    setRect(ctx, 9, 12, 1, 1, "#ffffff");
+    setRect(ctx, 10, 12, 1, 1, "#2f7a3e");
+    setRect(ctx, 13, 12, 1, 1, "#2f7a3e");
+    setRect(ctx, 14, 12, 1, 1, "#ffffff");
+    setRect(ctx, 11, 13, 2, 1, "#deaa88");
+    setRect(ctx, 11, 14, 2, 1, "#c9786b");
+    fillTextured(20, 16, 8, 4, "#5a943c", 9, 121);
+    fillTextured(28, 16, 8, 4, "#4e3927", 8, 122);
+    fillTextured(16, 20, 4, 12, "#4e8234", 9, 123);
+    fillTextured(20, 20, 8, 12, "#5ea040", 10, 124);
+    fillTextured(28, 20, 4, 12, "#4e8234", 9, 125);
+    fillTextured(32, 20, 8, 12, "#548e39", 10, 126);
+    setRect(ctx, 20, 29, 8, 1, "#5d3e24");
+    setRect(ctx, 23, 29, 2, 1, "#d8aa45");
+    const paintArm = (baseX, baseY, s31) => {
+      fillTextured(baseX + 4, baseY, 4, 4, "#5ea040", 8, s31);
+      fillTextured(baseX + 8, baseY, 4, 4, "#ecc19f", 8, s31 + 1);
+      fillTextured(baseX, baseY + 4, 16, 4, "#548f38", 9, s31 + 2);
+      fillTextured(baseX, baseY + 8, 16, 8, "#f0c5a5", 8, s31 + 3);
+    };
+    paintArm(40, 16, 130);
+    paintArm(32, 48, 140);
+    const paintLeg = (baseX, baseY, s31) => {
+      fillTextured(baseX + 4, baseY, 4, 4, "#4e3826", 6, s31);
+      fillTextured(baseX + 8, baseY, 4, 4, "#3a2c22", 6, s31 + 1);
+      fillTextured(baseX, baseY + 4, 16, 10, "#5a412d", 8, s31 + 2);
+      fillTextured(baseX, baseY + 14, 16, 2, "#3d3028", 6, s31 + 3);
+    };
+    paintLeg(0, 16, 150);
+    paintLeg(16, 48, 160);
+    return canvas;
+  }
+  function createKnightSkinCanvas() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, 64, 64);
+    const fillTextured = (rx2, ry2, rw, rh, baseHex, variance = 10, seed = 1) => {
+      for (let y = 0; y < rh; y++) {
+        for (let x = 0; x < rw; x++) {
+          const d = Math.round((pxNoise(seed, rx2 + x, ry2 + y) - 0.5) * variance * 2);
+          setRect(ctx, rx2 + x, ry2 + y, 1, 1, shadeHex(baseHex, d));
+        }
+      }
+    };
+    fillTextured(8, 0, 8, 8, "#8d96a6", 10, 201);
+    fillTextured(16, 0, 8, 8, "#5a6270", 8, 202);
+    fillTextured(0, 8, 8, 8, "#7b8494", 9, 203);
+    fillTextured(8, 8, 8, 8, "#8891a2", 9, 204);
+    fillTextured(16, 8, 8, 8, "#7b8494", 9, 205);
+    fillTextured(24, 8, 8, 8, "#6a7282", 9, 206);
+    setRect(ctx, 11, 0, 2, 8, "#e3b33a");
+    setRect(ctx, 11, 8, 2, 3, "#e3b33a");
+    setRect(ctx, 9, 11, 6, 3, "#20242c");
+    setRect(ctx, 10, 12, 1, 1, "#7cd4ff");
+    setRect(ctx, 13, 12, 1, 1, "#7cd4ff");
+    fillTextured(20, 16, 8, 4, "#8b94a4", 8, 211);
+    fillTextured(28, 16, 8, 4, "#363d48", 6, 212);
+    fillTextured(16, 20, 4, 12, "#757e8e", 8, 213);
+    fillTextured(20, 20, 8, 12, "#2d4d88", 9, 214);
+    fillTextured(28, 20, 4, 12, "#757e8e", 8, 215);
+    fillTextured(32, 20, 8, 12, "#7b2929", 9, 216);
+    setRect(ctx, 23, 21, 2, 6, "#e3b33a");
+    setRect(ctx, 21, 23, 6, 2, "#e3b33a");
+    setRect(ctx, 20, 29, 8, 1, "#4b3622");
+    const paintArm = (baseX, baseY, s31) => {
+      fillTextured(baseX + 4, baseY, 4, 4, "#8d96a6", 8, s31);
+      fillTextured(baseX + 8, baseY, 4, 4, "#555c68", 7, s31 + 1);
+      fillTextured(baseX, baseY + 4, 16, 5, "#818a9b", 9, s31 + 2);
+      fillTextured(baseX, baseY + 9, 16, 7, "#5c6473", 8, s31 + 3);
+    };
+    paintArm(40, 16, 220);
+    paintArm(32, 48, 230);
+    const paintLeg = (baseX, baseY, s31) => {
+      fillTextured(baseX + 4, baseY, 4, 4, "#474f5c", 6, s31);
+      fillTextured(baseX + 8, baseY, 4, 4, "#313640", 6, s31 + 1);
+      fillTextured(baseX, baseY + 4, 16, 10, "#5a6372", 8, s31 + 2);
+      fillTextured(baseX, baseY + 14, 16, 2, "#3a404a", 7, s31 + 3);
+    };
+    paintLeg(0, 16, 240);
+    paintLeg(16, 48, 250);
+    return canvas;
+  }
+  function createSkinCanvas(presetId = "steve") {
+    if (presetId === "alex") return createAlexSkinCanvas();
+    if (presetId === "knight") return createKnightSkinCanvas();
+    return createSteveSkinCanvas();
+  }
+  function createSkinTextureFromCanvas(canvas) {
     const texture = new vh(canvas);
     texture.magFilter = Te;
     texture.minFilter = Te;
@@ -23109,6 +23923,56 @@ void main() {
     texture.colorSpace = sn;
     texture.needsUpdate = true;
     return texture;
+  }
+  function createSteveSkinTexture(presetId = "steve") {
+    return createSkinTextureFromCanvas(createSkinCanvas(presetId));
+  }
+  function createSkinTextureFromSpec(skinSpec, onReady = null) {
+    const spec = skinSpec || { preset: "steve", customDataUrl: null };
+    const tex = createSteveSkinTexture(spec.preset || "steve");
+    if (spec.customDataUrl) {
+      applySkinSpecToTexture(tex, spec).then(() => {
+        if (onReady) onReady(tex);
+      });
+    } else if (onReady) {
+      onReady(tex);
+    }
+    return tex;
+  }
+  function applySkinSpecToTexture(texture, skinSpec) {
+    const spec = skinSpec || { preset: "steve", customDataUrl: null };
+    if (spec.customDataUrl && typeof Image !== "undefined") {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 64;
+          canvas.height = 64;
+          const ctx = canvas.getContext("2d");
+          ctx.imageSmoothingEnabled = false;
+          ctx.clearRect(0, 0, 64, 64);
+          if (img.width === 64 && img.height === 32) {
+            ctx.drawImage(img, 0, 0, 64, 32, 0, 0, 64, 32);
+            ctx.drawImage(img, 0, 16, 16, 16, 16, 48, 16, 16);
+            ctx.drawImage(img, 40, 16, 16, 16, 32, 48, 16, 16);
+          } else {
+            ctx.drawImage(img, 0, 0, 64, 64);
+          }
+          texture.image = canvas;
+          texture.needsUpdate = true;
+          resolve(texture);
+        };
+        img.onerror = () => {
+          texture.image = createSkinCanvas(spec.preset || "steve");
+          texture.needsUpdate = true;
+          resolve(texture);
+        };
+        img.src = spec.customDataUrl;
+      });
+    }
+    texture.image = createSkinCanvas(spec.preset || "steve");
+    texture.needsUpdate = true;
+    return Promise.resolve(texture);
   }
   function createSkinCuboid(wPx, hPx, dPx, yMinPx, yMaxPx, faceRects) {
     const hw = wPx * SKIN_PX * 0.5;
@@ -23444,6 +24308,11 @@ void main() {
       }
       if (mesh) this.heldMount.add(mesh);
     }
+    setSkinTexture(tex) {
+      if (!tex) return;
+      this.material.map = tex;
+      this.material.needsUpdate = true;
+    }
     setVisible(visible) {
       this.root.visible = visible;
     }
@@ -23598,14 +24467,24 @@ void main() {
       }
     }
     syncEquipment(heldStack, armorSlots) {
+      const sig = `${heldStack?.id || 0}:${armorSlots?.helmet?.id || 0}:${armorSlots?.chestplate?.id || 0}:${armorSlots?.leggings?.id || 0}:${armorSlots?.boots?.id || 0}`;
+      if (sig === this._eqSig) return;
+      this._eqSig = sig;
       this.model.setHeldItem(heldStack);
       this.model.setArmor(armorSlots);
+      this._dirty = true;
+    }
+    invalidate() {
+      this._dirty = true;
+    }
+    setSkinTexture(skinTexture) {
+      this.model?.setSkinTexture?.(skinTexture);
       this._dirty = true;
     }
     renderToTarget(renderer, time) {
       if (!this.targetCanvas || !this.targetCtx || !renderer?.domElement) return;
       const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-      if (!this._dirty && now - this._lastRenderAt < 50) return;
+      if (!this._dirty && now - this._lastRenderAt < 80) return;
       if (this._dirty && now - this._lastRenderAt < 28) return;
       this._dirty = false;
       this._lastRenderAt = now;
@@ -23977,6 +24856,11 @@ void main() {
         );
       }
     }
+    setSkinTexture(tex) {
+      if (!tex) return;
+      this.armMaterial.map = tex;
+      this.armMaterial.needsUpdate = true;
+    }
     render(renderer) {
       renderer.clearDepth();
       renderer.render(this.scene, this.camera);
@@ -24003,9 +24887,15 @@ void main() {
       this.crosshairH.geometry.dispose();
       this.crosshairMat.dispose();
       for (const [id2, mesh] of this.heldCache.entries()) {
-        if (id2 < 256) mesh.geometry.dispose();
+        if (id2 < 256 || mesh.geometry) mesh.geometry?.dispose?.();
       }
       this.heldCache.clear();
+      if (this.bowStageCache) {
+        for (const mesh of this.bowStageCache.values()) {
+          mesh?.geometry?.dispose?.();
+        }
+        this.bowStageCache.clear();
+      }
       this.blockMaterial.dispose();
       this.extrudedMaterial.dispose();
     }
@@ -24455,7 +25345,7 @@ void main() {
       this.onVitalsChange?.();
     }
     damage(amount, sourceType = "generic") {
-      if (this.creativeMode || this.isDead || amount <= 0) return false;
+      if (this.creativeMode && sourceType !== "void" || this.isDead || amount <= 0) return false;
       if (sourceType !== "void" && sourceType !== "starve" && this.hurtTimer > 0) {
         return false;
       }
@@ -24823,7 +25713,7 @@ void main() {
             false
           );
           this.x = res.x;
-          this.y = Math.max(1, Math.min(WORLD_HEIGHT + 32, res.y));
+          this.y = Math.max(-58, Math.min(WORLD_HEIGHT + 64, res.y));
           this.z = res.z;
           this.onGround = false;
           this.vy = 0;
@@ -25078,6 +25968,13 @@ void main() {
         this.fallDistance = 0;
         this.fireTicks = 0;
       }
+      if (this.creativeMode && !this.isDead && this.y < CREATIVE_VOID_Y) {
+        this.voidTimer += dt;
+        if (this.voidTimer >= 0.5) {
+          this.voidTimer = 0;
+          this.damage(8, "void");
+        }
+      }
       const targetEye = this.isSwimming ? PLAYER_SWIM_EYE_HEIGHT : this.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
       this.currentEyeHeight += (targetEye - this.currentEyeHeight) * Math.min(1, dt * 16);
       const targetFov = this.isSprinting ? BASE_FOV + SPRINT_FOV_BOOST : BASE_FOV;
@@ -25188,6 +26085,75 @@ void main() {
   var SETTINGS_KEY = "global_settings";
   var WORLDS_INDEX_KEY = "worlds_index";
   var WORLD_PREFIX = "world_data:";
+  function encodeModifiedRle(entries) {
+    if (!Array.isArray(entries) || entries.length === 0) return [];
+    const sorted = entries.filter((e) => Array.isArray(e) && e.length >= 4).map((e) => [e[0] | 0, e[1] | 0, e[2] | 0, e[3] | 0, e.length >= 5 ? e[4] | 0 : 0]);
+    sorted.sort((a, b) => a[1] - b[1] || a[2] - b[2] || a[0] - b[0]);
+    const runs = [];
+    let cur = null;
+    for (let i = 0; i < sorted.length; i++) {
+      const [x, y, z, id2, meta] = sorted[i];
+      if (cur && cur[1] === y && cur[2] === z && cur[3] === id2 && cur[4] === meta && cur[0] + cur[5] === x) {
+        cur[5]++;
+      } else {
+        cur = [x, y, z, id2, meta, 1];
+        runs.push(cur);
+      }
+    }
+    return runs;
+  }
+  function decodeModifiedRle(runs) {
+    if (!Array.isArray(runs) || runs.length === 0) return [];
+    const out = [];
+    for (let i = 0; i < runs.length; i++) {
+      const r = runs[i];
+      if (!Array.isArray(r) || r.length < 4) continue;
+      const x02 = r[0] | 0;
+      const y = r[1] | 0;
+      const z = r[2] | 0;
+      const id2 = r[3] | 0;
+      const meta = r.length >= 5 ? r[4] | 0 : 0;
+      const len = r.length >= 6 ? Math.max(1, r[5] | 0) : 1;
+      for (let dx2 = 0; dx2 < len; dx2++) {
+        if (meta !== 0) out.push([x02 + dx2, y, z, id2, meta]);
+        else out.push([x02 + dx2, y, z, id2]);
+      }
+    }
+    return out;
+  }
+  async function gzipCompressJson(obj) {
+    if (typeof CompressionStream === "undefined" || typeof TextEncoder === "undefined") return null;
+    try {
+      const bytes = new TextEncoder().encode(JSON.stringify(obj));
+      const cs2 = new CompressionStream("gzip");
+      const writer = cs2.writable.getWriter();
+      writer.write(bytes);
+      writer.close();
+      const buf = await new Response(cs2.readable).arrayBuffer();
+      const u8 = new Uint8Array(buf);
+      let bin = "";
+      for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
+      return btoa(bin);
+    } catch {
+      return null;
+    }
+  }
+  async function gzipDecompressJson(b64) {
+    if (!b64 || typeof DecompressionStream === "undefined" || typeof TextDecoder === "undefined") return null;
+    try {
+      const bin = atob(b64);
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const ds2 = new DecompressionStream("gzip");
+      const writer = ds2.writable.getWriter();
+      writer.write(u8);
+      writer.close();
+      const buf = await new Response(ds2.readable).arrayBuffer();
+      return JSON.parse(new TextDecoder().decode(buf));
+    } catch {
+      return null;
+    }
+  }
   var SaveManager = class {
     constructor() {
       this.db = null;
@@ -25265,30 +26231,63 @@ void main() {
     }
     async _migrateLegacyIfNeeded() {
       const existingIndex = await this._getRaw(WORLDS_INDEX_KEY);
-      if (Array.isArray(existingIndex)) return;
+      if (Array.isArray(existingIndex)) {
+        let changed = false;
+        for (const meta of existingIndex) {
+          if (meta && !meta.migratedV9) {
+            meta.migratedV9 = true;
+            if (!meta.worldType) meta.worldType = "default";
+            if (meta.hardcore === void 0) meta.hardcore = false;
+            if (meta.id === "world_1" && meta.name === "\u041C\u043E\u0439 \u043C\u0438\u0440") {
+              meta.name = "\u041C\u043E\u0439 \u041C\u0438\u0440 #1";
+              const data = await this._getRaw(WORLD_PREFIX + meta.id);
+              if (data) {
+                data.name = "\u041C\u043E\u0439 \u041C\u0438\u0440 #1";
+                await this._putRaw(WORLD_PREFIX + meta.id, data);
+              }
+            }
+            changed = true;
+          }
+        }
+        if (changed) {
+          await this._putRaw(WORLDS_INDEX_KEY, existingIndex);
+        }
+        return;
+      }
       const legacy = await this._getRaw(LEGACY_SAVE_KEY);
       if (legacy && Number.isFinite(legacy.worldSeed)) {
         const id2 = "world_1";
         const now = legacy.updatedAt || Date.now();
+        const mods = Array.isArray(legacy.modifiedBlocks) ? legacy.modifiedBlocks : [];
         const worldPayload = {
-          version: 3,
+          version: 8,
+          schemaVersion: 9,
           id: id2,
-          name: "\u041C\u043E\u0439 \u043C\u0438\u0440",
+          name: "\u041C\u043E\u0439 \u041C\u0438\u0440 #1",
           worldSeed: legacy.worldSeed,
+          worldType: "default",
+          hardcore: false,
+          bonusChest: false,
+          bonusChestPlaced: false,
+          dead: false,
           player: legacy.player || null,
           hotbar: legacy.hotbar || null,
-          modifiedBlocks: Array.isArray(legacy.modifiedBlocks) ? legacy.modifiedBlocks : [],
+          modifiedBlocks: mods,
           createdAt: now,
           updatedAt: now
         };
         const meta = {
           id: id2,
-          name: "\u041C\u043E\u0439 \u043C\u0438\u0440",
+          name: "\u041C\u043E\u0439 \u041C\u0438\u0440 #1",
           seed: legacy.worldSeed,
+          worldType: "default",
+          hardcore: false,
+          dead: false,
+          migratedV9: true,
           createdAt: now,
           updatedAt: now,
           biomeName: "",
-          modifiedCount: worldPayload.modifiedBlocks.length
+          modifiedCount: mods.length
         };
         await this._putRaw(WORLD_PREFIX + id2, worldPayload);
         await this._putRaw(WORLDS_INDEX_KEY, [meta]);
@@ -25315,19 +26314,34 @@ void main() {
       if (!Array.isArray(list)) return [];
       return [...list].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     }
-    async createWorld({ name, seed, gameMode = "survival" }) {
+    async createWorld({
+      name,
+      seed,
+      gameMode = "survival",
+      worldType = "default",
+      hardcore = false,
+      bonusChest = false
+    }) {
       const list = await this.listWorlds();
       const id2 = `world_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e3)}`;
       const now = Date.now();
-      const cleanName = (name || "").trim() || `\u041C\u0438\u0440 ${list.length + 1}`;
+      const cleanName = (name || "").trim() || `\u041C\u043E\u0439 \u041C\u0438\u0440 #${list.length + 1}`;
       const cleanSeed = Number.isFinite(seed) && seed !== 0 ? seed | 0 : Math.floor(Math.random() * 2147483647) + 1 | 0;
-      const cleanMode = gameMode === "creative" ? "creative" : "survival";
+      const isHardcore = Boolean(hardcore);
+      const cleanMode = isHardcore ? "survival" : gameMode === "creative" ? "creative" : "survival";
+      const cleanType = worldType === "superflat" ? "superflat" : "default";
       const worldData = {
         version: 8,
+        schemaVersion: 9,
         id: id2,
         name: cleanName,
         worldSeed: cleanSeed,
         gameMode: cleanMode,
+        worldType: cleanType,
+        hardcore: isHardcore,
+        bonusChest: Boolean(bonusChest),
+        bonusChestPlaced: false,
+        dead: false,
         worldTime: 1e3,
         dayCount: 1,
         spawnPoint: null,
@@ -25359,6 +26373,11 @@ void main() {
         name: cleanName,
         seed: cleanSeed,
         gameMode: cleanMode,
+        worldType: cleanType,
+        hardcore: isHardcore,
+        bonusChest: Boolean(bonusChest),
+        dead: false,
+        migratedV9: true,
         createdAt: now,
         updatedAt: now,
         biomeName: "",
@@ -25373,23 +26392,53 @@ void main() {
     async loadWorld(worldId) {
       this.activeWorldId = worldId;
       const data = await this._getRaw(WORLD_PREFIX + worldId);
-      return data ? { ...data } : null;
+      if (!data) return null;
+      const out = { ...data };
+      if (!Array.isArray(out.modifiedBlocks) || out.modifiedBlocks.length === 0) {
+        if (out.modifiedGzip) {
+          const dec = await gzipDecompressJson(out.modifiedGzip);
+          if (Array.isArray(dec)) out.modifiedBlocks = decodeModifiedRle(dec);
+        } else if (Array.isArray(out.modifiedBlocksRle)) {
+          out.modifiedBlocks = decodeModifiedRle(out.modifiedBlocksRle);
+        } else {
+          out.modifiedBlocks = [];
+        }
+      }
+      if (!out.worldType) out.worldType = "default";
+      if (out.hardcore === void 0) out.hardcore = false;
+      if (out.bonusChest === void 0) out.bonusChest = false;
+      if (out.dead === void 0) out.dead = false;
+      return out;
     }
     async saveWorld(worldId, state) {
       if (!worldId) return false;
       this.activeWorldId = worldId;
       const now = Date.now();
       const existing = await this._getRaw(WORLD_PREFIX + worldId);
-      const name = state.worldName || existing?.name || "\u041C\u043E\u0439 \u043C\u0438\u0440";
+      const name = state.worldName || existing?.name || "\u041C\u043E\u0439 \u041C\u0438\u0440 #1";
       const createdAt = existing?.createdAt || now;
       const mods = Array.isArray(state.modifiedBlocks) ? state.modifiedBlocks : [];
-      const gameMode = state.gameMode === "creative" || state.gameMode === "survival" ? state.gameMode : existing?.gameMode || "survival";
+      const worldType = state.worldType === "superflat" || existing?.worldType === "superflat" ? "superflat" : "default";
+      const hardcore = state.hardcore !== void 0 ? Boolean(state.hardcore) : Boolean(existing?.hardcore);
+      const bonusChest = state.bonusChest !== void 0 ? Boolean(state.bonusChest) : Boolean(existing?.bonusChest);
+      const bonusChestPlaced = state.bonusChestPlaced !== void 0 ? Boolean(state.bonusChestPlaced) : Boolean(existing?.bonusChestPlaced);
+      const dead = state.dead !== void 0 ? Boolean(state.dead) : Boolean(existing?.dead);
+      const gameMode = hardcore ? "survival" : state.gameMode === "creative" || state.gameMode === "survival" ? state.gameMode : existing?.gameMode || "survival";
+      const useCompressed = mods.length >= 256;
+      const rle = useCompressed ? encodeModifiedRle(mods) : null;
+      const gz = useCompressed ? await gzipCompressJson(rle) : null;
       const payload = {
         version: 8,
+        schemaVersion: 9,
         id: worldId,
         name,
         worldSeed: state.worldSeed,
         gameMode,
+        worldType,
+        hardcore,
+        bonusChest,
+        bonusChestPlaced,
+        dead,
         worldTime: Number.isFinite(state.worldTime) ? state.worldTime : existing?.worldTime ?? 1e3,
         dayCount: Number.isFinite(state.dayCount) ? state.dayCount : existing?.dayCount ?? 1,
         spawnPoint: state.spawnPoint ?? existing?.spawnPoint ?? null,
@@ -25400,7 +26449,10 @@ void main() {
         inventory: state.inventory ?? existing?.inventory ?? null,
         blockEntities: state.blockEntities ?? existing?.blockEntities ?? null,
         entities: state.entities !== void 0 ? state.entities : existing?.entities ?? null,
-        modifiedBlocks: mods,
+        modifiedBlocks: useCompressed ? [] : mods,
+        modifiedBlocksRle: useCompressed && !gz ? rle : void 0,
+        modifiedGzip: gz || void 0,
+        modifiedCount: mods.length,
         createdAt,
         updatedAt: now
       };
@@ -25411,6 +26463,11 @@ void main() {
         name,
         seed: state.worldSeed,
         gameMode,
+        worldType,
+        hardcore,
+        bonusChest,
+        dead,
+        migratedV9: true,
         createdAt,
         updatedAt: now,
         biomeName: state.biomeName || existing?.biomeName || "",
@@ -25424,6 +26481,90 @@ void main() {
         await this.saveSettings(state.settings);
       }
       return ok;
+    }
+    async renameWorld(worldId, newName) {
+      const clean = (newName || "").trim();
+      if (!worldId || !clean) return false;
+      const data = await this._getRaw(WORLD_PREFIX + worldId);
+      if (data) {
+        data.name = clean;
+        data.updatedAt = Date.now();
+        await this._putRaw(WORLD_PREFIX + worldId, data);
+      }
+      const list = await this._getRaw(WORLDS_INDEX_KEY) || [];
+      const item = list.find((w) => w.id === worldId);
+      if (item) {
+        item.name = clean;
+        item.updatedAt = Date.now();
+        await this._putRaw(WORLDS_INDEX_KEY, list);
+      }
+      return true;
+    }
+    async exportWorldJson(worldId) {
+      const data = await this.loadWorld(worldId);
+      if (!data) return null;
+      const clean = {
+        ...data,
+        modifiedBlocksRle: encodeModifiedRle(data.modifiedBlocks || []),
+        modifiedBlocks: void 0,
+        modifiedGzip: void 0
+      };
+      return JSON.stringify(
+        {
+          format: "mcworld-classic-v9",
+          exportedAt: Date.now(),
+          world: clean
+        },
+        null,
+        2
+      );
+    }
+    async importWorldJson(rawTextOrObj) {
+      const parsed = typeof rawTextOrObj === "string" ? JSON.parse(rawTextOrObj) : rawTextOrObj;
+      const src = parsed?.world || parsed;
+      if (!src || !Number.isFinite(src.worldSeed)) {
+        throw new Error("\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 \u0444\u0430\u0439\u043B\u0430 \u043C\u0438\u0440\u0430 .mcworld.json");
+      }
+      const list = await this.listWorlds();
+      const id2 = `world_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e3)}`;
+      const now = Date.now();
+      const mods = Array.isArray(src.modifiedBlocks) && src.modifiedBlocks.length > 0 ? src.modifiedBlocks : decodeModifiedRle(src.modifiedBlocksRle || []);
+      const cleanName = (src.name || "").trim() || `\u0418\u043C\u043F\u043E\u0440\u0442 #${list.length + 1}`;
+      const payload = {
+        ...src,
+        version: 8,
+        schemaVersion: 9,
+        id: id2,
+        name: cleanName,
+        worldType: src.worldType === "superflat" ? "superflat" : "default",
+        hardcore: Boolean(src.hardcore),
+        bonusChest: Boolean(src.bonusChest),
+        dead: Boolean(src.dead),
+        modifiedBlocks: mods,
+        modifiedBlocksRle: void 0,
+        modifiedGzip: void 0,
+        createdAt: now,
+        updatedAt: now
+      };
+      const meta = {
+        id: id2,
+        name: cleanName,
+        seed: payload.worldSeed,
+        gameMode: payload.hardcore ? "survival" : payload.gameMode === "creative" ? "creative" : "survival",
+        worldType: payload.worldType,
+        hardcore: payload.hardcore,
+        bonusChest: payload.bonusChest,
+        dead: payload.dead,
+        migratedV9: true,
+        createdAt: now,
+        updatedAt: now,
+        biomeName: "",
+        modifiedCount: mods.length
+      };
+      list.unshift(meta);
+      await this._putRaw(WORLD_PREFIX + id2, payload);
+      await this._putRaw(WORLDS_INDEX_KEY, list);
+      return meta;
     }
     async deleteWorld(worldId) {
       await this._deleteRaw(WORLD_PREFIX + worldId);
@@ -28291,10 +29432,13 @@ void main() {
         if (!ui2) continue;
         ui2.btn.classList.toggle("selected", i === this.inventory.selectedSlot);
         const slot = this.inventory.slots[i];
+        const sig = slot && slot.id > 0 && slot.count > 0 ? `${slot.id}:${slot.count}:${slot.durability || 0}:${slot.maxDurability || 0}` : "empty";
+        if (ui2.lastSig === sig) continue;
+        ui2.lastSig = sig;
         if (slot && slot.id > 0 && slot.count > 0) {
           ui2.icon.src = this.atlas.getItemIconDataURL(slot.id);
           ui2.icon.classList.remove("hidden");
-          const showCount = !this.inventory.creativeMode && slot.count > 1;
+          const showCount = slot.count > 1;
           ui2.count.textContent = showCount ? String(slot.count) : "";
           ui2.count.classList.toggle("hidden", !showCount);
           const maxDur = slot.maxDurability || 0;
@@ -28408,12 +29552,28 @@ void main() {
       this.mainMenuOverlay = document.getElementById("main-menu-overlay");
       this.menuHome = document.getElementById("menu-home");
       this.menuWorlds = document.getElementById("menu-worlds");
+      this.menuSkins = document.getElementById("menu-skins");
+      this.menuSplashEl = document.getElementById("menu-splash");
       this.worldsListEl = document.getElementById("worlds-list");
       this.inputWorldName = document.getElementById("input-world-name");
       this.inputWorldSeed = document.getElementById("input-world-seed");
       this.btnNewModeSurvival = document.getElementById("btn-new-mode-survival");
+      this.btnNewModeHardcore = document.getElementById("btn-new-mode-hardcore");
       this.btnNewModeCreative = document.getElementById("btn-new-mode-creative");
+      this.btnWorldTypeDefault = document.getElementById("btn-world-type-default");
+      this.btnWorldTypeSuperflat = document.getElementById("btn-world-type-superflat");
+      this.btnBonusChest = document.getElementById("btn-bonus-chest");
+      this.inputImportWorld = document.getElementById("input-import-world");
       this.selectedNewWorldMode = "survival";
+      this.selectedNewWorldHardcore = false;
+      this.selectedWorldType = "default";
+      this.selectedBonusChest = false;
+      this.btnMenuSkins = document.getElementById("btn-menu-skins");
+      this.btnSkinsBack = document.getElementById("btn-skins-back");
+      this.skinPresetBtns = Array.from(document.querySelectorAll(".skin-preset-btn"));
+      this.inputSkinUpload = document.getElementById("input-skin-upload");
+      this.skinMenuCanvas = document.getElementById("skin-menu-canvas");
+      this.skinActiveLabel = document.getElementById("skin-active-label");
       this.survivalHudEl = document.getElementById("survival-hud");
       this.armorRowEl = document.getElementById("hud-armor-row");
       this.heartsRowEl = document.getElementById("hud-hearts-row");
@@ -28425,9 +29585,11 @@ void main() {
       this.suffocationVignetteEl = document.getElementById("suffocation-vignette");
       this.fluidOverlayEl = document.getElementById("fluid-overlay");
       this.deathOverlayEl = document.getElementById("death-overlay");
+      this.deathTitleEl = document.getElementById("death-title");
       this.deathReasonEl = document.getElementById("death-reason");
       this.deathScoreEl = document.getElementById("death-score");
       this.btnRespawn = document.getElementById("btn-respawn");
+      this.btnDeathSpectate = document.getElementById("btn-death-spectate");
       this.btnDeathMenu = document.getElementById("btn-death-menu");
       this.settingsOverlay = document.getElementById("settings-overlay");
       this.pcHint = document.getElementById("pc-lock-hint");
@@ -28459,8 +29621,19 @@ void main() {
       this.btnHintMode = document.getElementById("btn-hint-mode");
       this.rangeRenderDist = document.getElementById("range-render-dist");
       this.labelRenderDist = document.getElementById("label-render-dist");
+      this.rangeResScale = document.getElementById("range-res-scale");
+      this.labelResScale = document.getElementById("label-res-scale");
       this.rangeSensitivity = document.getElementById("range-sensitivity");
       this.labelSensitivity = document.getElementById("label-sensitivity");
+      this.rangeTouchScale = document.getElementById("range-touch-scale");
+      this.labelTouchScale = document.getElementById("label-touch-scale");
+      this.audioRanges = {
+        master: { input: document.getElementById("range-audio-master"), label: document.getElementById("label-audio-master") },
+        music: { input: document.getElementById("range-audio-music"), label: document.getElementById("label-audio-music") },
+        blocks: { input: document.getElementById("range-audio-blocks"), label: document.getElementById("label-audio-blocks") },
+        hostile: { input: document.getElementById("range-audio-hostile"), label: document.getElementById("label-audio-hostile") },
+        ui: { input: document.getElementById("range-audio-ui"), label: document.getElementById("label-audio-ui") }
+      };
       this.debugVisible = false;
       this.isPaused = false;
       this.inMainMenu = true;
@@ -28525,29 +29698,102 @@ void main() {
         this.hideDeathScreen();
         this.callbacks.onRespawn?.();
       });
+      this.btnDeathSpectate?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.hideDeathScreen();
+        this.callbacks.onSpectateWorld?.();
+      });
       this.btnDeathMenu?.addEventListener("click", (e) => {
         e.stopPropagation();
         this.hideDeathScreen();
         this.callbacks.onExitToMenu?.();
       });
-      const selectNewMode = (mode) => {
-        this.selectedNewWorldMode = mode === "creative" ? "creative" : "survival";
-        this.btnNewModeSurvival?.classList.toggle("active", this.selectedNewWorldMode === "survival");
-        this.btnNewModeCreative?.classList.toggle("active", this.selectedNewWorldMode === "creative");
+      const selectNewMode = (mode, hardcore = false) => {
+        this.selectedNewWorldHardcore = Boolean(hardcore);
+        this.selectedNewWorldMode = hardcore ? "survival" : mode === "creative" ? "creative" : "survival";
+        this.btnNewModeSurvival?.classList.toggle("active", !this.selectedNewWorldHardcore && this.selectedNewWorldMode === "survival");
+        this.btnNewModeHardcore?.classList.toggle("active", this.selectedNewWorldHardcore);
+        this.btnNewModeCreative?.classList.toggle("active", !this.selectedNewWorldHardcore && this.selectedNewWorldMode === "creative");
       };
       this.btnNewModeSurvival?.addEventListener("click", (e) => {
         e.stopPropagation();
-        selectNewMode("survival");
+        selectNewMode("survival", false);
+      });
+      this.btnNewModeHardcore?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        selectNewMode("survival", true);
       });
       this.btnNewModeCreative?.addEventListener("click", (e) => {
         e.stopPropagation();
-        selectNewMode("creative");
+        selectNewMode("creative", false);
+      });
+      const selectWorldType = (wType) => {
+        this.selectedWorldType = wType === "superflat" ? "superflat" : "default";
+        this.btnWorldTypeDefault?.classList.toggle("active", this.selectedWorldType === "default");
+        this.btnWorldTypeSuperflat?.classList.toggle("active", this.selectedWorldType === "superflat");
+      };
+      this.btnWorldTypeDefault?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        selectWorldType("default");
+      });
+      this.btnWorldTypeSuperflat?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        selectWorldType("superflat");
+      });
+      this.btnBonusChest?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.selectedBonusChest = !this.selectedBonusChest;
+        this.btnBonusChest.classList.toggle("active", this.selectedBonusChest);
+        this.btnBonusChest.textContent = this.selectedBonusChest ? "\u{1F381} \u0411\u043E\u043D\u0443\u0441-\u0441\u0443\u043D\u0434\u0443\u043A: \u0412\u041A\u041B" : "\u{1F381} \u0411\u043E\u043D\u0443\u0441-\u0441\u0443\u043D\u0434\u0443\u043A: \u0412\u042B\u041A\u041B";
       });
       this.btnMenuPlay?.addEventListener("click", async (e) => {
         e.stopPropagation();
         this.menuHome?.classList.add("hidden");
+        this.menuSkins?.classList.add("hidden");
         this.menuWorlds?.classList.remove("hidden");
         await this.callbacks.onOpenWorldsManager?.();
+      });
+      this.btnMenuSkins?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.menuHome?.classList.add("hidden");
+        this.menuWorlds?.classList.add("hidden");
+        this.menuSkins?.classList.remove("hidden");
+        this.callbacks.onOpenSkinsMenu?.();
+      });
+      this.btnSkinsBack?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.menuSkins?.classList.add("hidden");
+        this.menuHome?.classList.remove("hidden");
+      });
+      for (const sBtn of this.skinPresetBtns) {
+        sBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.callbacks.onSelectSkinPreset?.(sBtn.dataset.skin);
+        });
+      }
+      this.inputSkinUpload?.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === "string") {
+            this.callbacks.onUploadCustomSkin?.(reader.result);
+          }
+        };
+        reader.readAsDataURL(file);
+        e.target.value = "";
+      });
+      this.inputImportWorld?.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === "string") {
+            this.callbacks.onImportWorldJson?.(reader.result);
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = "";
       });
       this.btnMenuSettings?.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -28556,6 +29802,7 @@ void main() {
       this.btnWorldsBack?.addEventListener("click", (e) => {
         e.stopPropagation();
         this.menuWorlds?.classList.add("hidden");
+        this.menuSkins?.classList.add("hidden");
         this.menuHome?.classList.remove("hidden");
       });
       this.btnCreateWorld?.addEventListener("click", (e) => {
@@ -28579,7 +29826,10 @@ void main() {
         this.callbacks.onCreateWorld?.({
           name,
           seed: parsedSeed,
-          gameMode: this.selectedNewWorldMode
+          gameMode: this.selectedNewWorldMode,
+          worldType: this.selectedWorldType,
+          hardcore: this.selectedNewWorldHardcore,
+          bonusChest: this.selectedBonusChest
         });
       });
       this.btnResume?.addEventListener("click", (e) => {
@@ -28659,11 +29909,28 @@ void main() {
         if (this.labelRenderDist) this.labelRenderDist.textContent = `${val} \u0447\u0430\u043D\u043A\u043E\u0432`;
         this.callbacks.onChangeRenderDistance?.(val);
       });
+      this.rangeResScale?.addEventListener("input", (e) => {
+        const val = parseFloat(e.target.value);
+        if (this.labelResScale) this.labelResScale.textContent = `${Math.round(val * 100)}%`;
+        this.callbacks.onChangeResolutionScale?.(val);
+      });
       this.rangeSensitivity?.addEventListener("input", (e) => {
         const val = parseFloat(e.target.value);
         if (this.labelSensitivity) this.labelSensitivity.textContent = `${Math.round(val * 100)}%`;
         this.callbacks.onChangeSensitivity?.(val);
       });
+      this.rangeTouchScale?.addEventListener("input", (e) => {
+        const val = parseFloat(e.target.value);
+        if (this.labelTouchScale) this.labelTouchScale.textContent = `${Math.round(val * 100)}%`;
+        this.callbacks.onChangeTouchScale?.(val);
+      });
+      for (const [key, pair] of Object.entries(this.audioRanges)) {
+        pair.input?.addEventListener("input", (e) => {
+          const val = parseInt(e.target.value, 10);
+          if (pair.label) pair.label.textContent = `${val}%`;
+          this.callbacks.onChangeAudioVolume?.(key, val);
+        });
+      }
     }
     triggerDamageFlash() {
       if (!this.damageVignetteEl) return;
@@ -28673,14 +29940,19 @@ void main() {
         this.damageVignetteEl?.classList.remove("flash");
       }, 260);
     }
-    showDeathScreen(sourceType = "generic", score = 0) {
+    showDeathScreen(sourceType = "generic", score = 0, hardcore = false) {
       if (!this.deathOverlayEl) return;
+      if (this.deathTitleEl) {
+        this.deathTitleEl.textContent = hardcore ? "\u041A\u043E\u043D\u0435\u0446 \u0438\u0433\u0440\u044B! (\u0425\u0430\u0440\u0434\u043A\u043E\u0440)" : "\u0412\u044B \u043F\u043E\u0433\u0438\u0431\u043B\u0438!";
+      }
       if (this.deathReasonEl) {
         this.deathReasonEl.textContent = DEATH_REASON_TEXT[sourceType] || DEATH_REASON_TEXT.generic;
       }
       if (this.deathScoreEl) {
         this.deathScoreEl.textContent = `\u0421\u0447\u0451\u0442: ${score | 0}`;
       }
+      this.btnRespawn?.classList.toggle("hidden", Boolean(hardcore));
+      this.btnDeathSpectate?.classList.toggle("hidden", !hardcore);
       this.deathOverlayEl.classList.remove("hidden");
       this._updateCrosshairVisibility(false);
     }
@@ -28807,15 +30079,65 @@ void main() {
       this.mainMenuOverlay?.classList.remove("hidden");
       this.menuHome?.classList.toggle("hidden", showWorlds);
       this.menuWorlds?.classList.toggle("hidden", !showWorlds);
+      this.menuSkins?.classList.add("hidden");
       this.survivalHudEl?.classList.add("hidden");
       this._updateCrosshairVisibility(false);
+      if (!showWorlds && this.menuSplashEl) {
+        const splashes = [
+          "100% \u041E\u0444\u0444\u043B\u0430\u0439\u043D \xB7 Java 1.21 AI!",
+          "\u0421\u0443\u043F\u0435\u0440\u043F\u043B\u043E\u0441\u043A\u0438\u0439 \xB7 \u0425\u0430\u0440\u0434\u043A\u043E\u0440 \xB7 \u0421\u043A\u0438\u043D\u044B!",
+          "\u0422\u0435\u043A\u0443\u0449\u0430\u044F \u0432\u043E\u0434\u0430 \u0438 \u0440\u0435\u0434\u043A\u0438\u0435 \u043B\u0430\u0432\u043E\u0432\u044B\u0435 \u043E\u0437\u0451\u0440\u0430!",
+          "\u041F\u0440\u043E\u0446\u0435\u0434\u0443\u0440\u043D\u044B\u0439 WebAudio \u0437\u0432\u0443\u043A!",
+          "\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u0432 .mcworld.json!"
+        ];
+        this.menuSplashEl.textContent = splashes[Math.random() * splashes.length | 0];
+      }
     }
     hideMainMenu(cameraMode = CAMERA_MODES.FIRST_PERSON) {
       this.inMainMenu = false;
       this.mainMenuOverlay?.classList.add("hidden");
       this.settingsOverlay?.classList.add("hidden");
+      this.menuSkins?.classList.add("hidden");
       this.setPaused(false);
       this._updateCrosshairVisibility(cameraMode === CAMERA_MODES.FIRST_PERSON);
+    }
+    setSkinMenuUI(skinSpec, skinCanvasSource) {
+      const preset = skinSpec?.customDataUrl ? "custom" : skinSpec?.preset || "steve";
+      for (const btn of this.skinPresetBtns) {
+        btn.classList.toggle("active", btn.dataset.skin === preset);
+      }
+      if (this.skinActiveLabel) {
+        const label = preset === "custom" ? "\u0421\u0432\u043E\u0439 PNG-\u0441\u043A\u0438\u043D" : preset === "alex" ? "\u0410\u043B\u0435\u043A\u0441" : preset === "knight" ? "\u0420\u044B\u0446\u0430\u0440\u044C" : "\u0421\u0442\u0438\u0432";
+        this.skinActiveLabel.textContent = `\u0422\u0435\u043A\u0443\u0449\u0438\u0439 \u0441\u043A\u0438\u043D: ${label}`;
+      }
+      if (typeof this.skinMenuCanvas?.getContext === "function" && skinCanvasSource) {
+        const ctx = this.skinMenuCanvas.getContext("2d");
+        if (ctx) {
+          ctx.imageSmoothingEnabled = false;
+          ctx.clearRect(0, 0, 96, 96);
+          ctx.drawImage(skinCanvasSource, 8, 8, 8, 8, 24, 6, 48, 48);
+          ctx.drawImage(skinCanvasSource, 20, 20, 8, 12, 24, 54, 48, 42);
+          ctx.drawImage(skinCanvasSource, 44, 20, 4, 12, 10, 54, 14, 42);
+          ctx.drawImage(skinCanvasSource, 36, 52, 4, 12, 72, 54, 14, 42);
+        }
+      }
+    }
+    setResolutionScaleUI(scale) {
+      const s31 = Number(scale) || 1;
+      if (this.rangeResScale) this.rangeResScale.value = String(s31);
+      if (this.labelResScale) this.labelResScale.textContent = `${Math.round(s31 * 100)}%`;
+    }
+    setTouchScaleUI(scale) {
+      const s31 = Number(scale) || 1;
+      if (this.rangeTouchScale) this.rangeTouchScale.value = String(s31);
+      if (this.labelTouchScale) this.labelTouchScale.textContent = `${Math.round(s31 * 100)}%`;
+    }
+    setAudioVolumesUI(audio = {}) {
+      for (const [key, pair] of Object.entries(this.audioRanges)) {
+        const v = Number.isFinite(audio[key]) ? audio[key] : 80;
+        if (pair.input) pair.input.value = String(v);
+        if (pair.label) pair.label.textContent = `${v}%`;
+      }
     }
     renderWorldsList(worlds, activeWorldId) {
       if (!this.worldsListEl) return;
@@ -28835,8 +30157,11 @@ void main() {
         info.className = "world-card-info";
         const title = document.createElement("div");
         title.className = "world-card-title";
-        const modeTag = w.gameMode === "creative" ? "\u{1F9F1} \u041A\u0440\u0435\u0430\u0442\u0438\u0432" : "\u2694\uFE0F \u0412\u044B\u0436\u0438\u0432\u0430\u043D\u0438\u0435";
-        title.textContent = `${w.name || "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u043C\u0438\u0440"} \xB7 ${modeTag}`;
+        const modeTag = w.hardcore ? '<span class="world-badge-hardcore">\u2620\uFE0F \u0425\u0430\u0440\u0434\u043A\u043E\u0440</span>' : w.gameMode === "creative" ? "\u{1F9F1} \u041A\u0440\u0435\u0430\u0442\u0438\u0432" : "\u2694\uFE0F \u0412\u044B\u0436\u0438\u0432\u0430\u043D\u0438\u0435";
+        const typeTag = w.worldType === "superflat" ? ' \xB7 <span class="world-badge-flat">\u041F\u043B\u043E\u0441\u043A\u0438\u0439</span>' : "";
+        const deadTag = w.dead ? ' \xB7 <span class="world-badge-hardcore">\u041F\u043E\u0433\u0438\u0431</span>' : "";
+        const safeName = String(w.name || "\u0411\u0435\u0437\u044B\u043C\u044F\u043D\u043D\u044B\u0439 \u043C\u0438\u0440").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        title.innerHTML = `${safeName} \xB7 ${modeTag}${typeTag}${deadTag}`;
         const meta = document.createElement("div");
         meta.className = "world-card-meta";
         const dateStr = w.updatedAt ? new Date(w.updatedAt).toLocaleString("ru-RU", {
@@ -28853,10 +30178,31 @@ void main() {
         const playBtn = document.createElement("button");
         playBtn.type = "button";
         playBtn.className = "mc-menu-btn mc-menu-primary mc-world-btn";
-        playBtn.textContent = "\u0412\u043E\u0439\u0442\u0438";
+        playBtn.textContent = w.hardcore && w.dead ? "\u041E\u0441\u043C\u043E\u0442\u0440" : "\u0412\u043E\u0439\u0442\u0438";
         playBtn.addEventListener("click", (e) => {
           e.stopPropagation();
           this.callbacks.onSelectWorld?.(w.id);
+        });
+        const renameBtn = document.createElement("button");
+        renameBtn.type = "button";
+        renameBtn.className = "mc-menu-btn mc-world-btn";
+        renameBtn.textContent = "\u270E";
+        renameBtn.title = "\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C \u043C\u0438\u0440";
+        renameBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const nextName = typeof window !== "undefined" && window.prompt ? window.prompt("\u041D\u043E\u0432\u043E\u0435 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435 \u043C\u0438\u0440\u0430:", w.name || "") : "";
+          if (nextName && nextName.trim()) {
+            this.callbacks.onRenameWorld?.(w.id, nextName.trim());
+          }
+        });
+        const exportBtn = document.createElement("button");
+        exportBtn.type = "button";
+        exportBtn.className = "mc-menu-btn mc-world-btn";
+        exportBtn.textContent = "\u2B07";
+        exportBtn.title = "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432 .mcworld.json";
+        exportBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.callbacks.onExportWorld?.(w.id);
         });
         const delBtn = document.createElement("button");
         delBtn.type = "button";
@@ -28867,7 +30213,7 @@ void main() {
           e.stopPropagation();
           this.callbacks.onDeleteWorld?.(w.id);
         });
-        actions.append(playBtn, delBtn);
+        actions.append(playBtn, renameBtn, exportBtn, delBtn);
         card.append(info, actions);
         this.worldsListEl.appendChild(card);
       }
@@ -29500,6 +30846,9 @@ void main() {
       this._creativeCatalogEl = null;
       this._creativeScrollbarEl = null;
       this._creativeThumbEl = null;
+      this.creativeSearch = "";
+      this._dollRect = null;
+      this._dollRectAt = 0;
       this.overlay = document.getElementById("inventory-overlay");
       this.windowEl = document.getElementById("inventory-window");
       this.titleEl = document.getElementById("inv-title");
@@ -29616,8 +30965,13 @@ void main() {
     }
     _updatePaperDollLook(clientX, clientY) {
       if (this.playerPreview && this.playerCanvas && this.mode === "inventory") {
-        const rect = this.playerCanvas.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
+        const now = performance.now();
+        if (!this._dollRect || now - this._dollRectAt > 400) {
+          this._dollRect = this.playerCanvas.getBoundingClientRect();
+          this._dollRectAt = now;
+        }
+        const rect = this._dollRect;
+        if (rect && rect.width > 0 && rect.height > 0) {
           const nx2 = (clientX - rect.left) / rect.width * 2 - 1;
           const ny2 = (clientY - rect.top) / rect.height * 2 - 1;
           this.playerPreview.setLookTarget(nx2, ny2);
@@ -29722,6 +31076,7 @@ void main() {
         this.recipeBookOpen = false;
       }
       this.overlay?.classList.remove("hidden");
+      this._dollRect = null;
       this.renderLayout();
       this.render();
       this.onOpen?.(mode);
@@ -29877,6 +31232,7 @@ void main() {
         e.stopPropagation();
         if (performance.now() - this._lastTouchEventAt < 950) return;
         this._handleSlotMouseDown(zone, index, e);
+        this._updateCursorGhost(e.clientX, e.clientY);
       });
       btn.addEventListener("mouseenter", (e) => {
         if (this._drag?.active) {
@@ -30488,7 +31844,7 @@ void main() {
       this._recomputeCraftResult();
       this.render();
     }
-    _getCreativeCatalogEntries(category) {
+    _getCreativeCatalogEntries(category, query = "") {
       const blocks = BlockRegistry.getPlaceableBlocks();
       const items = ItemRegistry.getAllItems();
       const natureSet = /* @__PURE__ */ new Set([
@@ -30551,22 +31907,26 @@ void main() {
           // ENDER_PEARL
         );
       };
+      let list;
       if (category === "blocks") {
-        return blocks.filter((b) => !natureSet.has(b.id) && b.id !== 76).map((b) => ({ id: b.id, name: b.name }));
-      }
-      if (category === "nature") {
-        return blocks.filter((b) => natureSet.has(b.id)).map((b) => ({ id: b.id, name: b.name }));
-      }
-      if (category === "combat") {
-        return [
+        list = blocks.filter((b) => !natureSet.has(b.id) && b.id !== 76).map((b) => ({ id: b.id, name: b.name }));
+      } else if (category === "nature") {
+        list = blocks.filter((b) => natureSet.has(b.id)).map((b) => ({ id: b.id, name: b.name }));
+      } else if (category === "combat") {
+        list = [
           ...blocks.filter((b) => b.id === 76).map((b) => ({ id: b.id, name: b.name })),
           ...items.filter((it) => isCombatOrTool(it.id)).map((it) => ({ id: it.id, name: it.name }))
         ];
+      } else if (category === "items") {
+        list = items.filter((it) => !isCombatOrTool(it.id)).map((it) => ({ id: it.id, name: it.name }));
+      } else {
+        list = [...blocks.map((b) => ({ id: b.id, name: b.name })), ...items.map((it) => ({ id: it.id, name: it.name }))];
       }
-      if (category === "items") {
-        return items.filter((it) => !isCombatOrTool(it.id)).map((it) => ({ id: it.id, name: it.name }));
+      const q = (query || "").trim().toLowerCase();
+      if (q) {
+        list = list.filter((e) => (e.name || "").toLowerCase().includes(q));
       }
-      return [...blocks.map((b) => ({ id: b.id, name: b.name })), ...items.map((it) => ({ id: it.id, name: it.name }))];
+      return list;
     }
     _syncCreativeThumb() {
       const cat = this._creativeCatalogEl;
@@ -30717,9 +32077,14 @@ void main() {
           ["all", "\u0412\u0441\u0435"],
           ["blocks", "\u0411\u043B\u043E\u043A\u0438"],
           ["nature", "\u041F\u0440\u0438\u0440\u043E\u0434\u0430"],
-          ["combat", "\u041E\u0440\u0443\u0436\u0438\u0435 \u0438 \u0438\u043D\u0441\u0442\u0440."],
-          ["items", "\u0415\u0434\u0430 \u0438 \u0440\u0435\u0441\u0443\u0440\u0441\u044B"]
+          ["combat", "\u041E\u0440\u0443\u0436\u0438\u0435"],
+          ["items", "\u041F\u0440\u0435\u0434\u043C\u0435\u0442\u044B"]
         ];
+        const searchInput = document.createElement("input");
+        searchInput.type = "search";
+        searchInput.className = "inv-creative-search";
+        searchInput.placeholder = "\u041F\u043E\u0438\u0441\u043A \u043F\u0440\u0435\u0434\u043C\u0435\u0442\u043E\u0432...";
+        searchInput.value = this.creativeSearch;
         const body = document.createElement("div");
         body.className = "inv-creative-body";
         const catalog = document.createElement("div");
@@ -30734,7 +32099,7 @@ void main() {
         this._creativeThumbEl = thumb;
         const fillCatalog = () => {
           catalog.innerHTML = "";
-          const list = this._getCreativeCatalogEntries(this.creativeCategory);
+          const list = this._getCreativeCatalogEntries(this.creativeCategory, this.creativeSearch);
           for (const entry of list) {
             const btn = document.createElement("button");
             btn.type = "button";
@@ -30799,8 +32164,14 @@ void main() {
         scrollbar.addEventListener("touchend", () => {
           this._scrollbarDrag = null;
         }, { passive: true });
+        searchInput.addEventListener("input", (e) => {
+          e.stopPropagation();
+          this.creativeSearch = searchInput.value;
+          fillCatalog();
+        });
+        searchInput.addEventListener("keydown", (e) => e.stopPropagation());
         body.append(catalog, scrollbar);
-        shell.append(tabs, body);
+        shell.append(tabs, searchInput, body);
         this.topSectionEl.appendChild(shell);
         fillCatalog();
       }
@@ -30820,6 +32191,9 @@ void main() {
       ui2.btn.classList.toggle("touch-selected", isSelectedTouch);
       const isDragHighlighted = Boolean(this._drag?.active && this._drag.evenActive && this._drag.visitedKeys?.has(`${zone}:${index}`));
       ui2.btn.classList.toggle("drag-preview", isDragHighlighted);
+      const sig = stack && stack.id > 0 && stack.count > 0 ? `${stack.id}:${stack.count}:${stack.durability || 0}:${stack.maxDurability || 0}` : "empty";
+      if (ui2.lastSig === sig) return;
+      ui2.lastSig = sig;
       if (stack && stack.id > 0 && stack.count > 0) {
         ui2.icon.src = this.atlas.getItemIconDataURL(stack.id);
         ui2.icon.classList.remove("hidden");
@@ -31021,8 +32395,8 @@ void main() {
     }
     _updateCursorGhost(x, y) {
       if (!this.cursorGhostEl || !this.cursorStack) return;
-      this.cursorGhostEl.style.left = `${x + 12}px`;
-      this.cursorGhostEl.style.top = `${y - 8}px`;
+      this.cursorGhostEl.style.left = `${x - 26}px`;
+      this.cursorGhostEl.style.top = `${y - 26}px`;
     }
     _showTooltip(stack, x, y) {
       if (!this.tooltipEl || !stack || !stack.id) {
@@ -31157,6 +32531,12 @@ void main() {
     setCreativeMode(creative) {
       if (this.btnFly) {
         this.btnFly.classList.toggle("hidden", !creative);
+      }
+    }
+    setTouchScale(scale = 1) {
+      const s31 = Math.max(0.7, Math.min(1.4, Number(scale) || 1));
+      if (typeof document !== "undefined" && document.documentElement?.style) {
+        document.documentElement.style.setProperty("--touch-scale", String(s31));
       }
     }
     setHeldFoodIndicator(isFood, modeTag = "") {
@@ -31997,92 +33377,60 @@ void main() {
   var MenuPanorama = class {
     constructor() {
       this.scene = new xo();
+      this.scene.fog = new _o("#9cd0ff", 18, 44);
       this.camera = new Oe(
-        76,
+        72,
         window.innerWidth / Math.max(1, window.innerHeight),
         0.1,
-        50
+        90
       );
-      this.yaw = 0;
-      this.pitch = -0.06;
+      this.yaw = 0.6;
+      this.pitch = -0.14;
+      this.elapsed = 0;
       const materials = [];
       const faces = ["px", "nx", "py", "ny", "pz", "nz"];
       this.textures = [];
       for (const face of faces) {
-        const tex = this._paintPanoramaFace(face);
+        const tex = this._paintSkyFace(face);
         this.textures.push(tex);
         materials.push(new jn({
           map: tex,
           side: tn,
-          depthWrite: false
+          depthWrite: false,
+          fog: false
         }));
       }
-      const geom = new qi(20, 20, 20);
+      const geom = new qi(70, 70, 70);
       this.boxMesh = new Ce(geom, materials);
       this.scene.add(this.boxMesh);
+      this.disposables = [];
+      this._buildVoxelValley();
     }
-    _paintPanoramaFace(face) {
-      const size = 128;
+    _paintSkyFace(face) {
+      const size = 64;
       const c = document.createElement("canvas");
       c.width = size;
       c.height = size;
       const g = c.getContext("2d");
       g.imageSmoothingEnabled = false;
       if (face === "py") {
-        g.fillStyle = "#69a9f6";
+        g.fillStyle = "#68abfb";
         g.fillRect(0, 0, size, size);
-        g.fillStyle = "rgba(255,255,255,0.75)";
-        g.fillRect(14, 22, 34, 14);
-        g.fillRect(72, 48, 40, 18);
-        g.fillRect(28, 86, 36, 12);
       } else if (face === "ny") {
-        g.fillStyle = "#3372bc";
+        g.fillStyle = "#a8d7ff";
         g.fillRect(0, 0, size, size);
-        g.fillStyle = "#487d2e";
-        g.fillRect(0, 0, 32, 32);
-        g.fillRect(96, 80, 32, 48);
       } else {
-        const sky = g.createLinearGradient(0, 0, 0, size * 0.56);
-        sky.addColorStop(0, "#69a9f6");
-        sky.addColorStop(1, "#bce0ff");
+        const sky = g.createLinearGradient(0, 0, 0, size);
+        sky.addColorStop(0, "#68abfb");
+        sky.addColorStop(0.55, "#a8d7ff");
+        sky.addColorStop(1, "#9cd0ff");
         g.fillStyle = sky;
-        g.fillRect(0, 0, size, Math.floor(size * 0.56));
+        g.fillRect(0, 0, size, size);
         if (face === "pz") {
           g.fillStyle = "#fff5b8";
-          g.fillRect(42, 16, 16, 16);
+          g.fillRect(22, 10, 10, 10);
           g.fillStyle = "#ffffff";
-          g.fillRect(46, 20, 8, 8);
-        }
-        g.fillStyle = "rgba(255, 255, 255, 0.85)";
-        g.fillRect(8, 22, 26, 6);
-        g.fillRect(74, 18, 34, 7);
-        const seedOff = face.charCodeAt(0) * 19 + face.charCodeAt(1) * 7;
-        for (let x = 0; x < size; x += 4) {
-          const mh = 12 + Math.floor(Math.abs(Math.sin((x + seedOff) * 0.065)) * 24);
-          const topY = 66 - mh;
-          g.fillStyle = "#6f8096";
-          g.fillRect(x, topY, 4, mh);
-          if (mh > 25) {
-            g.fillStyle = "#f2f7fc";
-            g.fillRect(x, topY, 4, 5);
-          }
-        }
-        g.fillStyle = "#3372bc";
-        g.fillRect(0, 68, size, 60);
-        for (let x = 0; x < size; x += 4) {
-          const gh = 68 + Math.floor(Math.sin((x + seedOff * 2) * 0.09) * 8);
-          if (x % 24 < 16) {
-            g.fillStyle = "#5fa440";
-            g.fillRect(x, gh, 4, 60);
-            g.fillStyle = "#487d2e";
-            g.fillRect(x, gh + 6, 4, 54);
-            if ((x + seedOff) % 20 === 0) {
-              g.fillStyle = "#6b4a2b";
-              g.fillRect(x + 1, gh - 8, 2, 8);
-              g.fillStyle = "#3f7c2a";
-              g.fillRect(x - 3, gh - 15, 10, 8);
-            }
-          }
+          g.fillRect(24, 12, 6, 6);
         }
       }
       const tex = new vh(c);
@@ -32093,15 +33441,232 @@ void main() {
       tex.colorSpace = sn;
       return tex;
     }
+    _buildVoxelValley() {
+      const R = 24;
+      const W = R * 2 + 1;
+      const H = 22;
+      const grid = new Uint8Array(W * H * W);
+      const AIR = 0;
+      const GRASS = 1;
+      const DIRT = 2;
+      const STONE = 3;
+      const WATER = 4;
+      const LOG = 5;
+      const LEAVES = 6;
+      const SAND = 7;
+      const BIRCH_LOG = 8;
+      const FLOWER = 9;
+      const setB = (x, y, z, id2) => {
+        const gx2 = x + R;
+        const gz = z + R;
+        if (gx2 < 0 || gx2 >= W || gz < 0 || gz >= W || y < 0 || y >= H) return;
+        grid[(y * W + gz) * W + gx2] = id2;
+      };
+      const getB = (x, y, z) => {
+        const gx2 = x + R;
+        const gz = z + R;
+        if (gx2 < 0 || gx2 >= W || gz < 0 || gz >= W || y < 0 || y >= H) return AIR;
+        return grid[(y * W + gz) * W + gx2];
+      };
+      const waterLevel = 5;
+      for (let z = -R; z <= R; z++) {
+        for (let x = -R; x <= R; x++) {
+          const d = Math.hypot(x * 0.9, z * 1.05);
+          const ridge = Math.sin(x * 0.19) * 2.2 + Math.cos(z * 0.21) * 2.1 + Math.sin((x + z) * 0.14) * 1.8;
+          let h = Math.round(5 + Math.max(0, (d - 6.5) * 0.42) + ridge);
+          if (x > 6 && z < -6) {
+            h = Math.max(h, 11 + Math.round(Math.sin(x * 0.4 + z * 0.3) * 1.4));
+          }
+          h = Math.max(2, Math.min(H - 5, h));
+          for (let y = 0; y <= h; y++) {
+            if (y === h) {
+              setB(x, y, z, h <= waterLevel ? SAND : h >= 12 ? STONE : GRASS);
+            } else if (y >= h - 2) {
+              setB(x, y, z, h <= waterLevel ? SAND : DIRT);
+            } else {
+              setB(x, y, z, STONE);
+            }
+          }
+          if (h < waterLevel) {
+            for (let y = h + 1; y <= waterLevel; y++) {
+              setB(x, y, z, WATER);
+            }
+          }
+        }
+      }
+      for (let y = waterLevel; y <= 13; y++) {
+        setB(8, y, -8, WATER);
+        setB(9, y, -8, WATER);
+        if (y === 13) setB(9, y, -9, WATER);
+      }
+      const placeTree = (tx2, tz, birch = false) => {
+        let groundY = -1;
+        for (let y = H - 2; y >= 1; y--) {
+          if (getB(tx2, y, tz) === GRASS) {
+            groundY = y;
+            break;
+          }
+        }
+        if (groundY < 0 || groundY >= H - 7) return;
+        const trunk = 4;
+        for (let y = 1; y <= trunk; y++) setB(tx2, groundY + y, tz, birch ? BIRCH_LOG : LOG);
+        for (let ly2 = groundY + trunk - 1; ly2 <= groundY + trunk + 2; ly2++) {
+          const rad = ly2 >= groundY + trunk + 1 ? 1 : 2;
+          for (let dz = -rad; dz <= rad; dz++) {
+            for (let dx2 = -rad; dx2 <= rad; dx2++) {
+              if (Math.abs(dx2) === rad && Math.abs(dz) === rad && dx2 + dz + ly2 & 1) continue;
+              if (getB(tx2 + dx2, ly2, tz + dz) === AIR) {
+                setB(tx2 + dx2, ly2, tz + dz, LEAVES);
+              }
+            }
+          }
+        }
+      };
+      const treeCoords = [
+        [-11, -9, false],
+        [-15, 2, true],
+        [-9, 11, false],
+        [12, 10, true],
+        [15, -1, false],
+        [-5, -14, true],
+        [3, 14, false],
+        [-17, -12, false],
+        [17, 13, true]
+      ];
+      for (const [tx2, tz, isBirch] of treeCoords) placeTree(tx2, tz, isBirch);
+      for (let z = -R + 2; z <= R - 2; z += 3) {
+        for (let x = -R + 2; x <= R - 2; x += 3) {
+          if ((x * 13 + z * 7 & 3) !== 0) continue;
+          for (let y = H - 2; y >= 5; y--) {
+            if (getB(x, y, z) === GRASS && getB(x, y + 1, z) === AIR) {
+              setB(x, y + 1, z, FLOWER);
+              break;
+            }
+          }
+        }
+      }
+      const PALETTE = {
+        [GRASS]: [0.39, 0.72, 0.25],
+        [DIRT]: [0.53, 0.37, 0.24],
+        [STONE]: [0.5, 0.52, 0.55],
+        [WATER]: [0.19, 0.48, 0.85],
+        [LOG]: [0.42, 0.29, 0.17],
+        [BIRCH_LOG]: [0.85, 0.84, 0.8],
+        [LEAVES]: [0.27, 0.58, 0.19],
+        [SAND]: [0.85, 0.8, 0.58],
+        [FLOWER]: [0.95, 0.82, 0.18]
+      };
+      const FACES2 = [
+        { dir: [0, 1, 0], shade: 1, v: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]] },
+        { dir: [0, -1, 0], shade: 0.56, v: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]] },
+        { dir: [1, 0, 0], shade: 0.78, v: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]] },
+        { dir: [-1, 0, 0], shade: 0.72, v: [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]] },
+        { dir: [0, 0, 1], shade: 0.86, v: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]] },
+        { dir: [0, 0, -1], shade: 0.82, v: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]] }
+      ];
+      const solidPos = [];
+      const solidCol = [];
+      const solidIdx = [];
+      const waterPos = [];
+      const waterCol = [];
+      const waterIdx = [];
+      const pushCubeFace = (posArr, colArr, idxArr, wx2, y, wz, f, rgb) => {
+        const baseV = posArr.length / 3;
+        const hash = ((wx2 * 73856093 ^ y * 19349663 ^ wz * 83492791) & 15) / 15 - 0.5;
+        const tint = 1 + hash * 0.08;
+        for (let i = 0; i < 4; i++) {
+          posArr.push(wx2 + f.v[i][0], y + f.v[i][1], wz + f.v[i][2]);
+          colArr.push(
+            Math.min(1, Math.max(0, rgb[0] * f.shade * tint)),
+            Math.min(1, Math.max(0, rgb[1] * f.shade * tint)),
+            Math.min(1, Math.max(0, rgb[2] * f.shade * tint))
+          );
+        }
+        idxArr.push(baseV, baseV + 1, baseV + 2, baseV, baseV + 2, baseV + 3);
+      };
+      for (let y = 0; y < H; y++) {
+        for (let z = -R; z <= R; z++) {
+          for (let x = -R; x <= R; x++) {
+            const id2 = getB(x, y, z);
+            if (id2 === AIR) continue;
+            const isWater = id2 === WATER;
+            const rgb = PALETTE[id2] || PALETTE[STONE];
+            for (const f of FACES2) {
+              const nid = getB(x + f.dir[0], y + f.dir[1], z + f.dir[2]);
+              if (isWater) {
+                if (nid !== AIR) continue;
+                const topShrink = f.dir[1] === 1 ? -0.12 : 0;
+                const baseV = waterPos.length / 3;
+                for (let i = 0; i < 4; i++) {
+                  const vy2 = f.v[i][1] === 1 ? y + 1 + topShrink : y;
+                  waterPos.push(x + f.v[i][0], vy2, z + f.v[i][2]);
+                  waterCol.push(rgb[0] * f.shade, rgb[1] * f.shade, rgb[2] * f.shade);
+                }
+                waterIdx.push(baseV, baseV + 1, baseV + 2, baseV, baseV + 2, baseV + 3);
+              } else {
+                if (nid !== AIR && nid !== WATER && nid !== FLOWER) continue;
+                const useRgb = id2 === GRASS && f.dir[1] !== 1 ? PALETTE[DIRT] : rgb;
+                if (id2 === FLOWER) {
+                  if (f.dir[1] !== 1) continue;
+                  pushCubeFace(solidPos, solidCol, solidIdx, x, y - 0.85, z, f, rgb);
+                } else {
+                  pushCubeFace(solidPos, solidCol, solidIdx, x, y, z, f, useRgb);
+                }
+              }
+            }
+          }
+        }
+      }
+      const solidGeom = new Yt();
+      solidGeom.setAttribute("position", new At(solidPos, 3));
+      solidGeom.setAttribute("color", new At(solidCol, 3));
+      solidGeom.setIndex(solidIdx);
+      const solidMat = new jn({ vertexColors: true, fog: true });
+      this.voxelMesh = new Ce(solidGeom, solidMat);
+      this.scene.add(this.voxelMesh);
+      this.disposables.push(solidGeom, solidMat);
+      if (waterIdx.length > 0) {
+        const waterGeom = new Yt();
+        waterGeom.setAttribute("position", new At(waterPos, 3));
+        waterGeom.setAttribute("color", new At(waterCol, 3));
+        waterGeom.setIndex(waterIdx);
+        const waterMat = new jn({
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.82,
+          fog: true
+        });
+        this.waterMesh = new Ce(waterGeom, waterMat);
+        this.scene.add(this.waterMesh);
+        this.disposables.push(waterGeom, waterMat);
+      }
+      this.cloudGroup = new gi();
+      const cloudGeom = new qi(6.5, 1, 4.2);
+      const cloudMat = new jn({ color: 16777215, transparent: true, opacity: 0.86, fog: true });
+      this.disposables.push(cloudGeom, cloudMat);
+      const cloudOffsets = [[-14, 19, -12], [6, 20, -16], [16, 18, 9], [-12, 20, 14], [0, 21, 18]];
+      for (const [cx2, cy2, cz] of cloudOffsets) {
+        const cm2 = new Ce(cloudGeom, cloudMat);
+        cm2.position.set(cx2, cy2, cz);
+        this.cloudGroup.add(cm2);
+      }
+      this.scene.add(this.cloudGroup);
+    }
     resize(width, height) {
       this.camera.aspect = width / Math.max(1, height);
       this.camera.updateProjectionMatrix();
     }
     render(renderer, dt) {
-      this.yaw += dt * 0.085;
+      this.elapsed += dt;
+      this.yaw += dt * 0.068;
+      const bob = Math.sin(this.elapsed * 0.4) * 0.35;
+      this.camera.position.set(Math.sin(this.yaw * 0.5) * 2.5, 11.2 + bob, Math.cos(this.yaw * 0.5) * 2.5);
       this.camera.rotation.order = "YXZ";
       this.camera.rotation.y = this.yaw;
-      this.camera.rotation.x = this.pitch + Math.sin(this.yaw * 0.7) * 0.035;
+      this.camera.rotation.x = this.pitch + Math.sin(this.yaw * 0.6) * 0.04;
+      if (this.cloudGroup) {
+        this.cloudGroup.rotation.y = this.elapsed * 0.015;
+      }
       renderer.clear();
       renderer.render(this.scene, this.camera);
     }
@@ -32112,6 +33677,10 @@ void main() {
         for (const m of this.boxMesh.material) m.dispose();
       }
       for (const t of this.textures) t.dispose();
+      if (this.voxelMesh) this.scene.remove(this.voxelMesh);
+      if (this.waterMesh) this.scene.remove(this.waterMesh);
+      if (this.cloudGroup) this.scene.remove(this.cloudGroup);
+      for (const d of this.disposables) d.dispose?.();
     }
   };
 
@@ -32931,14 +34500,18 @@ void main() {
   };
 
   // src/world/Chunk.js
-  function chunkKey(cx2, cz) {
+  function chunkKey2(cx2, cz) {
     return `${cx2},${cz}`;
+  }
+  function numChunkKey(cx2, cz) {
+    return (cx2 + 32768) * 65536 + (cz + 32768);
   }
   var Chunk = class {
     constructor(cx2, cz) {
       this.cx = cx2;
       this.cz = cz;
-      this.key = chunkKey(cx2, cz);
+      this.key = chunkKey2(cx2, cz);
+      this.numKey = numChunkKey(cx2, cz);
       this.blocks = new Uint8Array(CHUNK_VOLUME);
       this.biomes = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
       this.light = new Uint8Array(CHUNK_VOLUME);
@@ -32950,6 +34523,7 @@ void main() {
       this.dirty = true;
       this.hasMeshed = false;
       this.fluidSprings = null;
+      this.fluidWakes = null;
       this.opaqueMesh = null;
       this.cutoutMesh = null;
       this.waterMesh = null;
@@ -33249,21 +34823,21 @@ void main() {
         this.ravineNoise = new FastNoise(this.seed ^ 4277009102);
       }
       sampleClimate(wx2, wz) {
-        const temp = this.tempNoise.fbm2D(wx2 * 21e-4, wz * 21e-4, 3, 0.5, 2);
-        const humid = this.humidNoise.fbm2D(wx2 * 23e-4 + 51.7, wz * 23e-4 - 37.2, 3, 0.5, 2);
-        const cont = this.contNoise.fbm2D(wx2 * 31e-4 - 19.4, wz * 31e-4 + 83.1, 4, 0.5, 2);
-        const erosion = this.erosionNoise.fbm2D(wx2 * 36e-4 + 11.2, wz * 36e-4 + 44.5, 3, 0.5, 2);
-        const weird = this.weirdNoise.fbm2D(wx2 * 52e-4, wz * 52e-4, 2, 0.5, 2);
+        const temp = this.tempNoise.fbm2D(wx2 * 72e-5, wz * 72e-5, 2, 0.45, 2);
+        const humid = this.humidNoise.fbm2D(wx2 * 78e-5 + 51.7, wz * 78e-5 - 37.2, 2, 0.45, 2);
+        const cont = this.contNoise.fbm2D(wx2 * 95e-5 - 19.4, wz * 95e-5 + 83.1, 2, 0.45, 2);
+        const erosion = this.erosionNoise.fbm2D(wx2 * 105e-5 + 11.2, wz * 105e-5 + 44.5, 2, 0.45, 2);
+        const weird = this.weirdNoise.fbm2D(wx2 * 16e-4, wz * 16e-4, 2, 0.45, 2);
         let biome = BI.PLAINS;
-        if (erosion < -0.21 || cont > 0.24 && weird > 0.22) {
+        if (erosion < -0.18 || cont > 0.22 && weird > 0.2) {
           biome = BI.MOUNTAINS;
-        } else if (temp > 0.19 && humid < 0.06) {
+        } else if (temp > 0.16 && humid < 0.08) {
           biome = BI.DESERT;
-        } else if (temp < -0.19) {
+        } else if (temp < -0.16) {
           biome = BI.SNOWY_TAIGA;
-        } else if (cont < -0.04 && humid > 0.1) {
+        } else if (cont < -0.04 && humid > 0.09) {
           biome = BI.SWAMP;
-        } else if (humid > 0.17) {
+        } else if (humid > 0.15) {
           biome = BI.BIRCH_FOREST;
         } else if (humid > -0.04) {
           biome = BI.FOREST;
@@ -33296,14 +34870,14 @@ void main() {
         const hills = this.detailNoise.fbm2D(wx2 * 0.014, wz * 0.014, 3, 0.5, 2.05);
         const ridge = this.erosionNoise.ridged2D(wx2 * 95e-4, wz * 95e-4, 3, 0.5, 2.1);
         let h = avgBase + hills * avgAmp + ridge * 24 * avgRidgeW;
-        const riverDist = Math.abs(this.riverNoise.fbm2D(wx2 * 26e-4 + 9.3, wz * 26e-4 - 14.8, 3, 0.5, 2));
+        const riverDist = Math.abs(this.riverNoise.fbm2D(wx2 * 85e-5 + 9.3, wz * 85e-5 - 14.8, 3, 0.5, 2));
         let isRiver = false;
-        if (riverDist < 0.052) {
-          const t = 1 - riverDist / 0.052;
+        if (riverDist < 0.045) {
+          const t = 1 - riverDist / 0.045;
           const smooth = t * t * (3 - 2 * t);
           const riverBed = 57.5 + this.detailNoise.noise2D(wx2 * 0.05, wz * 0.05) * 1.4;
           h = lerp2(h, riverBed, smooth * 0.92);
-          if (riverDist < 0.036) isRiver = true;
+          if (riverDist < 0.03) isRiver = true;
         }
         const height = Math.max(8, Math.min(WORLD_HEIGHT2 - 12, Math.round(h)));
         let finalBiome = centerBiome;
@@ -33326,10 +34900,12 @@ void main() {
       }
       return ctx;
     }
-    function getTerrainHeight(seed, wx2, wz) {
+    function getTerrainHeight(seed, wx2, wz, worldType = "default") {
+      if (worldType === "superflat") return 3;
       return getCtx(seed).getColumnData(wx2, wz).height;
     }
-    function getBiomeAt(seed, wx2, wz) {
+    function getBiomeAt(seed, wx2, wz, worldType = "default") {
+      if (worldType === "superflat") return BI.PLAINS;
       return getCtx(seed).getColumnData(wx2, wz).biome;
     }
     function setBlockSafe(blocks, lx2, y, lz, id2) {
@@ -33509,7 +35085,24 @@ void main() {
         }
       }
     }
-    function generateChunkData(seed, cx2, cz) {
+    function generateChunkData(seed, cx2, cz, worldType = "default") {
+      if (worldType === "superflat") {
+        const blocks2 = new Uint8Array(CHUNK_VOLUME2);
+        const biomes2 = new Uint8Array(CHUNK_SIZE2 * CHUNK_SIZE2);
+        biomes2.fill(BI.PLAINS);
+        const slice2 = CHUNK_SIZE2 * CHUNK_SIZE2;
+        blocks2.fill(B.BEDROCK, 0, slice2);
+        blocks2.fill(B.DIRT, slice2, slice2 * 3);
+        blocks2.fill(B.GRASS, slice2 * 3, slice2 * 4);
+        return {
+          blocks: blocks2,
+          biomes: biomes2,
+          fluidSprings: new Uint16Array(0),
+          fluidWakes: new Uint16Array(0),
+          minY: 0,
+          maxY: 3
+        };
+      }
       const ctx = getCtx(seed);
       const blocks = new Uint8Array(CHUNK_VOLUME2);
       const biomes = new Uint8Array(CHUNK_SIZE2 * CHUNK_SIZE2);
@@ -33889,8 +35482,9 @@ void main() {
         }
       }
       const springIndices = [];
+      const wakeIndices = [];
       const isWallRock = (id2) => id2 === B.STONE || id2 === B.DEEPSLATE || id2 === B.GRANITE || id2 === B.DIORITE || id2 === B.ANDESITE || id2 === B.DIRT || id2 === B.SANDSTONE || id2 === B.COBBLESTONE;
-      if (B.LAVA && (Math.abs(cx2) > 1 || Math.abs(cz) > 1) && chunkRand() < 0.045) {
+      if (B.LAVA && (Math.abs(cx2) > 3 || Math.abs(cz) > 3) && chunkRand() < 45e-4) {
         const px2 = 4 + Math.floor(chunkRand() * 8);
         const pz = 4 + Math.floor(chunkRand() * 8);
         const colIdx = pz * CHUNK_SIZE2 + px2;
@@ -33949,19 +35543,20 @@ void main() {
                 if (lx2 <= 0 || lx2 >= 15 || lz <= 0 || lz >= 15) continue;
                 if (dx2 * dx2 + dz * dz <= 4 && getBlockSafe(blocks, lx2, baseWy, lz) === B.AIR && isWallRock(getBlockSafe(blocks, lx2, baseWy - 1, lz))) {
                   setBlockSafe(blocks, lx2, baseWy, lz, B.WATER);
+                  wakeIndices.push((baseWy * CHUNK_SIZE2 + lz) * CHUNK_SIZE2 + lx2);
                 }
               }
             }
           }
         }
       }
-      for (let attempt = 0; attempt < 18 && springIndices.length < 2; attempt++) {
+      for (let attempt = 0; attempt < 18 && springIndices.length < 3; attempt++) {
         const lx2 = 1 + Math.floor(chunkRand() * 14);
         const lz = 1 + Math.floor(chunkRand() * 14);
         const colH = heightMap[lz * CHUNK_SIZE2 + lx2];
-        const useLava = B.LAVA && attempt >= 10;
-        const minSy = useLava ? 12 : biomes[lz * CHUNK_SIZE2 + lx2] === BI.MOUNTAINS ? SEA_LEVEL2 + 6 : 16;
-        const maxSy = useLava ? Math.min(34, colH - 6) : Math.min(WORLD_HEIGHT2 - 8, colH - 2);
+        const useLava = B.LAVA && attempt >= 12;
+        const minSy = useLava ? 10 : biomes[lz * CHUNK_SIZE2 + lx2] === BI.MOUNTAINS ? SEA_LEVEL2 + 6 : 16;
+        const maxSy = useLava ? Math.min(24, colH - 12) : Math.min(WORLD_HEIGHT2 - 8, colH - 2);
         if (maxSy <= minSy) continue;
         const sy2 = minSy + Math.floor(chunkRand() * (maxSy - minSy));
         const curId = getBlockSafe(blocks, lx2, sy2, lz);
@@ -33982,6 +35577,20 @@ void main() {
           springIndices.push((sy2 * CHUNK_SIZE2 + lz) * CHUNK_SIZE2 + lx2);
         }
       }
+      for (let z = 0; z < CHUNK_SIZE2; z++) {
+        for (let x = 0; x < CHUNK_SIZE2; x++) {
+          const h = heightMap[z * CHUNK_SIZE2 + x];
+          if (h >= SEA_LEVEL2) continue;
+          for (let y = h + 1; y <= SEA_LEVEL2; y++) {
+            const idx = (y * CHUNK_SIZE2 + z) * CHUNK_SIZE2 + x;
+            if (blocks[idx] !== B.WATER) continue;
+            const touchesOpen = x > 0 && blocks[idx - 1] === B.AIR || x < 15 && blocks[idx + 1] === B.AIR || z > 0 && blocks[idx - CHUNK_SIZE2] === B.AIR || z < 15 && blocks[idx + CHUNK_SIZE2] === B.AIR || y > 0 && blocks[idx - slice] === B.AIR;
+            if (touchesOpen) {
+              wakeIndices.push(idx);
+            }
+          }
+        }
+      }
       let minY = WORLD_HEIGHT2 - 1;
       let maxY = 0;
       for (let y = 0; y < WORLD_HEIGHT2; y++) {
@@ -33999,6 +35608,7 @@ void main() {
         blocks,
         biomes,
         fluidSprings: new Uint16Array(springIndices),
+        fluidWakes: new Uint16Array(wakeIndices),
         minY: minY <= maxY ? minY : 0,
         maxY: minY <= maxY ? maxY : 0
       };
@@ -35278,7 +36888,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const topBorderY = Math.min(WORLD_HEIGHT - 1, startScanY + 2);
       for (let p = 0; p < 4; p++) {
         const bp2 = borderPairs[p];
-        const neighbor = world.chunks.get(chunkKey(bp2.ncx, bp2.ncz));
+        const neighbor = world.getChunk ? world.getChunk(bp2.ncx, bp2.ncz) : world.chunks.get(`${bp2.ncx},${bp2.ncz}`);
         if (!neighbor || !neighbor.isGenerated) continue;
         const nbBaseX = bp2.ncx * CHUNK_SIZE;
         const nbBaseZ = bp2.ncz * CHUNK_SIZE;
@@ -35619,22 +37229,24 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
 
   // src/world/WorldGen.js
   var WorldGen = class {
-    constructor(seed) {
+    constructor(seed, worldType = "default") {
       this.seed = normalizeSeed(seed);
+      this.worldType = worldType === "superflat" ? "superflat" : "default";
       this.kernel = createChunkGeneratorKernel(KERNEL_CONFIG);
       this.biomeManager = new BiomeManager(this.seed);
     }
     getTerrainHeight(wx2, wz) {
-      return this.kernel.getTerrainHeight(this.seed, Math.floor(wx2), Math.floor(wz));
+      return this.kernel.getTerrainHeight(this.seed, Math.floor(wx2), Math.floor(wz), this.worldType);
     }
     getBiomeAt(wx2, wz) {
-      return this.kernel.getBiomeAt(this.seed, Math.floor(wx2), Math.floor(wz));
+      return this.kernel.getBiomeAt(this.seed, Math.floor(wx2), Math.floor(wz), this.worldType);
     }
     generateChunk(chunk) {
-      const result = this.kernel.generateChunkData(this.seed, chunk.cx, chunk.cz);
+      const result = this.kernel.generateChunkData(this.seed, chunk.cx, chunk.cz, this.worldType);
       chunk.blocks.set(result.blocks);
       chunk.biomes.set(result.biomes);
       chunk.fluidSprings = result.fluidSprings && result.fluidSprings.length > 0 ? result.fluidSprings : null;
+      chunk.fluidWakes = result.fluidWakes && result.fluidWakes.length > 0 ? result.fluidWakes : null;
       chunk.minY = result.minY;
       chunk.maxY = result.maxY;
       chunk.isGenerated = true;
@@ -35651,7 +37263,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const KERNEL = (${createChunkGeneratorKernel.toString()})(${JSON.stringify(KERNEL_CONFIG)});
       self.onmessage = function(e) {
         const msg = e.data;
-        const res = KERNEL.generateChunkData(msg.seed, msg.cx, msg.cz);
+        const res = KERNEL.generateChunkData(msg.seed, msg.cx, msg.cz, msg.worldType || 'default');
         self.postMessage(
           {
             cx: msg.cx,
@@ -35659,10 +37271,11 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
             blocks: res.blocks.buffer,
             biomes: res.biomes.buffer,
             fluidSprings: res.fluidSprings.buffer,
+            fluidWakes: res.fluidWakes.buffer,
             minY: res.minY,
             maxY: res.maxY,
           },
-          [res.blocks.buffer, res.biomes.buffer, res.fluidSprings.buffer]
+          [res.blocks.buffer, res.biomes.buffer, res.fluidSprings.buffer, res.fluidWakes.buffer]
         );
       };
     `;
@@ -35673,6 +37286,9 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
      * Finds a scenic dry-land spawn coordinate near (0, 0), preferring Plains/Forest/Beach.
      */
     findSafeSpawn() {
+      if (this.worldType === "superflat") {
+        return { x: 0.5, y: 4, z: 0.5 };
+      }
       for (let radius = 0; radius <= 160; radius += 4) {
         for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
           const wx2 = Math.round(Math.cos(angle) * radius);
@@ -35689,16 +37305,46 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
   };
 
   // src/world/World.js
+  var SyncedChunkMap = class extends Map {
+    constructor(grid, onMutate) {
+      super();
+      this._grid = grid;
+      this._onMutate = onMutate;
+    }
+    set(key, chunk) {
+      super.set(key, chunk);
+      if (chunk && chunk.numKey !== void 0) {
+        this._grid.set(chunk.numKey, chunk);
+      }
+      this._onMutate(chunk);
+      return this;
+    }
+    delete(key) {
+      const prev = super.get(key);
+      const res = super.delete(key);
+      if (prev && prev.numKey !== void 0) {
+        this._grid.delete(prev.numKey);
+      }
+      this._onMutate(prev || null);
+      return res;
+    }
+    clear() {
+      super.clear();
+      this._grid.clear();
+      this._onMutate(null);
+    }
+  };
   var World = class {
     constructor(scene, atlas, seed, renderDistance = 6, options = {}) {
       this.scene = scene;
       this.atlas = atlas;
       this.seed = seed;
+      this.worldType = options.worldType === "superflat" ? "superflat" : "default";
       this.renderDistance = renderDistance;
       this.unlimitedMemory = options.unlimitedMemory !== void 0 ? Boolean(options.unlimitedMemory) : true;
       this.fogEnabled = options.fogEnabled !== void 0 ? Boolean(options.fogEnabled) : false;
       this.onBlockChanged = options.onBlockChanged || null;
-      this.worldGen = new WorldGen(seed);
+      this.worldGen = new WorldGen(seed, this.worldType);
       this.mesher = new ChunkMesher(atlas, {
         fancyLeaves: options.fancyLeaves !== void 0 ? options.fancyLeaves : true,
         smoothLighting: options.smoothLighting !== void 0 ? options.smoothLighting : true
@@ -35706,7 +37352,12 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.animatedFluids = options.animatedFluids !== void 0 ? Boolean(options.animatedFluids) : true;
       this.lighting = new LightingEngine();
       this.fluids = new FluidSimulator({ onWashBlock: options.onWashBlock || null });
-      this.chunks = /* @__PURE__ */ new Map();
+      this.chunkGrid = /* @__PURE__ */ new Map();
+      this.dirtyChunks = /* @__PURE__ */ new Set();
+      this.chunks = new SyncedChunkMap(this.chunkGrid, () => {
+        this._cacheChunk = null;
+        this._cacheNumKey = -1;
+      });
       this.chunkDataCache = /* @__PURE__ */ new Map();
       this.modifiedBlocks = /* @__PURE__ */ new Map();
       this.modifiedByChunk = /* @__PURE__ */ new Map();
@@ -35720,6 +37371,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this._fluidAnimTime = 0;
       this._cacheCx = 2147483647;
       this._cacheCz = 2147483647;
+      this._cacheNumKey = -1;
       this._cacheChunk = null;
       this.workers = [];
       this.workerUrl = null;
@@ -35770,10 +37422,10 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
     }
     _handleWorkerMessage(data) {
       if (this.disposed || !data) return;
-      const { cx: cx2, cz, blocks, biomes, fluidSprings, minY, maxY } = data;
-      const key = chunkKey(cx2, cz);
+      const { cx: cx2, cz, blocks, biomes, fluidSprings, fluidWakes, minY, maxY } = data;
+      const key = chunkKey2(cx2, cz);
       this.inFlightKeys.delete(key);
-      if (this.chunks.has(key)) return;
+      if (this.getChunk(cx2, cz)) return;
       if (this.lastPlayerChunkX !== null && this.lastPlayerChunkZ !== null) {
         const dx2 = cx2 - this.lastPlayerChunkX;
         const dz = cz - this.lastPlayerChunkZ;
@@ -35797,33 +37449,98 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       chunk.blocks = new Uint8Array(blocks);
       chunk.biomes = new Uint8Array(biomes);
       chunk.fluidSprings = fluidSprings ? new Uint16Array(fluidSprings) : null;
+      chunk.fluidWakes = fluidWakes ? new Uint16Array(fluidWakes) : null;
       chunk.minY = minY;
       chunk.maxY = maxY;
       chunk.isGenerated = true;
       chunk.lightCalculated = false;
       chunk.dirty = false;
       this._applyModifiedBlocksToChunk(chunk);
-      this.chunks.set(key, chunk);
+      this._registerChunk(chunk);
       this.pendingLightChunks.push(chunk);
       this._scheduleChunkFluidSprings(chunk);
     }
+    _registerChunk(chunk) {
+      this.chunks.set(chunk.key, chunk);
+      this.chunkGrid.set(chunk.numKey, chunk);
+      if (chunk.dirty) this.dirtyChunks.add(chunk);
+    }
+    _unregisterChunk(key, chunk) {
+      this.chunks.delete(key);
+      this.chunkGrid.delete(chunk.numKey);
+      this.dirtyChunks.delete(chunk);
+      if (this._cacheChunk === chunk) {
+        this._cacheChunk = null;
+        this._cacheNumKey = -1;
+      }
+    }
     _scheduleChunkFluidSprings(chunk) {
-      if (!chunk.fluidSprings || chunk.fluidSprings.length === 0) return;
       const baseX = chunk.cx * CHUNK_SIZE;
       const baseZ = chunk.cz * CHUNK_SIZE;
       const slice = CHUNK_SIZE * CHUNK_SIZE;
-      for (let i = 0; i < chunk.fluidSprings.length; i++) {
-        const idx = chunk.fluidSprings[i];
-        const wy2 = idx / slice | 0;
-        const rem = idx % slice;
-        const lz = rem / CHUNK_SIZE | 0;
-        const lx2 = rem % CHUNK_SIZE;
-        const id2 = chunk.blocks[idx];
-        if (id2 === BLOCK_IDS.WATER || id2 === BLOCK_IDS.LAVA) {
-          this.fluids.schedule(baseX + lx2, wy2, baseZ + lz, this.fluids.getDelayForFluid(id2));
+      const scheduleIndexList = (list) => {
+        if (!list || list.length === 0) return;
+        for (let i = 0; i < list.length; i++) {
+          const idx = list[i];
+          const wy2 = idx / slice | 0;
+          const rem = idx % slice;
+          const lz = rem / CHUNK_SIZE | 0;
+          const lx2 = rem % CHUNK_SIZE;
+          const id2 = chunk.blocks[idx];
+          if (id2 === BLOCK_IDS.WATER || id2 === BLOCK_IDS.LAVA) {
+            this.fluids.schedule(baseX + lx2, wy2, baseZ + lz, this.fluids.getDelayForFluid(id2));
+          }
         }
-      }
+      };
+      scheduleIndexList(chunk.fluidSprings);
+      scheduleIndexList(chunk.fluidWakes);
       chunk.fluidSprings = null;
+      chunk.fluidWakes = null;
+      this._wakeBorderFluids(chunk);
+    }
+    _wakeBorderFluids(chunk) {
+      if (!chunk || !chunk.isGenerated) return;
+      const baseX = chunk.cx * CHUNK_SIZE;
+      const baseZ = chunk.cz * CHUNK_SIZE;
+      const minY = Math.max(1, chunk.minY);
+      const maxY = Math.min(WORLD_HEIGHT - 2, chunk.maxY);
+      const checkPair = (nxChunk, myX, myZ, nbX, nbZ, nBaseX, nBaseZ) => {
+        if (!nxChunk || !nxChunk.isGenerated) return;
+        const topY = Math.min(WORLD_HEIGHT - 2, Math.max(maxY, nxChunk.maxY) + 1);
+        for (let y = minY; y <= topY; y++) {
+          const myId = chunk.getBlock(myX, y, myZ);
+          const nbId = nxChunk.getBlock(nbX, y, nbZ);
+          if ((myId === BLOCK_IDS.WATER || myId === BLOCK_IDS.LAVA) && (nbId === 0 || BlockRegistry.isWashable(nbId))) {
+            this.fluids.schedule(baseX + myX, y, baseZ + myZ, this.fluids.getDelayForFluid(myId));
+          } else if ((nbId === BLOCK_IDS.WATER || nbId === BLOCK_IDS.LAVA) && (myId === 0 || BlockRegistry.isWashable(myId))) {
+            this.fluids.schedule(nBaseX + nbX, y, nBaseZ + nbZ, this.fluids.getDelayForFluid(nbId));
+          }
+        }
+      };
+      const left = this.getChunk(chunk.cx - 1, chunk.cz);
+      if (left) {
+        const lbX = left.cx * CHUNK_SIZE;
+        const lbZ = left.cz * CHUNK_SIZE;
+        for (let z = 0; z < CHUNK_SIZE; z++) checkPair(left, 0, z, 15, z, lbX, lbZ);
+      }
+      const right = this.getChunk(chunk.cx + 1, chunk.cz);
+      if (right) {
+        const rbX = right.cx * CHUNK_SIZE;
+        const rbZ = right.cz * CHUNK_SIZE;
+        for (let z = 0; z < CHUNK_SIZE; z++) checkPair(right, 15, z, 0, z, rbX, rbZ);
+      }
+      const back = this.getChunk(chunk.cx, chunk.cz - 1);
+      if (back) {
+        const bbX = back.cx * CHUNK_SIZE;
+        const bbZ = back.cz * CHUNK_SIZE;
+        for (let x = 0; x < CHUNK_SIZE; x++) checkPair(back, x, 0, x, 15, bbX, bbZ);
+      }
+      const front = this.getChunk(chunk.cx, chunk.cz + 1);
+      if (front) {
+        const fbX = front.cx * CHUNK_SIZE;
+        const fbZ = front.cz * CHUNK_SIZE;
+        for (let x = 0; x < CHUNK_SIZE; x++) checkPair(front, x, 15, x, 0, fbX, fbZ);
+      }
     }
     _saveToCache(chunk) {
       this.chunkDataCache.set(chunk.key, {
@@ -35880,7 +37597,10 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       }
       if (needsRemesh) {
         for (const chunk of this.chunks.values()) {
-          if (chunk.isGenerated) chunk.dirty = true;
+          if (chunk.isGenerated) {
+            chunk.dirty = true;
+            this.dirtyChunks.add(chunk);
+          }
         }
       }
     }
@@ -35901,18 +37621,19 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         const cz = Math.floor(wz / CHUNK_SIZE);
         const lx2 = wx2 - cx2 * CHUNK_SIZE;
         const lz = wz - cz * CHUNK_SIZE;
-        const cKey = chunkKey(cx2, cz);
+        const cKey = chunkKey2(cx2, cz);
         let list = this.modifiedByChunk.get(cKey);
         if (!list) {
           list = [];
           this.modifiedByChunk.set(cKey, list);
         }
         list.push([lx2, wy2, lz, id2, meta]);
-        const chunk = this.chunks.get(cKey);
+        const chunk = this.getChunk(cx2, cz);
         if (chunk && chunk.isGenerated) {
           chunk.setBlock(lx2, wy2, lz, id2, meta);
           chunk.lightCalculated = false;
           chunk.dirty = true;
+          this.dirtyChunks.add(chunk);
           this.pendingLightChunks.push(chunk);
         }
       }
@@ -35949,18 +37670,24 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
     }
     getChunk(cx2, cz) {
       if (this._cacheChunk && this._cacheCx === cx2 && this._cacheCz === cz) {
-        if (this.chunks.get(this._cacheChunk.key) === this._cacheChunk) {
-          return this._cacheChunk;
-        }
-        this._cacheChunk = null;
+        return this._cacheChunk;
       }
-      const ch = this.chunks.get(chunkKey(cx2, cz)) || null;
+      const nk = numChunkKey(cx2, cz);
+      const ch = this.chunkGrid.get(nk) || null;
       if (ch) {
         this._cacheCx = cx2;
         this._cacheCz = cz;
+        this._cacheNumKey = nk;
         this._cacheChunk = ch;
       }
       return ch;
+    }
+    isBlockLoaded(wx2, wy2, wz) {
+      if (wy2 < 0 || wy2 >= WORLD_HEIGHT) return false;
+      const fx2 = Math.floor(wx2);
+      const fz = Math.floor(wz);
+      const chunk = this.getChunk(Math.floor(fx2 / CHUNK_SIZE), Math.floor(fz / CHUNK_SIZE));
+      return Boolean(chunk && chunk.isGenerated);
     }
     getBlock(wx2, wy2, wz) {
       if (wy2 < 0 || wy2 >= WORLD_HEIGHT) return 0;
@@ -35994,7 +37721,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const fz = Math.floor(wz);
       const cx2 = Math.floor(fx2 / CHUNK_SIZE);
       const cz = Math.floor(fz / CHUNK_SIZE);
-      const chunk = this.chunks.get(chunkKey(cx2, cz));
+      const chunk = this.getChunk(cx2, cz);
       if (!chunk || !chunk.isGenerated) return { sky: 15, block: 0 };
       const lx2 = fx2 - cx2 * CHUNK_SIZE;
       const lz = fz - cz * CHUNK_SIZE;
@@ -36011,7 +37738,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const fz = Math.floor(wz);
       const cx2 = Math.floor(fx2 / CHUNK_SIZE);
       const cz = Math.floor(fz / CHUNK_SIZE);
-      const chunk = this.chunks.get(chunkKey(cx2, cz));
+      const chunk = this.getChunk(cx2, cz);
       if (!chunk || !chunk.isGenerated) return 15;
       return chunk.getSkyLight(fx2 - cx2 * CHUNK_SIZE, fy2, fz - cz * CHUNK_SIZE);
     }
@@ -36022,7 +37749,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const fz = Math.floor(wz);
       const cx2 = Math.floor(fx2 / CHUNK_SIZE);
       const cz = Math.floor(fz / CHUNK_SIZE);
-      const chunk = this.chunks.get(chunkKey(cx2, cz));
+      const chunk = this.getChunk(cx2, cz);
       if (!chunk || !chunk.isGenerated) return 0;
       return chunk.getBlockLight(fx2 - cx2 * CHUNK_SIZE, fy2, fz - cz * CHUNK_SIZE);
     }
@@ -36031,7 +37758,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const fz = Math.floor(wz);
       const cx2 = Math.floor(fx2 / CHUNK_SIZE);
       const cz = Math.floor(fz / CHUNK_SIZE);
-      const chunk = this.chunks.get(chunkKey(cx2, cz));
+      const chunk = this.getChunk(cx2, cz);
       if (chunk && chunk.isGenerated) {
         return chunk.getBiome(fx2 - cx2 * CHUNK_SIZE, fz - cz * CHUNK_SIZE);
       }
@@ -36052,7 +37779,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const fz = Math.floor(wz);
       const cx2 = Math.floor(fx2 / CHUNK_SIZE);
       const cz = Math.floor(fz / CHUNK_SIZE);
-      const chunk = this.chunks.get(chunkKey(cx2, cz));
+      const chunk = this.getChunk(cx2, cz);
       if (!chunk || !chunk.isGenerated) return false;
       const lx2 = fx2 - cx2 * CHUNK_SIZE;
       const lz = fz - cz * CHUNK_SIZE;
@@ -36080,9 +37807,10 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const rebuildTargets = new Set(touchedChunks);
       rebuildTargets.add(chunk);
       const pushNeighborIfPresent = (ncx, ncz) => {
-        const n = this.chunks.get(chunkKey(ncx, ncz));
+        const n = this.getChunk(ncx, ncz);
         if (n && n.isGenerated) {
           n.dirty = true;
+          this.dirtyChunks.add(n);
           rebuildTargets.add(n);
         }
       };
@@ -36096,6 +37824,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       if (lx2 === CHUNK_SIZE - 1 && lz === CHUNK_SIZE - 1) pushNeighborIfPresent(cx2 + 1, cz + 1);
       for (const target of rebuildTargets) {
         target.dirty = true;
+        this.dirtyChunks.add(target);
       }
       if (rebuildImmediate) {
         for (const target of rebuildTargets) {
@@ -36153,6 +37882,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         if (lz === CHUNK_SIZE - 1) addNb(cx2, cz + 1);
       } else {
         chunk.dirty = true;
+        this.dirtyChunks.add(chunk);
       }
       return true;
     }
@@ -36167,7 +37897,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const fz = Math.floor(wz);
       const cx2 = Math.floor(fx2 / CHUNK_SIZE);
       const cz = Math.floor(fz / CHUNK_SIZE);
-      const chunk = this.chunks.get(chunkKey(cx2, cz));
+      const chunk = this.getChunk(cx2, cz);
       if (chunk && chunk.isGenerated) {
         const lx2 = fx2 - cx2 * CHUNK_SIZE;
         const lz = fz - cz * CHUNK_SIZE;
@@ -36181,9 +37911,10 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       return this.worldGen.getTerrainHeight(fx2, fz) + 1;
     }
     _markDirty(cx2, cz) {
-      const chunk = this.chunks.get(chunkKey(cx2, cz));
+      const chunk = this.getChunk(cx2, cz);
       if (chunk && chunk.isGenerated) {
         chunk.dirty = true;
+        this.dirtyChunks.add(chunk);
       }
     }
     _markOrthogonalNeighborsDirty(cx2, cz) {
@@ -36229,9 +37960,9 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       }
     }
     _ensureChunkGeneratedSync(cx2, cz) {
-      const key = chunkKey(cx2, cz);
-      let chunk = this.chunks.get(key);
+      let chunk = this.getChunk(cx2, cz);
       if (!chunk) {
+        const key = chunkKey2(cx2, cz);
         chunk = new Chunk(cx2, cz);
         const cached = this.chunkDataCache.get(key);
         if (cached) {
@@ -36249,7 +37980,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
           this.worldGen.generateChunk(chunk);
           this._applyModifiedBlocksToChunk(chunk);
         }
-        this.chunks.set(key, chunk);
+        this._registerChunk(chunk);
         if (!chunk.lightCalculated) {
           this.lighting.initChunkLighting(this, chunk);
         }
@@ -36262,8 +37993,8 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       return chunk;
     }
     _requestChunkAsyncOrSync(cx2, cz) {
-      const key = chunkKey(cx2, cz);
-      if (this.chunks.has(key)) return true;
+      if (this.getChunk(cx2, cz)) return true;
+      const key = chunkKey2(cx2, cz);
       if (this.chunkDataCache.has(key)) {
         this._ensureChunkGeneratedSync(cx2, cz);
         return true;
@@ -36274,7 +38005,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         this.inFlightKeys.add(key);
         const worker = this.workers[this.nextWorkerIdx % this.workers.length];
         this.nextWorkerIdx++;
-        worker.postMessage({ seed: this.seed, cx: cx2, cz });
+        worker.postMessage({ seed: this.seed, cx: cx2, cz, worldType: this.worldType });
         return true;
       }
       this._ensureChunkGeneratedSync(cx2, cz);
@@ -36290,7 +38021,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       let ni2 = 0;
       for (let dz = -1; dz <= 1; dz++) {
         for (let dx2 = -1; dx2 <= 1; dx2++) {
-          nb[ni2++] = dx2 === 0 && dz === 0 ? chunk : this.chunks.get(chunkKey(chunk.cx + dx2, chunk.cz + dz)) || null;
+          nb[ni2++] = dx2 === 0 && dz === 0 ? chunk : this.getChunk(chunk.cx + dx2, chunk.cz + dz);
         }
       }
       const { opaqueGeometry, cutoutGeometry, waterGeometry, lavaGeometry, iceGeometry } = this.mesher.buildChunkGeometries(chunk, nb);
@@ -36370,6 +38101,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       }
       chunk.dirty = false;
       chunk.hasMeshed = true;
+      this.dirtyChunks.delete(chunk);
     }
     update(playerX, playerZ, dt = 0.016) {
       if (this.animatedFluids) {
@@ -36393,7 +38125,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
               this.chunkDataCache.delete(key);
             }
             chunk.disposeMeshes(this.scene);
-            this.chunks.delete(key);
+            this._unregisterChunk(key, chunk);
           }
         }
         if (this.pendingLightChunks.length > 0) {
@@ -36412,6 +38144,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         if (chunk && this.chunks.has(chunk.key) && !chunk.lightCalculated) {
           this.lighting.initChunkLighting(this, chunk);
           chunk.dirty = true;
+          this.dirtyChunks.add(chunk);
           if (this.unlimitedMemory) this._saveToCache(chunk);
           this._markOrthogonalNeighborsDirty(chunk.cx, chunk.cz);
         }
@@ -36420,11 +38153,11 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       while (this.pendingCoords.length > 0) {
         if (performance.now() - startTime >= CHUNK_FRAME_BUDGET_MS) break;
         const [cx2, cz] = this.pendingCoords[0];
-        const key = chunkKey(cx2, cz);
-        if (this.chunks.has(key)) {
+        if (this.getChunk(cx2, cz)) {
           this.pendingCoords.shift();
           continue;
         }
+        const key = chunkKey2(cx2, cz);
         const isCached = this.chunkDataCache.has(key);
         if (!isCached && this.workers.length === 0 && syncDispatched >= 1) break;
         const dispatched = this._requestChunkAsyncOrSync(cx2, cz);
@@ -36434,8 +38167,12 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       }
       const dirtyChunks = this._dirtyScratch;
       dirtyChunks.length = 0;
-      for (const chunk of this.chunks.values()) {
-        if (chunk.dirty && chunk.isGenerated && chunk.lightCalculated) {
+      for (const chunk of this.dirtyChunks) {
+        if (!chunk.dirty) {
+          this.dirtyChunks.delete(chunk);
+          continue;
+        }
+        if (chunk.isGenerated && chunk.lightCalculated) {
           const dx2 = chunk.cx - pcx;
           const dz = chunk.cz - pcz;
           dirtyChunks.push({ chunk, distSq: dx2 * dx2 + dz * dz });
@@ -36467,7 +38204,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       for (let dz = -3; dz <= 3; dz++) {
         for (let dx2 = -3; dx2 <= 3; dx2++) {
           if (dx2 * dx2 + dz * dz > 10) continue;
-          const chunk = this.chunks.get(chunkKey(pcx + dx2, pcz + dz));
+          const chunk = this.getChunk(pcx + dx2, pcz + dz);
           if (!chunk || !chunk.isGenerated || chunk.maxY <= 1) continue;
           const minSec = Math.max(0, chunk.minY >> 4);
           const maxSec = Math.min(WORLD_HEIGHT - 1 >> 4, chunk.maxY >> 4);
@@ -36527,6 +38264,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
     dispose() {
       this.disposed = true;
       this._cacheChunk = null;
+      this._cacheNumKey = -1;
       this._terminateWorkers();
       this.lighting.clear();
       this.fluids.clear();
@@ -36535,6 +38273,8 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         chunk.disposeMeshes(this.scene);
       }
       this.chunks.clear();
+      this.chunkGrid.clear();
+      this.dirtyChunks.clear();
       this.chunkDataCache.clear();
       this.mesher.opaqueMaterial.dispose();
       this.mesher.cutoutMaterial.dispose();
@@ -36564,6 +38304,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.loadingOverlay = document.getElementById("loading-overlay");
       this.loadingStatus = document.getElementById("loading-status");
       this.saveManager = new SaveManager();
+      this.soundManager = new SoundManager();
       this.atlas = new TextureAtlas();
       this.skinTexture = createSteveSkinTexture();
       this.scene = new xo();
@@ -36585,6 +38326,8 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         renderDistance: isTouchDevice ? DEFAULT_RENDER_DISTANCE_MOBILE : DEFAULT_RENDER_DISTANCE_PC,
         unlimitedMemory: true,
         highQuality: !isTouchDevice,
+        resolutionScale: 1,
+        touchScale: 1,
         fogEnabled: false,
         cloudsEnabled: true,
         starsEnabled: true,
@@ -36594,7 +38337,9 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         particlesMode: isTouchDevice ? "minimal" : "all",
         sensitivity: 1,
         hintsEnabled: true,
-        gameMode: "survival"
+        gameMode: "survival",
+        skin: { preset: "steve", customDataUrl: "" },
+        audio: { master: 80, music: 60, blocks: 80, hostile: 80, ui: 80 }
       };
       this.renderer = new Qp({
         canvas: this.canvas,
@@ -36615,6 +38360,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.itemManager = new ItemEntityManager(this.scene, this.atlas);
       this.fallingManager = new FallingBlockManager(this.scene, this.atlas);
       this.entityManager = new EntityManager(this.scene, this.atlas);
+      this.entityManager.setSoundManager(this.soundManager);
       this.inventory = new Inventory({ creativeMode: false });
       this.blockEntities = new BlockEntityManager();
       this.blockEntities.onSmeltXp = (wx2, wy2, wz, xp2) => {
@@ -36627,8 +38373,13 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.mobileControls = null;
       this.hud = null;
       this.activeWorldId = null;
-      this.activeWorldName = "\u041C\u043E\u0439 \u043C\u0438\u0440";
+      this.activeWorldName = "\u041C\u043E\u0439 \u041C\u0438\u0440 #1";
       this.currentWorldMode = "survival";
+      this.currentWorldType = "default";
+      this.currentWorldHardcore = false;
+      this.currentBonusChest = false;
+      this.bonusChestPlaced = false;
+      this.hardcoreDeadSpectating = false;
       this.worldSeed = randomWorldSeed();
       this.spawnPoint = null;
       this.bedSpawnPoint = null;
@@ -36643,6 +38394,9 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.eatingSlotIndex = -1;
       this.bowChargeTime = 0;
       this.isSleeping = false;
+      this._wasHeadInWater = false;
+      this._stepSoundTimer = 0;
+      this._guiPausedFrameDone = false;
       this.virtualMouse = null;
       this.lastFrameTime = performance.now();
       this.tickAccumulator = 0;
@@ -36657,8 +38411,26 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
     }
     _applyPixelRatio() {
       const dpr = window.devicePixelRatio || 1;
-      const cap = this.settings.highQuality ? this.settings.touchMode ? 2 : 2.5 : 1.15;
-      this.renderer.setPixelRatio(Math.min(dpr, cap));
+      const scale = Math.max(0.5, Math.min(1.25, Number(this.settings.resolutionScale) || 1));
+      const cap = this.settings.highQuality ? this.settings.touchMode ? 1.65 : 2 : 1.15;
+      const effective = Math.max(0.5, Math.min(2.25, Math.min(dpr, cap) * scale));
+      this.renderer.setPixelRatio(effective);
+      this._guiPausedFrameDone = false;
+    }
+    _applySkin(skinSpec = this.settings.skin) {
+      const spec = skinSpec || { preset: "steve", customDataUrl: "" };
+      const nextTex = createSkinTextureFromSpec(spec, (loadedTex) => {
+        this.skinTexture = loadedTex;
+        this.playerModel?.setSkinTexture(loadedTex);
+        this.playerPreview?.setSkinTexture(loadedTex);
+        this.firstPersonHand?.setSkinTexture(loadedTex);
+        this.hud?.setSkinMenuUI(spec, loadedTex.image);
+      });
+      this.skinTexture = nextTex;
+      this.playerModel?.setSkinTexture(nextTex);
+      this.playerPreview?.setSkinTexture(nextTex);
+      this.firstPersonHand?.setSkinTexture(nextTex);
+      this.hud?.setSkinMenuUI(spec, nextTex.image);
     }
     _applySensitivity() {
       const mult = this.settings.sensitivity || 1;
@@ -36693,16 +38465,17 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this._scheduleSave();
     }
     openInventoryModal(mode = "inventory", blockPos = null) {
-      if (!this.inventoryUI || !this.player || this.player.isDead || this.hud?.inMainMenu || this.hud?.isPaused) return;
+      if (!this.inventoryUI || !this.player || this.player.isDead || this.hardcoreDeadSpectating || this.hud?.inMainMenu || this.hud?.isPaused) return;
       if (document.pointerLockElement) {
         document.exitPointerLock?.();
       }
+      this._guiPausedFrameDone = false;
       this.player.setGuiOpen(true);
       this.inventoryUI.open(mode, blockPos);
       this.virtualMouse?.setGuiOpen(true);
     }
     togglePlayerInventory() {
-      if (!this.inventoryUI || !this.player || this.player.isDead || this.hud?.inMainMenu) return;
+      if (!this.inventoryUI || !this.player || this.player.isDead || this.hardcoreDeadSpectating || this.hud?.inMainMenu) return;
       if (this.inventoryUI.isOpen) {
         this.inventoryUI.close();
         return;
@@ -36715,8 +38488,14 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       await this.saveManager.init();
       const savedSettings = await this.saveManager.loadSettings();
       if (savedSettings) {
+        const mergedAudio = { ...this.settings.audio, ...savedSettings.audio || {} };
+        const mergedSkin = { ...this.settings.skin, ...savedSettings.skin || {} };
         Object.assign(this.settings, savedSettings);
+        this.settings.audio = mergedAudio;
+        this.settings.skin = mergedSkin;
       }
+      this.soundManager.setVolumes(this.settings.audio);
+      this._applySkin(this.settings.skin);
       this.inventory.creativeMode = this.gameMode === "creative";
       this._applyPixelRatio();
       this.skyRenderer.setCloudsEnabled(this.settings.cloudsEnabled);
@@ -36754,6 +38533,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
           if (xp2 > 0) this.player?.addXp(xp2);
         },
         onClose: () => {
+          this._guiPausedFrameDone = false;
           this.virtualMouse?.setGuiOpen(false);
           this.player?.setGuiOpen(false);
           this.hotbar?.render();
@@ -36767,6 +38547,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.hud = new Hud({
         onCycleCamera: () => this.player?.cycleCameraMode(),
         onPauseChange: (paused) => {
+          this._guiPausedFrameDone = false;
           if (paused && this.inventoryUI?.isOpen) {
             this.inventoryUI.close();
           }
@@ -36774,25 +38555,100 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
           this.hud.setPointerLocked(Boolean(this.player?.pointerLocked));
         },
         onResume: () => {
+          this._guiPausedFrameDone = false;
+          this.soundManager.playUiClick();
           if (!this.settings.touchMode && !this.player?.isDead) {
             this._requestPointerLockSafe();
           }
         },
         onRespawn: () => {
+          this.soundManager.playUiClick();
           this.respawnPlayer();
         },
+        onSpectateWorld: () => {
+          this.soundManager.playUiClick();
+          this._enterHardcoreSpectateMode();
+        },
         onOpenWorldsManager: async () => {
+          this.soundManager.playUiClick();
           const list = await this.saveManager.listWorlds();
           this.hud.renderWorldsList(list, this.activeWorldId);
         },
-        onCreateWorld: async ({ name, seed, gameMode }) => {
-          const meta = await this.saveManager.createWorld({ name, seed, gameMode });
+        onOpenSkinsMenu: () => {
+          this.soundManager.playUiClick();
+          this.hud.setSkinMenuUI(this.settings.skin, this.skinTexture?.image);
+        },
+        onSelectSkinPreset: (preset) => {
+          this.soundManager.playUiClick();
+          this.settings.skin = { preset: preset || "steve", customDataUrl: "" };
+          this._applySkin(this.settings.skin);
+          this.saveSettingsOnly();
+          this.hud.showToast(`\u0421\u043A\u0438\u043D \u0432\u044B\u0431\u0440\u0430\u043D: ${preset === "alex" ? "\u0410\u043B\u0435\u043A\u0441" : preset === "knight" ? "\u0420\u044B\u0446\u0430\u0440\u044C" : "\u0421\u0442\u0438\u0432"}`);
+        },
+        onUploadCustomSkin: (dataUrl) => {
+          this.soundManager.playUiClick();
+          this.settings.skin = { preset: "custom", customDataUrl: dataUrl };
+          this._applySkin(this.settings.skin);
+          this.saveSettingsOnly();
+          this.hud.showToast("\u0421\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0439 PNG-\u0441\u043A\u0438\u043D \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D!");
+        },
+        onCreateWorld: async ({ name, seed, gameMode, worldType, hardcore, bonusChest }) => {
+          this.soundManager.playUiClick();
+          const meta = await this.saveManager.createWorld({
+            name,
+            seed,
+            gameMode,
+            worldType,
+            hardcore,
+            bonusChest
+          });
           await this.enterWorld(meta.id);
         },
         onSelectWorld: async (worldId) => {
+          this.soundManager.playUiClick();
           await this.enterWorld(worldId);
         },
+        onRenameWorld: async (worldId, newName) => {
+          this.soundManager.playUiClick();
+          await this.saveManager.renameWorld(worldId, newName);
+          const nextList = await this.saveManager.listWorlds();
+          if (this.activeWorldId === worldId) {
+            this.activeWorldName = newName;
+          }
+          this.hud.renderWorldsList(nextList, this.activeWorldId);
+          this.hud.showToast(`\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D\u043E: ${newName}`);
+        },
+        onExportWorld: async (worldId) => {
+          this.soundManager.playUiClick();
+          const json = await this.saveManager.exportWorldJson(worldId);
+          if (!json) {
+            this.hud.showToast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043C\u0438\u0440");
+            return;
+          }
+          const blob = new Blob([json], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `minecraft-${worldId}.mcworld.json`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1e3);
+          this.hud.showToast("\u0424\u0430\u0439\u043B .mcworld.json \u0441\u043A\u0430\u0447\u0430\u043D");
+        },
+        onImportWorldJson: async (jsonText) => {
+          this.soundManager.playUiClick();
+          try {
+            const meta = await this.saveManager.importWorldJson(jsonText);
+            const list = await this.saveManager.listWorlds();
+            this.hud.renderWorldsList(list, this.activeWorldId);
+            this.hud.showToast(`\u0418\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D \u043C\u0438\u0440: ${meta.name}`);
+          } catch (err) {
+            this.hud.showToast(`\u041E\u0448\u0438\u0431\u043A\u0430 \u0438\u043C\u043F\u043E\u0440\u0442\u0430: ${err?.message || "\u043D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442"}`);
+          }
+        },
         onDeleteWorld: async (worldId) => {
+          this.soundManager.playUiClick();
           const nextList = await this.saveManager.deleteWorld(worldId);
           if (this.activeWorldId === worldId) {
             this.activeWorldId = null;
@@ -36801,6 +38657,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
           this.hud.showToast("\u041C\u0438\u0440 \u0443\u0434\u0430\u043B\u0451\u043D");
         },
         onExitToMenu: async () => {
+          this.soundManager.playUiClick();
           if (this.inventoryUI?.isOpen) this.inventoryUI.close();
           this.virtualMouse?.setGuiOpen(false);
           await this.saveNow();
@@ -36881,17 +38738,35 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         onChangeRenderDistance: (dist) => {
           this.settings.renderDistance = dist;
           this.world?.setRenderDistance(dist);
+          this._guiPausedFrameDone = false;
+          this.saveSettingsOnly();
+        },
+        onChangeResolutionScale: (scale) => {
+          this.settings.resolutionScale = Math.max(0.5, Math.min(1.25, Number(scale) || 1));
+          this._applyPixelRatio();
+          this.renderer.setSize(window.innerWidth, window.innerHeight, false);
           this.saveSettingsOnly();
         },
         onChangeSensitivity: (mult) => {
           this.settings.sensitivity = mult;
           this._applySensitivity();
           this.saveSettingsOnly();
+        },
+        onChangeTouchScale: (scale) => {
+          this.settings.touchScale = Math.max(0.75, Math.min(1.35, Number(scale) || 1));
+          this.mobileControls?.setTouchScale(this.settings.touchScale);
+          this.saveSettingsOnly();
+        },
+        onChangeAudioVolume: (channel, val) => {
+          if (!this.settings.audio) this.settings.audio = {};
+          this.settings.audio[channel] = val;
+          this.soundManager.setChannelVolume(channel, val);
+          this.saveSettingsOnly();
         }
       });
       let worlds = await this.saveManager.listWorlds();
       if (worlds.length === 0) {
-        const first = await this.saveManager.createWorld({ name: "\u041D\u043E\u0432\u044B\u0439 \u043C\u0438\u0440", seed: randomWorldSeed() });
+        const first = await this.saveManager.createWorld({ name: "\u041C\u043E\u0439 \u041C\u0438\u0440 #1", seed: randomWorldSeed() });
         worlds = [first];
       }
       this.mobileControls = new MobileControls(null, {
@@ -36900,6 +38775,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         onDropOne: () => this._dropHeld(1),
         onDropAll: () => this._dropHeld(64)
       });
+      this.mobileControls.setTouchScale(this.settings.touchScale);
       this.setTouchMode(this.settings.touchMode, false);
       document.body.classList.add("webgl-crosshair");
       this._syncSettingsUI();
@@ -36910,6 +38786,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this._startAutosave();
       this.loadingOverlay?.classList.add("hidden");
       this.hud.showMainMenu(false);
+      this.hud.setSkinMenuUI(this.settings.skin, this.skinTexture?.image);
       this.hud.renderWorldsList(worlds, this.activeWorldId);
       this.isRunning = true;
       this.lastFrameTime = performance.now();
@@ -36947,7 +38824,11 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.hud.setParticlesModeLabel(this.settings.particlesMode);
       this.hud.setHintsEnabledLabel(this.settings.hintsEnabled);
       this.hud.setRenderDistanceUI(this.settings.renderDistance);
+      this.hud.setResolutionScaleUI(this.settings.resolutionScale);
       this.hud.setSensitivityUI(this.settings.sensitivity);
+      this.hud.setTouchScaleUI(this.settings.touchScale);
+      this.hud.setAudioVolumesUI(this.settings.audio);
+      this.hud.setSkinMenuUI(this.settings.skin, this.skinTexture?.image);
     }
     _unloadWorldFromEngine() {
       if (this.inventoryUI?.isOpen) this.inventoryUI.close();
@@ -36965,6 +38846,8 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.bowChargeTime = 0;
       this.firstPersonHand.setBowCharge(0);
       this.isSleeping = false;
+      this.hardcoreDeadSpectating = false;
+      this._guiPausedFrameDone = false;
       if (this.world) {
         this.world.dispose();
         this.world = null;
@@ -37051,8 +38934,53 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         this._syncHeldAndArmorVisuals();
       }
       this.hud?.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
-      this.hud?.showDeathScreen(sourceType, score);
-      this._scheduleSave();
+      this.hud?.showDeathScreen(sourceType, score, this.currentWorldHardcore);
+      this.saveNow();
+    }
+    _enterHardcoreSpectateMode() {
+      if (!this.player) return;
+      this.hardcoreDeadSpectating = true;
+      this.player.isDead = false;
+      this.player.creativeMode = true;
+      this.player.flyMode = true;
+      this.player.y = Math.max(this.player.y + 1.5, 4);
+      this.playerModel.setDead?.(false);
+      this.hud?.hideDeathScreen();
+      this.hud?.showToast("\u0420\u0435\u0436\u0438\u043C \u043D\u0430\u0431\u043B\u044E\u0434\u0430\u0442\u0435\u043B\u044F (\u0425\u0430\u0440\u0434\u043A\u043E\u0440)");
+      if (!this.settings.touchMode) {
+        this._requestPointerLockSafe();
+      }
+    }
+    _trySpawnBonusChest() {
+      if (!this.currentBonusChest || this.bonusChestPlaced || !this.world || !this.player) return;
+      const cx2 = Math.floor(this.player.x) + 2;
+      const cz = Math.floor(this.player.z) + 2;
+      const cy2 = Math.max(1, Math.min(WORLD_HEIGHT - 4, this.world.getSurfaceHeightAt(cx2, cz)));
+      this.world.setBlock(cx2, cy2, cz, BLOCK_IDS.CHEST, true, true, 2);
+      const chest = this.blockEntities.getOrCreateChest(cx2, cy2, cz);
+      if (chest && Array.isArray(chest.slots)) {
+        const loot = [
+          ItemRegistry.createStack(ITEM_IDS.WOODEN_PICKAXE, 1),
+          ItemRegistry.createStack(ITEM_IDS.WOODEN_AXE, 1),
+          ItemRegistry.createStack(ITEM_IDS.APPLE, 4),
+          ItemRegistry.createStack(ITEM_IDS.BREAD, 3),
+          ItemRegistry.createStack(BLOCK_IDS.OAK_LOG, 6),
+          ItemRegistry.createStack(ITEM_IDS.STICK, 6)
+        ];
+        for (let i = 0; i < loot.length && i < chest.slots.length; i++) {
+          chest.slots[i] = loot[i];
+        }
+      }
+      const torchDirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      for (const [dx2, dz] of torchDirs) {
+        const tx2 = cx2 + dx2;
+        const tz = cz + dz;
+        const ty2 = Math.max(1, this.world.getSurfaceHeightAt(tx2, tz));
+        if (this.world.getBlock(tx2, ty2, tz) === 0 && BlockRegistry.isSolid(this.world.getBlock(tx2, ty2 - 1, tz))) {
+          this.world.setBlock(tx2, ty2, tz, BLOCK_IDS.TORCH, true, true, 0);
+        }
+      }
+      this.bonusChestPlaced = true;
     }
     _isBedSpotValid(spot) {
       if (!spot || !this.world) return false;
@@ -37100,8 +39028,14 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this._unloadWorldFromEngine();
       const saved = await this.saveManager.loadWorld(worldId);
       this.activeWorldId = worldId;
-      this.activeWorldName = saved?.name || "\u041C\u043E\u0439 \u043C\u0438\u0440";
+      this.activeWorldName = saved?.name || "\u041C\u043E\u0439 \u041C\u0438\u0440 #1";
       this.currentWorldMode = saved?.gameMode === "creative" ? "creative" : "survival";
+      this.currentWorldType = saved?.worldType === "superflat" ? "superflat" : "default";
+      this.currentWorldHardcore = Boolean(saved?.hardcore);
+      if (this.currentWorldHardcore) this.currentWorldMode = "survival";
+      this.currentBonusChest = Boolean(saved?.bonusChest);
+      this.bonusChestPlaced = Boolean(saved?.bonusChestPlaced);
+      this.hardcoreDeadSpectating = Boolean(this.currentWorldHardcore && saved?.dead);
       this.worldSeed = Number.isFinite(saved?.worldSeed) ? saved.worldSeed : randomWorldSeed();
       this.spawnPoint = saved?.spawnPoint || null;
       this.bedSpawnPoint = saved?.bedSpawnPoint || null;
@@ -37110,6 +39044,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         Number.isFinite(saved?.dayCount) ? saved.dayCount : 1
       );
       this.world = new World(this.scene, this.atlas, this.worldSeed, this.settings.renderDistance, {
+        worldType: this.currentWorldType,
         unlimitedMemory: this.settings.unlimitedMemory,
         fogEnabled: this.settings.fogEnabled,
         fancyLeaves: this.settings.fancyLeaves,
@@ -37151,7 +39086,10 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         onConsumeHeld: (n) => this.inventory.consumeHeld(n),
         getArmorPoints: () => this.inventory.getTotalArmorPoints(),
         onPrimaryAttack: () => this._handlePrimaryAttack(),
-        onEatTick: (itemId) => this.particleManager.spawnFoodCrumbs(this.player, itemId, 3),
+        onEatTick: (itemId) => {
+          this.particleManager.spawnFoodCrumbs(this.player, itemId, 3);
+          this.soundManager.playEat();
+        },
         onPlaceAction: () => this._handlePlaceBlock(),
         onPickBlock: () => this._handlePickBlock(),
         onCameraModeChange: (mode) => this.hud?.onCameraModeChanged(mode),
@@ -37174,7 +39112,10 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
             this._syncHeldAndArmorVisuals();
           }
         },
-        onDamage: () => {
+        onDamage: (info) => {
+          const amt = typeof info === "object" ? info?.finalDmg ?? info?.amount ?? 0 : Number(info || 0);
+          const src = typeof info === "object" ? info?.sourceType : "generic";
+          this.soundManager.playHurt(src === "fall" || amt >= 6);
           this.hud?.triggerDamageFlash();
           this.hud?.updateSurvivalVitals(this.player, this.inventory.getTotalArmorPoints());
         },
@@ -37196,6 +39137,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         if (!this.spawnPoint) {
           this.spawnPoint = { x: this.player.x, y: this.player.y, z: this.player.z };
         }
+        this._trySpawnBonusChest();
       }
       this.inventory.creativeMode = isCreative;
       if (saved?.inventory) {
@@ -37214,8 +39156,11 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.skyRenderer.update(1e-3, this.player.x, this.player.y, this.player.z, this.world);
       this.player.update(1e-3);
       this.hud?.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
-      if (this.player.isDead) {
-        this.hud?.showDeathScreen(this.player.lastDamageSource || "generic", this.player.score || 0);
+      if (this.currentWorldHardcore && saved?.dead) {
+        this.player.isDead = true;
+        this.hud?.showDeathScreen(this.player.lastDamageSource || "generic", this.player.score || 0, true);
+      } else if (this.player.isDead) {
+        this.hud?.showDeathScreen(this.player.lastDamageSource || "generic", this.player.score || 0, this.currentWorldHardcore);
       }
     }
     async enterWorld(worldId) {
@@ -37309,7 +39254,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       return false;
     }
     _handlePrimaryAttack() {
-      if (!this.world || !this.player || this.player.isDead || this.player.isPaused || this.player.guiOpen) return false;
+      if (!this.world || !this.player || this.player.isDead || this.hardcoreDeadSpectating || this.player.isPaused || this.player.guiOpen) return false;
       const eye = this.player.getEyeOrigin();
       const dir = this.player.getLookDirection();
       const reach = this.gameMode === "creative" ? REACH_DISTANCE : MELEE_REACH;
@@ -37318,6 +39263,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       if (!mobHit) return false;
       const ok = this.entityManager.tryMeleeAttack(this.player, mobHit.entity, this.particleManager);
       if (ok) {
+        this.soundManager.playHit();
         this.hotbar.render();
         this._syncHeldAndArmorVisuals();
         this.miningElapsed = 0;
@@ -37328,7 +39274,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
     }
     _handlePlaceBlock() {
       const hit = this.currentTargetHit;
-      if (!this.world || !this.player || this.player.isDead) return false;
+      if (!this.world || !this.player || this.player.isDead || this.hardcoreDeadSpectating) return false;
       const eye = this.player.getEyeOrigin();
       const dir = this.player.getLookDirection();
       const blockDist = hit ? hit.distance : REACH_DISTANCE;
@@ -37612,6 +39558,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         placeMeta = this._getPlayerHorizontalDir() + 2 & 3;
       }
       if (!this.world.setBlock(px2, py2, pz, slot.id, true, true, placeMeta)) return false;
+      this.soundManager.playBlockPlace(slot.id);
       if (this.gameMode !== "creative") {
         this.hotbar.consumeSelected(1);
       }
@@ -37619,7 +39566,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       return true;
     }
     _updateBow(dt) {
-      if (!this.player || this.player.isDead) {
+      if (!this.player || this.player.isDead || this.hardcoreDeadSpectating) {
         this.bowChargeTime = 0;
         this.firstPersonHand.setBowCharge(0);
         return;
@@ -37637,6 +39584,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         if (holdingBow && this.bowChargeTime >= 0.14 && this._consumeAnyArrow()) {
           const charge = Math.min(1, this.bowChargeTime / BOW_CHARGE_SEC);
           this.entityManager.shootPlayerArrow(this.player, charge);
+          this.soundManager.playBowShoot();
           if (this.gameMode !== "creative") {
             this.inventory.damageHeldTool(1);
             this.hotbar.render();
@@ -37699,6 +39647,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
           }
         }
         this.hud?.updateSurvivalVitals(this.player, this.inventory.getTotalArmorPoints());
+        this.soundManager.playBurp();
         this.eatingElapsed = 0;
         this.eatingSlotIndex = -1;
         this.firstPersonHand.setEatingActive(false);
@@ -37708,7 +39657,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
     }
     _updateInteraction(dt) {
       if (!this.player || !this.world) return;
-      if (this.player.isDead) {
+      if (this.player.isDead || this.hardcoreDeadSpectating) {
         this.selectionBox.update(null, this.world);
         this.breakOverlay.update(null, 0);
         this.firstPersonHand.setMiningActive(false);
@@ -37750,6 +39699,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
             this.hud.showToast("\u0420\u0435\u0434\u0441\u0442\u043E\u0443\u043D\u043E\u0432\u0430\u044F \u0440\u0443\u0434\u0430 \u0441\u0432\u0435\u0442\u0438\u0442\u0441\u044F!");
           }
           this.particleManager.spawnBlockBreak(hit.x, hit.y, hit.z, hit.blockId, 12);
+          this.soundManager.playBlockBreak(hit.blockId);
           this.world.setBlock(hit.x, hit.y, hit.z, 0, true, true);
           this.firstPersonHand.triggerSwing();
           this.creativeBreakTimer = CREATIVE_BREAK_COOLDOWN;
@@ -37788,6 +39738,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       if (progress >= 1) {
         const drops = BlockRegistry.getHarvestDrops(hit.blockId, heldDef);
         this.particleManager.spawnBlockBreak(hit.x, hit.y, hit.z, hit.blockId, 14);
+        this.soundManager.playBlockBreak(hit.blockId);
         this.world.setBlock(hit.x, hit.y, hit.z, 0, true, true);
         for (const drop of drops) {
           this.itemManager.spawnDrop(drop.id, hit.x + 0.5, hit.y + 0.35, hit.z + 0.5, drop.count);
@@ -37850,6 +39801,12 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       }, { once: true, passive: true });
     }
     _bindWindowEvents() {
+      const unlockAudio = () => {
+        this.soundManager?.unlock();
+      };
+      window.addEventListener("pointerdown", unlockAudio, { passive: true });
+      window.addEventListener("keydown", unlockAudio, { passive: true });
+      window.addEventListener("touchstart", unlockAudio, { passive: true });
       window.addEventListener("resize", () => {
         const w = window.innerWidth;
         const h = Math.max(1, window.innerHeight);
@@ -37859,6 +39816,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
         this.firstPersonHand.resize(w, h);
         this._applyPixelRatio();
         this.renderer.setSize(w, h, false);
+        this._guiPausedFrameDone = false;
       });
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden") {
@@ -37892,6 +39850,11 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       return this.saveManager.saveWorld(this.activeWorldId, {
         worldName: this.activeWorldName,
         gameMode: this.currentWorldMode,
+        worldType: this.currentWorldType,
+        hardcore: this.currentWorldHardcore,
+        bonusChest: this.currentBonusChest,
+        bonusChestPlaced: this.bonusChestPlaced,
+        dead: Boolean(this.player.isDead || this.hardcoreDeadSpectating),
         worldSeed: this.worldSeed,
         worldTime: this.skyRenderer.worldTime,
         dayCount: this.skyRenderer.dayCount,
@@ -37929,9 +39892,12 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       const dt = Math.min(0.05, Math.max(1e-4, (now - this.lastFrameTime) / 1e3));
       this.lastFrameTime = now;
       if (this.hud.inMainMenu) {
+        this.soundManager.updateMusic(dt, false);
         this.menuPanorama.render(this.renderer, dt);
         return;
       }
+      this.soundManager.updateMusic(dt, true);
+      const guiFrozen = Boolean(this.hud.isPaused || this.inventoryUI?.isOpen);
       if (!this.hud.isPaused && this.player && this.world) {
         this.tickAccumulator += dt * 1e3;
         while (this.tickAccumulator >= TICK_MS) {
@@ -37947,6 +39913,25 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
             this.firstPersonHand.setEatingActive(false);
             this.firstPersonHand.setBowCharge(0);
           }
+        }
+        if (this.player.inWater && !this._wasHeadInWater) {
+          this.soundManager.playSplash();
+        }
+        this._wasHeadInWater = Boolean(this.player.inWater);
+        const hSpeed = Math.hypot(this.player.vx || 0, this.player.vz || 0);
+        if (this.player.onGround && !this.player.flyMode && hSpeed > 1.2 && !this.player.isDead) {
+          this._stepSoundTimer += dt * (hSpeed / 4.3);
+          if (this._stepSoundTimer >= 0.42) {
+            this._stepSoundTimer = 0;
+            const groundBlock = this.world.getBlock(
+              Math.floor(this.player.x),
+              Math.floor(this.player.y - 0.12),
+              Math.floor(this.player.z)
+            );
+            if (groundBlock > 0) this.soundManager.playStep(groundBlock);
+          }
+        } else {
+          this._stepSoundTimer = 0.25;
         }
         this.hud.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
         const skyInfo = {
@@ -37989,8 +39974,18 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
           this.skyRenderer.torchTint
         );
       }
-      if (this.inventoryUI?.isOpen && this.inventoryUI.mode === "inventory") {
-        this.playerPreview.renderToTarget(this.renderer, this.player?.time || now * 1e-3);
+      if (guiFrozen) {
+        if (this.inventoryUI?.isOpen && this.inventoryUI.mode === "inventory") {
+          this.playerPreview.renderToTarget(this.renderer, this.player?.time || now * 1e-3);
+        }
+        const interval = this.inventoryUI?.isOpen ? 100 : 250;
+        if (this._guiPausedFrameDone && now - (this._lastGuiRenderTime || 0) < interval) {
+          return;
+        }
+        this._guiPausedFrameDone = true;
+        this._lastGuiRenderTime = now;
+      } else {
+        this._guiPausedFrameDone = false;
       }
       this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
       this.renderer.setScissorTest(false);
@@ -37998,7 +39993,7 @@ diffuseColor.rgb *= max(max(skyTerm, blkTerm), vec3(uMinLight));`;
       this.renderer.render(this.scene, this.camera);
       if (this.player && this.player.cameraMode === CAMERA_MODES.FIRST_PERSON) {
         this.firstPersonHand.render(this.renderer);
-        if (!this.hud.inMainMenu && !this.hud.isPaused && !this.inventoryUI?.isOpen && !this.player.isDead && !this.isSleeping) {
+        if (!this.hud.inMainMenu && !this.hud.isPaused && !this.inventoryUI?.isOpen && !this.player.isDead && !this.isSleeping && !this.hardcoreDeadSpectating) {
           this.firstPersonHand.renderCrosshair(this.renderer);
         }
       }

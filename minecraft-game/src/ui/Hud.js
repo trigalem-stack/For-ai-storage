@@ -100,12 +100,30 @@ export class Hud {
     this.mainMenuOverlay = document.getElementById('main-menu-overlay');
     this.menuHome = document.getElementById('menu-home');
     this.menuWorlds = document.getElementById('menu-worlds');
+    this.menuSkins = document.getElementById('menu-skins');
+    this.menuSplashEl = document.getElementById('menu-splash');
     this.worldsListEl = document.getElementById('worlds-list');
     this.inputWorldName = document.getElementById('input-world-name');
     this.inputWorldSeed = document.getElementById('input-world-seed');
     this.btnNewModeSurvival = document.getElementById('btn-new-mode-survival');
+    this.btnNewModeHardcore = document.getElementById('btn-new-mode-hardcore');
     this.btnNewModeCreative = document.getElementById('btn-new-mode-creative');
+    this.btnWorldTypeDefault = document.getElementById('btn-world-type-default');
+    this.btnWorldTypeSuperflat = document.getElementById('btn-world-type-superflat');
+    this.btnBonusChest = document.getElementById('btn-bonus-chest');
+    this.inputImportWorld = document.getElementById('input-import-world');
     this.selectedNewWorldMode = 'survival';
+    this.selectedNewWorldHardcore = false;
+    this.selectedWorldType = 'default';
+    this.selectedBonusChest = false;
+
+    // Skins menu
+    this.btnMenuSkins = document.getElementById('btn-menu-skins');
+    this.btnSkinsBack = document.getElementById('btn-skins-back');
+    this.skinPresetBtns = Array.from(document.querySelectorAll('.skin-preset-btn'));
+    this.inputSkinUpload = document.getElementById('input-skin-upload');
+    this.skinMenuCanvas = document.getElementById('skin-menu-canvas');
+    this.skinActiveLabel = document.getElementById('skin-active-label');
 
     // Survival HUD & Vignettes & Death Screen
     this.survivalHudEl = document.getElementById('survival-hud');
@@ -120,9 +138,11 @@ export class Hud {
     this.fluidOverlayEl = document.getElementById('fluid-overlay');
 
     this.deathOverlayEl = document.getElementById('death-overlay');
+    this.deathTitleEl = document.getElementById('death-title');
     this.deathReasonEl = document.getElementById('death-reason');
     this.deathScoreEl = document.getElementById('death-score');
     this.btnRespawn = document.getElementById('btn-respawn');
+    this.btnDeathSpectate = document.getElementById('btn-death-spectate');
     this.btnDeathMenu = document.getElementById('btn-death-menu');
 
     this.settingsOverlay = document.getElementById('settings-overlay');
@@ -165,8 +185,20 @@ export class Hud {
 
     this.rangeRenderDist = document.getElementById('range-render-dist');
     this.labelRenderDist = document.getElementById('label-render-dist');
+    this.rangeResScale = document.getElementById('range-res-scale');
+    this.labelResScale = document.getElementById('label-res-scale');
     this.rangeSensitivity = document.getElementById('range-sensitivity');
     this.labelSensitivity = document.getElementById('label-sensitivity');
+    this.rangeTouchScale = document.getElementById('range-touch-scale');
+    this.labelTouchScale = document.getElementById('label-touch-scale');
+
+    this.audioRanges = {
+      master: { input: document.getElementById('range-audio-master'), label: document.getElementById('label-audio-master') },
+      music: { input: document.getElementById('range-audio-music'), label: document.getElementById('label-audio-music') },
+      blocks: { input: document.getElementById('range-audio-blocks'), label: document.getElementById('label-audio-blocks') },
+      hostile: { input: document.getElementById('range-audio-hostile'), label: document.getElementById('label-audio-hostile') },
+      ui: { input: document.getElementById('range-audio-ui'), label: document.getElementById('label-audio-ui') },
+    };
 
     this.debugVisible = false;
     this.isPaused = false;
@@ -243,27 +275,99 @@ export class Hud {
       this.callbacks.onRespawn?.();
     });
 
+    this.btnDeathSpectate?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.hideDeathScreen();
+      this.callbacks.onSpectateWorld?.();
+    });
+
     this.btnDeathMenu?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.hideDeathScreen();
       this.callbacks.onExitToMenu?.();
     });
 
-    // New World gameMode selector
-    const selectNewMode = (mode) => {
-      this.selectedNewWorldMode = mode === 'creative' ? 'creative' : 'survival';
-      this.btnNewModeSurvival?.classList.toggle('active', this.selectedNewWorldMode === 'survival');
-      this.btnNewModeCreative?.classList.toggle('active', this.selectedNewWorldMode === 'creative');
+    // New World gameMode selector (Survival / Hardcore / Creative)
+    const selectNewMode = (mode, hardcore = false) => {
+      this.selectedNewWorldHardcore = Boolean(hardcore);
+      this.selectedNewWorldMode = hardcore ? 'survival' : (mode === 'creative' ? 'creative' : 'survival');
+      this.btnNewModeSurvival?.classList.toggle('active', !this.selectedNewWorldHardcore && this.selectedNewWorldMode === 'survival');
+      this.btnNewModeHardcore?.classList.toggle('active', this.selectedNewWorldHardcore);
+      this.btnNewModeCreative?.classList.toggle('active', !this.selectedNewWorldHardcore && this.selectedNewWorldMode === 'creative');
     };
-    this.btnNewModeSurvival?.addEventListener('click', (e) => { e.stopPropagation(); selectNewMode('survival'); });
-    this.btnNewModeCreative?.addEventListener('click', (e) => { e.stopPropagation(); selectNewMode('creative'); });
+    this.btnNewModeSurvival?.addEventListener('click', (e) => { e.stopPropagation(); selectNewMode('survival', false); });
+    this.btnNewModeHardcore?.addEventListener('click', (e) => { e.stopPropagation(); selectNewMode('survival', true); });
+    this.btnNewModeCreative?.addEventListener('click', (e) => { e.stopPropagation(); selectNewMode('creative', false); });
 
-    // Main Menu navigation
+    const selectWorldType = (wType) => {
+      this.selectedWorldType = wType === 'superflat' ? 'superflat' : 'default';
+      this.btnWorldTypeDefault?.classList.toggle('active', this.selectedWorldType === 'default');
+      this.btnWorldTypeSuperflat?.classList.toggle('active', this.selectedWorldType === 'superflat');
+    };
+    this.btnWorldTypeDefault?.addEventListener('click', (e) => { e.stopPropagation(); selectWorldType('default'); });
+    this.btnWorldTypeSuperflat?.addEventListener('click', (e) => { e.stopPropagation(); selectWorldType('superflat'); });
+
+    this.btnBonusChest?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.selectedBonusChest = !this.selectedBonusChest;
+      this.btnBonusChest.classList.toggle('active', this.selectedBonusChest);
+      this.btnBonusChest.textContent = this.selectedBonusChest ? '🎁 Бонус-сундук: ВКЛ' : '🎁 Бонус-сундук: ВЫКЛ';
+    });
+
+    // Main Menu navigation & Skins screen
     this.btnMenuPlay?.addEventListener('click', async (e) => {
       e.stopPropagation();
       this.menuHome?.classList.add('hidden');
+      this.menuSkins?.classList.add('hidden');
       this.menuWorlds?.classList.remove('hidden');
       await this.callbacks.onOpenWorldsManager?.();
+    });
+
+    this.btnMenuSkins?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.menuHome?.classList.add('hidden');
+      this.menuWorlds?.classList.add('hidden');
+      this.menuSkins?.classList.remove('hidden');
+      this.callbacks.onOpenSkinsMenu?.();
+    });
+
+    this.btnSkinsBack?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.menuSkins?.classList.add('hidden');
+      this.menuHome?.classList.remove('hidden');
+    });
+
+    for (const sBtn of this.skinPresetBtns) {
+      sBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.callbacks.onSelectSkinPreset?.(sBtn.dataset.skin);
+      });
+    }
+
+    this.inputSkinUpload?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          this.callbacks.onUploadCustomSkin?.(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+
+    this.inputImportWorld?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          this.callbacks.onImportWorldJson?.(reader.result);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
     });
 
     this.btnMenuSettings?.addEventListener('click', (e) => {
@@ -274,6 +378,7 @@ export class Hud {
     this.btnWorldsBack?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.menuWorlds?.classList.add('hidden');
+      this.menuSkins?.classList.add('hidden');
       this.menuHome?.classList.remove('hidden');
     });
 
@@ -299,6 +404,9 @@ export class Hud {
         name,
         seed: parsedSeed,
         gameMode: this.selectedNewWorldMode,
+        worldType: this.selectedWorldType,
+        hardcore: this.selectedNewWorldHardcore,
+        bonusChest: this.selectedBonusChest,
       });
     });
 
@@ -399,11 +507,31 @@ export class Hud {
       this.callbacks.onChangeRenderDistance?.(val);
     });
 
+    this.rangeResScale?.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      if (this.labelResScale) this.labelResScale.textContent = `${Math.round(val * 100)}%`;
+      this.callbacks.onChangeResolutionScale?.(val);
+    });
+
     this.rangeSensitivity?.addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       if (this.labelSensitivity) this.labelSensitivity.textContent = `${Math.round(val * 100)}%`;
       this.callbacks.onChangeSensitivity?.(val);
     });
+
+    this.rangeTouchScale?.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      if (this.labelTouchScale) this.labelTouchScale.textContent = `${Math.round(val * 100)}%`;
+      this.callbacks.onChangeTouchScale?.(val);
+    });
+
+    for (const [key, pair] of Object.entries(this.audioRanges)) {
+      pair.input?.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        if (pair.label) pair.label.textContent = `${val}%`;
+        this.callbacks.onChangeAudioVolume?.(key, val);
+      });
+    }
   }
 
   triggerDamageFlash() {
@@ -415,14 +543,19 @@ export class Hud {
     }, 260);
   }
 
-  showDeathScreen(sourceType = 'generic', score = 0) {
+  showDeathScreen(sourceType = 'generic', score = 0, hardcore = false) {
     if (!this.deathOverlayEl) return;
+    if (this.deathTitleEl) {
+      this.deathTitleEl.textContent = hardcore ? 'Конец игры! (Хардкор)' : 'Вы погибли!';
+    }
     if (this.deathReasonEl) {
       this.deathReasonEl.textContent = DEATH_REASON_TEXT[sourceType] || DEATH_REASON_TEXT.generic;
     }
     if (this.deathScoreEl) {
       this.deathScoreEl.textContent = `Счёт: ${score | 0}`;
     }
+    this.btnRespawn?.classList.toggle('hidden', Boolean(hardcore));
+    this.btnDeathSpectate?.classList.toggle('hidden', !hardcore);
     this.deathOverlayEl.classList.remove('hidden');
     this._updateCrosshairVisibility(false);
   }
@@ -570,16 +703,73 @@ export class Hud {
     this.mainMenuOverlay?.classList.remove('hidden');
     this.menuHome?.classList.toggle('hidden', showWorlds);
     this.menuWorlds?.classList.toggle('hidden', !showWorlds);
+    this.menuSkins?.classList.add('hidden');
     this.survivalHudEl?.classList.add('hidden');
     this._updateCrosshairVisibility(false);
+    if (!showWorlds && this.menuSplashEl) {
+      const splashes = [
+        '100% Оффлайн · Java 1.21 AI!',
+        'Суперплоский · Хардкор · Скины!',
+        'Текущая вода и редкие лавовые озёра!',
+        'Процедурный WebAudio звук!',
+        'Сохранение в .mcworld.json!',
+      ];
+      this.menuSplashEl.textContent = splashes[(Math.random() * splashes.length) | 0];
+    }
   }
 
   hideMainMenu(cameraMode = CAMERA_MODES.FIRST_PERSON) {
     this.inMainMenu = false;
     this.mainMenuOverlay?.classList.add('hidden');
     this.settingsOverlay?.classList.add('hidden');
+    this.menuSkins?.classList.add('hidden');
     this.setPaused(false);
     this._updateCrosshairVisibility(cameraMode === CAMERA_MODES.FIRST_PERSON);
+  }
+
+  setSkinMenuUI(skinSpec, skinCanvasSource) {
+    const preset = skinSpec?.customDataUrl ? 'custom' : (skinSpec?.preset || 'steve');
+    for (const btn of this.skinPresetBtns) {
+      btn.classList.toggle('active', btn.dataset.skin === preset);
+    }
+    if (this.skinActiveLabel) {
+      const label = preset === 'custom'
+        ? 'Свой PNG-скин'
+        : preset === 'alex' ? 'Алекс' : preset === 'knight' ? 'Рыцарь' : 'Стив';
+      this.skinActiveLabel.textContent = `Текущий скин: ${label}`;
+    }
+    if (typeof this.skinMenuCanvas?.getContext === 'function' && skinCanvasSource) {
+      const ctx = this.skinMenuCanvas.getContext('2d');
+      if (ctx) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, 96, 96);
+        // Draw enlarged front face (8,8..16,16) + torso preview
+        ctx.drawImage(skinCanvasSource, 8, 8, 8, 8, 24, 6, 48, 48);
+        ctx.drawImage(skinCanvasSource, 20, 20, 8, 12, 24, 54, 48, 42);
+        ctx.drawImage(skinCanvasSource, 44, 20, 4, 12, 10, 54, 14, 42);
+        ctx.drawImage(skinCanvasSource, 36, 52, 4, 12, 72, 54, 14, 42);
+      }
+    }
+  }
+
+  setResolutionScaleUI(scale) {
+    const s = Number(scale) || 1.0;
+    if (this.rangeResScale) this.rangeResScale.value = String(s);
+    if (this.labelResScale) this.labelResScale.textContent = `${Math.round(s * 100)}%`;
+  }
+
+  setTouchScaleUI(scale) {
+    const s = Number(scale) || 1.0;
+    if (this.rangeTouchScale) this.rangeTouchScale.value = String(s);
+    if (this.labelTouchScale) this.labelTouchScale.textContent = `${Math.round(s * 100)}%`;
+  }
+
+  setAudioVolumesUI(audio = {}) {
+    for (const [key, pair] of Object.entries(this.audioRanges)) {
+      const v = Number.isFinite(audio[key]) ? audio[key] : 80;
+      if (pair.input) pair.input.value = String(v);
+      if (pair.label) pair.label.textContent = `${v}%`;
+    }
   }
 
   renderWorldsList(worlds, activeWorldId) {
@@ -604,8 +794,14 @@ export class Hud {
 
       const title = document.createElement('div');
       title.className = 'world-card-title';
-      const modeTag = w.gameMode === 'creative' ? '🧱 Креатив' : '⚔️ Выживание';
-      title.textContent = `${w.name || 'Безымянный мир'} · ${modeTag}`;
+      const modeTag = w.hardcore
+        ? '<span class="world-badge-hardcore">☠️ Хардкор</span>'
+        : w.gameMode === 'creative' ? '🧱 Креатив' : '⚔️ Выживание';
+      const typeTag = w.worldType === 'superflat' ? ' · <span class="world-badge-flat">Плоский</span>' : '';
+      const deadTag = w.dead ? ' · <span class="world-badge-hardcore">Погиб</span>' : '';
+      const safeName = String(w.name || 'Безымянный мир')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      title.innerHTML = `${safeName} · ${modeTag}${typeTag}${deadTag}`;
 
       const meta = document.createElement('div');
       meta.className = 'world-card-meta';
@@ -626,10 +822,35 @@ export class Hud {
       const playBtn = document.createElement('button');
       playBtn.type = 'button';
       playBtn.className = 'mc-menu-btn mc-menu-primary mc-world-btn';
-      playBtn.textContent = 'Войти';
+      playBtn.textContent = w.hardcore && w.dead ? 'Осмотр' : 'Войти';
       playBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         this.callbacks.onSelectWorld?.(w.id);
+      });
+
+      const renameBtn = document.createElement('button');
+      renameBtn.type = 'button';
+      renameBtn.className = 'mc-menu-btn mc-world-btn';
+      renameBtn.textContent = '✎';
+      renameBtn.title = 'Переименовать мир';
+      renameBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nextName = typeof window !== 'undefined' && window.prompt
+          ? window.prompt('Новое название мира:', w.name || '')
+          : '';
+        if (nextName && nextName.trim()) {
+          this.callbacks.onRenameWorld?.(w.id, nextName.trim());
+        }
+      });
+
+      const exportBtn = document.createElement('button');
+      exportBtn.type = 'button';
+      exportBtn.className = 'mc-menu-btn mc-world-btn';
+      exportBtn.textContent = '⬇';
+      exportBtn.title = 'Экспорт в .mcworld.json';
+      exportBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.callbacks.onExportWorld?.(w.id);
       });
 
       const delBtn = document.createElement('button');
@@ -642,7 +863,7 @@ export class Hud {
         this.callbacks.onDeleteWorld?.(w.id);
       });
 
-      actions.append(playBtn, delBtn);
+      actions.append(playBtn, renameBtn, exportBtn, delBtn);
       card.append(info, actions);
       this.worldsListEl.appendChild(card);
     }

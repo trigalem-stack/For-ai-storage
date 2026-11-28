@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#2d63b8">
-  <title>Minecraft Web Edition — Stage 8</title>
+  <title>Minecraft Web Edition — Stage 9</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -192,7 +192,7 @@
     <button id="vm-btn-drop" class="vm-btn" type="button" title="Выбросить (Q)">Q Брос.</button>
   </div>
 
-  <!-- Death Screen Overlay (Stage 6) -->
+  <!-- Death Screen Overlay (Stage 6 & 9 Hardcore) -->
   <div id="death-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="death-title">
     <div class="death-card">
       <h1 id="death-title">Вы погибли!</h1>
@@ -200,6 +200,7 @@
       <p id="death-score" class="death-score">Счёт: 0</p>
       <div class="death-actions">
         <button id="btn-respawn" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">Возродиться</button>
+        <button id="btn-death-spectate" class="mc-menu-btn mc-btn-lg hidden" type="button">Осмотреть мир</button>
         <button id="btn-death-menu" class="mc-menu-btn mc-btn-lg" type="button">Главное меню</button>
       </div>
     </div>
@@ -207,30 +208,67 @@
 
   <!-- Main Menu & World Manager -->
   <div id="main-menu-overlay" role="dialog" aria-modal="true" aria-labelledby="main-title">
-    <div id="menu-home" class="mc-modal mc-main-card">
-      <div class="mc-logo-badge">
-        <div class="mc-cube-badge"></div>
-        <h1 id="main-title">MINECRAFT WEB</h1>
-        <p class="mc-modal-sub">Этап 8 · Мобы · Бой · Луки · Динамит · Опыт · Частицы</p>
+    <div id="menu-home" class="mc-title-stage">
+      <div class="mc-title-banner">
+        <h1 id="main-title" class="mc-block-logo">MINECRAFT</h1>
+        <div class="mc-edition-sub">WEB EDITION · 100% ОФФЛАЙН</div>
+        <div id="menu-splash" class="mc-splash">3D Мир · Мобы · Звук · Скины!</div>
       </div>
-      <div class="mc-modal-actions">
-        <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">▶ Играть (Миры)</button>
-        <button id="btn-menu-settings" class="mc-menu-btn mc-btn-lg" type="button">⚙ Настройки</button>
+
+      <div class="mc-title-buttons">
+        <button id="btn-menu-play" class="mc-menu-btn mc-menu-primary mc-btn-lg" type="button">Одиночная игра (Миры)</button>
+        <div class="mc-title-btn-row">
+          <button id="btn-menu-settings" class="mc-menu-btn mc-btn-lg" type="button">Настройки...</button>
+          <button id="btn-menu-skins" class="mc-menu-btn mc-btn-lg" type="button">Скин игрока</button>
+        </div>
       </div>
+      <div class="mc-title-footer">Minecraft Web Edition v9 · Локальное хранение в IndexedDB</div>
+    </div>
+
+    <div id="menu-skins" class="mc-modal mc-skins-card hidden">
+      <div class="palette-header">
+        <h2>Выбор скина</h2>
+        <button id="btn-skins-back" class="mc-menu-btn mc-back-btn" type="button">← Назад</button>
+      </div>
+      <div class="skin-preview-box">
+        <canvas id="skin-menu-canvas" width="96" height="96"></canvas>
+        <div id="skin-active-label" class="skin-active-label">Текущий скин: Стив</div>
+      </div>
+      <div class="skin-preset-row">
+        <button type="button" class="mc-menu-btn skin-preset-btn active" data-skin="steve">Стив</button>
+        <button type="button" class="mc-menu-btn skin-preset-btn" data-skin="alex">Алекс</button>
+        <button type="button" class="mc-menu-btn skin-preset-btn" data-skin="knight">Рыцарь</button>
+      </div>
+      <label class="mc-menu-btn mc-menu-primary skin-upload-label" for="input-skin-upload">
+        📁 Загрузить свой PNG-скин (64×64)
+        <input id="input-skin-upload" type="file" accept="image/png,image/*" class="hidden">
+      </label>
     </div>
 
     <div id="menu-worlds" class="mc-modal mc-worlds-card hidden">
       <div class="palette-header">
-        <h2>Мои миры</h2>
-        <button id="btn-worlds-back" class="mc-menu-btn mc-back-btn" type="button">← Назад</button>
+        <h2>Выбор мира</h2>
+        <div class="worlds-header-actions">
+          <label class="mc-menu-btn mc-back-btn world-import-btn" for="input-import-world" title="Импортировать мир .mcworld.json">
+            ⬆ Импорт
+            <input id="input-import-world" type="file" accept=".json,.mcworld.json" class="hidden">
+          </label>
+          <button id="btn-worlds-back" class="mc-menu-btn mc-back-btn" type="button">← Назад</button>
+        </div>
       </div>
 
       <div class="create-world-box">
-        <input id="input-world-name" class="mc-input" type="text" maxlength="32" placeholder="Название мира (например: Выживание)">
-        <input id="input-world-seed" class="mc-input" type="text" maxlength="24" placeholder="Сид (необязательно)">
-        <div class="mode-picker-row" role="group" aria-label="Режим нового мира">
+        <input id="input-world-name" class="mc-input" type="text" maxlength="32" placeholder="Название мира (например: Мой Мир)">
+        <input id="input-world-seed" class="mc-input" type="text" maxlength="24" placeholder="Ключ генерации (сид, необязательно)">
+        <div class="mode-picker-row mode-picker-row-3" role="group" aria-label="Режим нового мира">
           <button id="btn-new-mode-survival" type="button" class="mc-menu-btn mode-pick-btn active" data-mode="survival">⚔️ Выживание</button>
+          <button id="btn-new-mode-hardcore" type="button" class="mc-menu-btn mode-pick-btn" data-mode="hardcore">☠️ Хардкор</button>
           <button id="btn-new-mode-creative" type="button" class="mc-menu-btn mode-pick-btn" data-mode="creative">🧱 Креатив</button>
+        </div>
+        <div class="mode-picker-row mode-picker-row-3" role="group" aria-label="Тип мира и опции">
+          <button id="btn-world-type-default" type="button" class="mc-menu-btn mode-pick-btn active" data-world-type="default">🌍 Обычный</button>
+          <button id="btn-world-type-superflat" type="button" class="mc-menu-btn mode-pick-btn" data-world-type="superflat">🏜️ Суперплоский</button>
+          <button id="btn-bonus-chest" type="button" class="mc-menu-btn mode-pick-btn" title="Начальный сундук со снаряжением у спавна">🎁 Бонус-сундук: ВЫКЛ</button>
         </div>
         <button id="btn-create-world" class="mc-menu-btn mc-menu-primary" type="button">+ Создать новый мир</button>
       </div>
@@ -247,8 +285,9 @@
         <button id="btn-settings-close" class="mc-menu-btn mc-menu-primary mc-back-btn" type="button">Готово</button>
       </div>
 
-      <div class="settings-tabs" role="tablist">
+      <div class="settings-tabs settings-tabs-4" role="tablist">
         <button type="button" class="settings-tab-btn active" data-tab="graphics">Графика</button>
+        <button type="button" class="settings-tab-btn" data-tab="audio">Звук</button>
         <button type="button" class="settings-tab-btn" data-tab="controls">Управление</button>
         <button type="button" class="settings-tab-btn" data-tab="other">Интерфейс</button>
       </div>
@@ -265,9 +304,37 @@
           <button id="btn-graphics-mode" class="mc-menu-btn" type="button">Разрешение: Улучшенное (чёткий PixelRatio)</button>
           <button id="btn-memory-mode" class="mc-menu-btn" type="button">Память мира: Бесконечная (∞)</button>
 
+          <label class="mc-slider-row" for="range-res-scale">
+            <span>Масштаб рендера (Resolution): <strong id="label-res-scale">100%</strong></span>
+            <input id="range-res-scale" type="range" min="0.5" max="1.25" step="0.05" value="1.0">
+          </label>
+
           <label class="mc-slider-row" for="range-render-dist">
             <span>Дальность прорисовки: <strong id="label-render-dist">6 чанков</strong></span>
-            <input id="range-render-dist" type="range" min="2" max="16" step="1" value="6">
+            <input id="range-render-dist" type="range" min="2" max="12" step="1" value="6">
+          </label>
+        </div>
+
+        <div class="settings-tab-panel hidden" data-tab-panel="audio">
+          <label class="mc-slider-row" for="range-audio-master">
+            <span>Общая громкость: <strong id="label-audio-master">80%</strong></span>
+            <input id="range-audio-master" type="range" min="0" max="100" step="5" value="80">
+          </label>
+          <label class="mc-slider-row" for="range-audio-music">
+            <span>Музыка: <strong id="label-audio-music">45%</strong></span>
+            <input id="range-audio-music" type="range" min="0" max="100" step="5" value="45">
+          </label>
+          <label class="mc-slider-row" for="range-audio-blocks">
+            <span>Блоки и шаги: <strong id="label-audio-blocks">85%</strong></span>
+            <input id="range-audio-blocks" type="range" min="0" max="100" step="5" value="85">
+          </label>
+          <label class="mc-slider-row" for="range-audio-hostile">
+            <span>Враги и взрывы: <strong id="label-audio-hostile">85%</strong></span>
+            <input id="range-audio-hostile" type="range" min="0" max="100" step="5" value="85">
+          </label>
+          <label class="mc-slider-row" for="range-audio-ui">
+            <span>Интерфейс и подбор: <strong id="label-audio-ui">80%</strong></span>
+            <input id="range-audio-ui" type="range" min="0" max="100" step="5" value="80">
           </label>
         </div>
 
@@ -277,6 +344,11 @@
           <label class="mc-slider-row" for="range-sensitivity">
             <span>Чувствительность камеры: <strong id="label-sensitivity">100%</strong></span>
             <input id="range-sensitivity" type="range" min="0.4" max="2.2" step="0.1" value="1.0">
+          </label>
+
+          <label class="mc-slider-row" for="range-touch-scale">
+            <span>Размер кнопок (Touch): <strong id="label-touch-scale">100%</strong></span>
+            <input id="range-touch-scale" type="range" min="0.75" max="1.35" step="0.05" value="1.0">
           </label>
 
           <div class="mc-help-box">
@@ -291,7 +363,7 @@
         <div class="settings-tab-panel hidden" data-tab-panel="other">
           <button id="btn-hint-mode" class="mc-menu-btn" type="button">Подсказки управления: ВКЛ</button>
           <div class="mc-help-box">
-            Режим мира (Выживание / Креатив) выбирается при создании мира. Все миры, здоровье, еда, грядки, сундуки и инвентарь автоматически сохраняются локально в IndexedDB (100% оффлайн).
+            Миры поддерживают режимы Выживание, Хардкор (1 жизнь) и Креатив, Обычную и Суперплоскую генерацию, а также экспорт и импорт в .mcworld.json. Все данные сохраняются локально в IndexedDB (100% оффлайн).
           </div>
         </div>
       </div>

@@ -331,8 +331,10 @@ body.webgl-crosshair #crosshair::after {
   right: 2px;
   bottom: 1px;
   font-size: 11px;
-  font-weight: 700;
-  color: #fff;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #141414;
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -581,18 +583,182 @@ body.webgl-crosshair #crosshair::after {
 }
 
 /* Modals: Main Menu, World Manager, Tabbed Settings, Pause */
-#main-menu-overlay,
-#settings-overlay,
-#pause-overlay {
+#main-menu-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 16, 26, 0.74);
-  backdrop-filter: blur(5px);
+  background: rgba(12, 18, 28, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) max(12px, var(--safe-left));
   z-index: 45;
+}
+
+#settings-overlay,
+#pause-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 16, 26, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) max(12px, var(--safe-left));
+  z-index: 45;
+}
+
+/* Authentic Minecraft Title Stage over 3D Panorama */
+.mc-title-stage {
+  width: min(460px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.mc-title-banner {
+  position: relative;
+  text-align: center;
+  padding: 10px 18px;
+}
+
+.mc-block-logo {
+  margin: 0;
+  font-size: clamp(34px, 7vw, 56px);
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #f3f5f8;
+  text-shadow:
+    0 3px 0 #70747d,
+    0 6px 0 #3f434a,
+    0 9px 14px rgba(0, 0, 0, 0.65);
+}
+
+.mc-edition-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  color: #dfe6f2;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.85);
+}
+
+.mc-splash {
+  position: absolute;
+  right: -12px;
+  bottom: -8px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #ffff42;
+  text-shadow: 2px 2px 0 #3a3a00;
+  transform: rotate(-11deg);
+  animation: mcSplashPulse 1.1s ease-in-out infinite alternate;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+@keyframes mcSplashPulse {
+  0% { transform: rotate(-11deg) scale(0.95); }
+  100% { transform: rotate(-11deg) scale(1.07); }
+}
+
+.mc-title-buttons {
+  width: min(370px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mc-title-btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mc-title-footer {
+  font-size: 11px;
+  color: rgba(240, 245, 255, 0.84);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+
+.mc-skins-card {
+  width: min(410px, 94vw);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skin-preview-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(14, 18, 24, 0.65);
+  border: 2px solid #16191f;
+}
+
+#skin-menu-canvas {
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #1d2532;
+}
+
+.skin-active-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #e4eaf2;
+}
+
+.skin-preset-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.skin-preset-btn.active {
+  background: #4c9a2a;
+  border-color: #ffffff;
+}
+
+.skin-upload-label {
+  display: block;
+  text-align: center;
+}
+
+.worlds-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.world-import-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-picker-row-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.world-badge-hardcore {
+  color: #ff6b6b;
+  font-weight: 800;
+}
+
+.world-badge-flat {
+  color: #f6d55c;
+}
+
+.settings-tabs-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+#touch-action-cluster {
+  transform: scale(var(--touch-scale, 1));
+  transform-origin: bottom right;
 }
 
 .mc-modal {
@@ -1376,6 +1542,24 @@ body.webgl-crosshair #crosshair::after {
   width: 100%;
 }
 
+.inv-creative-search {
+  width: 100%;
+  height: 28px;
+  padding: 4px 8px;
+  background: #2c2f36;
+  color: #ffffff;
+  border: 2px solid #16181d;
+  border-bottom-color: #606572;
+  border-right-color: #606572;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.inv-creative-search::placeholder {
+  color: #a4acb8;
+}
+
 .inv-creative-catalog {
   flex: 1 1 auto;
   max-height: 246px;
@@ -1529,7 +1713,7 @@ body.webgl-crosshair #crosshair::after {
   width: 32px;
   height: 32px;
   pointer-events: none;
-  z-index: 94;
+  z-index: 96;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1765,8 +1949,7 @@ body.webgl-crosshair #crosshair::after {
 #death-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(135, 16, 16, 0.56);
-  backdrop-filter: blur(3px);
+  background: rgba(135, 16, 16, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;

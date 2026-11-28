@@ -97,20 +97,22 @@ export class FluidSimulator {
   }
 
   _writeFluidBlock(world, wx, wy, wz, newId, newMeta, lightQueue, dirtyChunks) {
+    if (world.isBlockLoaded && !world.isBlockLoaded(wx, wy, wz)) return false;
     const oldId = world.getBlock(wx, wy, wz);
     const oldMeta = world.getBlockMeta(wx, wy, wz);
     if (oldId === newId && oldMeta === newMeta) return false;
-
-    if (oldId !== 0 && oldId !== BLOCK_IDS.WATER && oldId !== BLOCK_IDS.LAVA && BlockRegistry.isWashable(oldId)) {
-      this.onWashBlock?.(wx, wy, wz, oldId, oldMeta);
-    }
 
     const oldOp = BlockRegistry.opacityTable[oldId];
     const newOp = BlockRegistry.opacityTable[newId];
     const oldEmit = BlockRegistry.emissionTable[oldId];
     const newEmit = BlockRegistry.emissionTable[newId];
 
-    world._setBlockFast(wx, wy, wz, newId, newMeta, dirtyChunks);
+    const wrote = world._setBlockFast(wx, wy, wz, newId, newMeta, dirtyChunks);
+    if (!wrote) return false;
+
+    if (oldId !== 0 && oldId !== BLOCK_IDS.WATER && oldId !== BLOCK_IDS.LAVA && BlockRegistry.isWashable(oldId)) {
+      this.onWashBlock?.(wx, wy, wz, oldId, oldMeta);
+    }
 
     if (oldOp !== newOp || oldEmit !== newEmit) {
       lightQueue.push([wx, wy, wz, oldId, newId]);
@@ -133,6 +135,7 @@ export class FluidSimulator {
     for (let d = 0; d < 4; d++) {
       const nx = wx + HORIZ_DIRS[d][0];
       const nz = wz + HORIZ_DIRS[d][1];
+      if (world.isBlockLoaded && !world.isBlockLoaded(nx, wy, nz)) continue;
       const nid = world.getBlock(nx, wy, nz);
       if (nid === fluidId && (world.getBlockMeta(nx, wy, nz) & 0x07) === 0 && (world.getBlockMeta(nx, wy, nz) & FLUID_FALLING_BIT) === 0) {
         continue;
@@ -174,6 +177,7 @@ export class FluidSimulator {
       if (d === opp) continue;
       const nx = wx + HORIZ_DIRS[d][0];
       const nz = wz + HORIZ_DIRS[d][1];
+      if (world.isBlockLoaded && !world.isBlockLoaded(nx, wy, nz)) continue;
       const nid = world.getBlock(nx, wy, nz);
       if (!this._canFluidEnter(nid) && nid !== fluidId) continue;
       const belowId = wy > 0 ? world.getBlock(nx, wy - 1, nz) : BLOCK_IDS.BEDROCK;
@@ -333,6 +337,11 @@ export class FluidSimulator {
       if ((dirMask & (1 << d)) === 0) continue;
       const nx = wx + HORIZ_DIRS[d][0];
       const nz = wz + HORIZ_DIRS[d][1];
+      if (world.isBlockLoaded && !world.isBlockLoaded(nx, wy, nz)) {
+        // Defer edge cell until neighboring chunk loads so flow never freezes at chunk borders
+        this.schedule(wx, wy, wz, delay);
+        continue;
+      }
       const nid = world.getBlock(nx, wy, nz);
 
       if (nid === otherFluidId) {
@@ -426,6 +435,9 @@ export class FluidSimulator {
 
     for (const chunk of dirtyChunks) {
       chunk.dirty = true;
+      if (world.dirtyChunks) {
+        world.dirtyChunks.add(chunk);
+      }
     }
 
     return processed;

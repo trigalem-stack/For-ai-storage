@@ -4,11 +4,16 @@ export function chunkKey(cx, cz) {
   return `${cx},${cz}`;
 }
 
+export function numChunkKey(cx, cz) {
+  return (cx + 32768) * 65536 + (cz + 32768);
+}
+
 export class Chunk {
   constructor(cx, cz) {
     this.cx = cx;
     this.cz = cz;
     this.key = chunkKey(cx, cz);
+    this.numKey = numChunkKey(cx, cz);
 
     // Compact flat typed array (32 KB per chunk)
     this.blocks = new Uint8Array(CHUNK_VOLUME);
@@ -28,6 +33,7 @@ export class Chunk {
     this.dirty = true;
     this.hasMeshed = false;
     this.fluidSprings = null;
+    this.fluidWakes = null;
 
     // Three.js mesh references managed by World
     this.opaqueMesh = null;

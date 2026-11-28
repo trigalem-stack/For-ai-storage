@@ -60,6 +60,8 @@ export const MOB_SPAWN_MAX_DIST = 56;
 export const MOB_DESPAWN_DIST = 76;
 export const PASSIVE_MOB_CAP = 16;
 export const HOSTILE_MOB_CAP = 20;
+export const MOB_FOLLOW_RANGE = 16.0;
+export const ENDERMAN_STARE_HOLD_SEC = 0.22;
 export const MELEE_REACH = 3.2;
 export const CRIT_MULTIPLIER = 1.5;
 export const BOW_CHARGE_SEC = 1.0;
@@ -72,6 +74,7 @@ export const TNT_EXPLOSION_POWER = 4.0;
 export const TNT_FUSE_TICKS = 80; // 4.0s at 20 TPS
 export const XP_MAGNET_RANGE = 6.5;
 export const XP_PICKUP_RANGE = 1.35;
+export const CREATIVE_VOID_Y = -64;
 
 // Player AABB hitbox & eye dimensions (authentic Minecraft Java proportions)
 export const PLAYER_WIDTH = 0.6;
@@ -116,7 +119,7 @@ export const MAX_STACK_DEFAULT = MAX_STACK_SIZE;
 export const DEFAULT_RENDER_DISTANCE_PC = 7;
 export const DEFAULT_RENDER_DISTANCE_MOBILE = 4;
 export const MIN_RENDER_DISTANCE = 2;
-export const MAX_RENDER_DISTANCE = 16;
+export const MAX_RENDER_DISTANCE = 12;
 
 // Chunk meshing frame budget (ms)
 export const CHUNK_FRAME_BUDGET_MS = 4.0;

@@ -1,4 +1,5 @@
 import * as THREE from '../vendor/three.module.min.js';
+import { SoundManager } from './audio/SoundManager.js';
 import { BLOCK_IDS, BlockRegistry } from './blocks/BlockRegistry.js';
 import {
   AUTOSAVE_INTERVAL_MS,
@@ -27,7 +28,12 @@ import { ItemRegistry } from './items/ItemRegistry.js';
 import { aabbIntersectsBlock, collidesWithWorld } from './physics/AABBPhysics.js';
 import { FirstPersonHand } from './player/FirstPersonHand.js';
 import { PlayerController } from './player/PlayerController.js';
-import { InventoryPlayerPreview, PlayerModel, createSteveSkinTexture } from './player/PlayerSkin.js';
+import {
+  InventoryPlayerPreview,
+  PlayerModel,
+  createSkinTextureFromSpec,
+  createSteveSkinTexture,
+} from './player/PlayerSkin.js';
 import { SaveManager } from './storage/SaveManager.js';
 import { TextureAtlas } from './textures/TextureAtlas.js';
 import { Hotbar } from './ui/Hotbar.js';
@@ -59,6 +65,7 @@ class MinecraftGame {
     this.loadingStatus = document.getElementById('loading-status');
 
     this.saveManager = new SaveManager();
+    this.soundManager = new SoundManager();
     this.atlas = new TextureAtlas();
     this.skinTexture = createSteveSkinTexture();
 
@@ -84,6 +91,8 @@ class MinecraftGame {
       renderDistance: isTouchDevice ? DEFAULT_RENDER_DISTANCE_MOBILE : DEFAULT_RENDER_DISTANCE_PC,
       unlimitedMemory: true,
       highQuality: !isTouchDevice,
+      resolutionScale: 1.0,
+      touchScale: 1.0,
       fogEnabled: false,
       cloudsEnabled: true,
       starsEnabled: true,
@@ -94,6 +103,8 @@ class MinecraftGame {
       sensitivity: 1.0,
       hintsEnabled: true,
       gameMode: 'survival',
+      skin: { preset: 'steve', customDataUrl: '' },
+      audio: { master: 80, music: 60, blocks: 80, hostile: 80, ui: 80 },
     };
 
     this.renderer = new THREE.WebGLRenderer({
@@ -117,6 +128,7 @@ class MinecraftGame {
     this.itemManager = new ItemEntityManager(this.scene, this.atlas);
     this.fallingManager = new FallingBlockManager(this.scene, this.atlas);
     this.entityManager = new EntityManager(this.scene, this.atlas);
+    this.entityManager.setSoundManager(this.soundManager);
 
     this.inventory = new Inventory({ creativeMode: false });
     this.blockEntities = new BlockEntityManager();
@@ -132,8 +144,13 @@ class MinecraftGame {
     this.hud = null;
 
     this.activeWorldId = null;
-    this.activeWorldName = 'Мой мир';
+    this.activeWorldName = 'Мой Мир #1';
     this.currentWorldMode = 'survival';
+    this.currentWorldType = 'default';
+    this.currentWorldHardcore = false;
+    this.currentBonusChest = false;
+    this.bonusChestPlaced = false;
+    this.hardcoreDeadSpectating = false;
     this.worldSeed = randomWorldSeed();
     this.spawnPoint = null;
     this.bedSpawnPoint = null;
@@ -149,6 +166,9 @@ class MinecraftGame {
     this.eatingSlotIndex = -1;
     this.bowChargeTime = 0;
     this.isSleeping = false;
+    this._wasHeadInWater = false;
+    this._stepSoundTimer = 0;
+    this._guiPausedFrameDone = false;
     this.virtualMouse = null;
 
     this.lastFrameTime = performance.now();
@@ -167,8 +187,27 @@ class MinecraftGame {
 
   _applyPixelRatio() {
     const dpr = window.devicePixelRatio || 1;
-    const cap = this.settings.highQuality ? (this.settings.touchMode ? 2.0 : 2.5) : 1.15;
-    this.renderer.setPixelRatio(Math.min(dpr, cap));
+    const scale = Math.max(0.5, Math.min(1.25, Number(this.settings.resolutionScale) || 1.0));
+    const cap = this.settings.highQuality ? (this.settings.touchMode ? 1.65 : 2.0) : 1.15;
+    const effective = Math.max(0.5, Math.min(2.25, Math.min(dpr, cap) * scale));
+    this.renderer.setPixelRatio(effective);
+    this._guiPausedFrameDone = false;
+  }
+
+  _applySkin(skinSpec = this.settings.skin) {
+    const spec = skinSpec || { preset: 'steve', customDataUrl: '' };
+    const nextTex = createSkinTextureFromSpec(spec, (loadedTex) => {
+      this.skinTexture = loadedTex;
+      this.playerModel?.setSkinTexture(loadedTex);
+      this.playerPreview?.setSkinTexture(loadedTex);
+      this.firstPersonHand?.setSkinTexture(loadedTex);
+      this.hud?.setSkinMenuUI(spec, loadedTex.image);
+    });
+    this.skinTexture = nextTex;
+    this.playerModel?.setSkinTexture(nextTex);
+    this.playerPreview?.setSkinTexture(nextTex);
+    this.firstPersonHand?.setSkinTexture(nextTex);
+    this.hud?.setSkinMenuUI(spec, nextTex.image);
   }
 
   _applySensitivity() {
@@ -208,17 +247,18 @@ class MinecraftGame {
   }
 
   openInventoryModal(mode = 'inventory', blockPos = null) {
-    if (!this.inventoryUI || !this.player || this.player.isDead || this.hud?.inMainMenu || this.hud?.isPaused) return;
+    if (!this.inventoryUI || !this.player || this.player.isDead || this.hardcoreDeadSpectating || this.hud?.inMainMenu || this.hud?.isPaused) return;
     if (document.pointerLockElement) {
       document.exitPointerLock?.();
     }
+    this._guiPausedFrameDone = false;
     this.player.setGuiOpen(true);
     this.inventoryUI.open(mode, blockPos);
     this.virtualMouse?.setGuiOpen(true);
   }
 
   togglePlayerInventory() {
-    if (!this.inventoryUI || !this.player || this.player.isDead || this.hud?.inMainMenu) return;
+    if (!this.inventoryUI || !this.player || this.player.isDead || this.hardcoreDeadSpectating || this.hud?.inMainMenu) return;
     if (this.inventoryUI.isOpen) {
       this.inventoryUI.close();
       return;
@@ -232,9 +272,15 @@ class MinecraftGame {
     await this.saveManager.init();
     const savedSettings = await this.saveManager.loadSettings();
     if (savedSettings) {
+      const mergedAudio = { ...this.settings.audio, ...(savedSettings.audio || {}) };
+      const mergedSkin = { ...this.settings.skin, ...(savedSettings.skin || {}) };
       Object.assign(this.settings, savedSettings);
+      this.settings.audio = mergedAudio;
+      this.settings.skin = mergedSkin;
     }
 
+    this.soundManager.setVolumes(this.settings.audio);
+    this._applySkin(this.settings.skin);
     this.inventory.creativeMode = this.gameMode === 'creative';
     this._applyPixelRatio();
     this.skyRenderer.setCloudsEnabled(this.settings.cloudsEnabled);
@@ -279,6 +325,7 @@ class MinecraftGame {
         if (xp > 0) this.player?.addXp(xp);
       },
       onClose: () => {
+        this._guiPausedFrameDone = false;
         this.virtualMouse?.setGuiOpen(false);
         this.player?.setGuiOpen(false);
         this.hotbar?.render();
@@ -293,6 +340,7 @@ class MinecraftGame {
     this.hud = new Hud({
       onCycleCamera: () => this.player?.cycleCameraMode(),
       onPauseChange: (paused) => {
+        this._guiPausedFrameDone = false;
         if (paused && this.inventoryUI?.isOpen) {
           this.inventoryUI.close();
         }
@@ -300,25 +348,100 @@ class MinecraftGame {
         this.hud.setPointerLocked(Boolean(this.player?.pointerLocked));
       },
       onResume: () => {
+        this._guiPausedFrameDone = false;
+        this.soundManager.playUiClick();
         if (!this.settings.touchMode && !this.player?.isDead) {
           this._requestPointerLockSafe();
         }
       },
       onRespawn: () => {
+        this.soundManager.playUiClick();
         this.respawnPlayer();
       },
+      onSpectateWorld: () => {
+        this.soundManager.playUiClick();
+        this._enterHardcoreSpectateMode();
+      },
       onOpenWorldsManager: async () => {
+        this.soundManager.playUiClick();
         const list = await this.saveManager.listWorlds();
         this.hud.renderWorldsList(list, this.activeWorldId);
       },
-      onCreateWorld: async ({ name, seed, gameMode }) => {
-        const meta = await this.saveManager.createWorld({ name, seed, gameMode });
+      onOpenSkinsMenu: () => {
+        this.soundManager.playUiClick();
+        this.hud.setSkinMenuUI(this.settings.skin, this.skinTexture?.image);
+      },
+      onSelectSkinPreset: (preset) => {
+        this.soundManager.playUiClick();
+        this.settings.skin = { preset: preset || 'steve', customDataUrl: '' };
+        this._applySkin(this.settings.skin);
+        this.saveSettingsOnly();
+        this.hud.showToast(`Скин выбран: ${preset === 'alex' ? 'Алекс' : preset === 'knight' ? 'Рыцарь' : 'Стив'}`);
+      },
+      onUploadCustomSkin: (dataUrl) => {
+        this.soundManager.playUiClick();
+        this.settings.skin = { preset: 'custom', customDataUrl: dataUrl };
+        this._applySkin(this.settings.skin);
+        this.saveSettingsOnly();
+        this.hud.showToast('Собственный PNG-скин установлен!');
+      },
+      onCreateWorld: async ({ name, seed, gameMode, worldType, hardcore, bonusChest }) => {
+        this.soundManager.playUiClick();
+        const meta = await this.saveManager.createWorld({
+          name,
+          seed,
+          gameMode,
+          worldType,
+          hardcore,
+          bonusChest,
+        });
         await this.enterWorld(meta.id);
       },
       onSelectWorld: async (worldId) => {
+        this.soundManager.playUiClick();
         await this.enterWorld(worldId);
       },
+      onRenameWorld: async (worldId, newName) => {
+        this.soundManager.playUiClick();
+        await this.saveManager.renameWorld(worldId, newName);
+        const nextList = await this.saveManager.listWorlds();
+        if (this.activeWorldId === worldId) {
+          this.activeWorldName = newName;
+        }
+        this.hud.renderWorldsList(nextList, this.activeWorldId);
+        this.hud.showToast(`Переименовано: ${newName}`);
+      },
+      onExportWorld: async (worldId) => {
+        this.soundManager.playUiClick();
+        const json = await this.saveManager.exportWorldJson(worldId);
+        if (!json) {
+          this.hud.showToast('Не удалось экспортировать мир');
+          return;
+        }
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `minecraft-${worldId}.mcworld.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        this.hud.showToast('Файл .mcworld.json скачан');
+      },
+      onImportWorldJson: async (jsonText) => {
+        this.soundManager.playUiClick();
+        try {
+          const meta = await this.saveManager.importWorldJson(jsonText);
+          const list = await this.saveManager.listWorlds();
+          this.hud.renderWorldsList(list, this.activeWorldId);
+          this.hud.showToast(`Импортирован мир: ${meta.name}`);
+        } catch (err) {
+          this.hud.showToast(`Ошибка импорта: ${err?.message || 'неверный формат'}`);
+        }
+      },
       onDeleteWorld: async (worldId) => {
+        this.soundManager.playUiClick();
         const nextList = await this.saveManager.deleteWorld(worldId);
         if (this.activeWorldId === worldId) {
           this.activeWorldId = null;
@@ -327,6 +450,7 @@ class MinecraftGame {
         this.hud.showToast('Мир удалён');
       },
       onExitToMenu: async () => {
+        this.soundManager.playUiClick();
         if (this.inventoryUI?.isOpen) this.inventoryUI.close();
         this.virtualMouse?.setGuiOpen(false);
         await this.saveNow();
@@ -407,6 +531,13 @@ class MinecraftGame {
       onChangeRenderDistance: (dist) => {
         this.settings.renderDistance = dist;
         this.world?.setRenderDistance(dist);
+        this._guiPausedFrameDone = false;
+        this.saveSettingsOnly();
+      },
+      onChangeResolutionScale: (scale) => {
+        this.settings.resolutionScale = Math.max(0.5, Math.min(1.25, Number(scale) || 1.0));
+        this._applyPixelRatio();
+        this.renderer.setSize(window.innerWidth, window.innerHeight, false);
         this.saveSettingsOnly();
       },
       onChangeSensitivity: (mult) => {
@@ -414,11 +545,22 @@ class MinecraftGame {
         this._applySensitivity();
         this.saveSettingsOnly();
       },
+      onChangeTouchScale: (scale) => {
+        this.settings.touchScale = Math.max(0.75, Math.min(1.35, Number(scale) || 1.0));
+        this.mobileControls?.setTouchScale(this.settings.touchScale);
+        this.saveSettingsOnly();
+      },
+      onChangeAudioVolume: (channel, val) => {
+        if (!this.settings.audio) this.settings.audio = {};
+        this.settings.audio[channel] = val;
+        this.soundManager.setChannelVolume(channel, val);
+        this.saveSettingsOnly();
+      },
     });
 
     let worlds = await this.saveManager.listWorlds();
     if (worlds.length === 0) {
-      const first = await this.saveManager.createWorld({ name: 'Новый мир', seed: randomWorldSeed() });
+      const first = await this.saveManager.createWorld({ name: 'Мой Мир #1', seed: randomWorldSeed() });
       worlds = [first];
     }
 
@@ -429,6 +571,7 @@ class MinecraftGame {
       onDropAll: () => this._dropHeld(64),
     });
 
+    this.mobileControls.setTouchScale(this.settings.touchScale);
     this.setTouchMode(this.settings.touchMode, false);
     document.body.classList.add('webgl-crosshair');
     this._syncSettingsUI();
@@ -440,6 +583,7 @@ class MinecraftGame {
 
     this.loadingOverlay?.classList.add('hidden');
     this.hud.showMainMenu(false);
+    this.hud.setSkinMenuUI(this.settings.skin, this.skinTexture?.image);
     this.hud.renderWorldsList(worlds, this.activeWorldId);
 
     this.isRunning = true;
@@ -482,7 +626,11 @@ class MinecraftGame {
     this.hud.setParticlesModeLabel(this.settings.particlesMode);
     this.hud.setHintsEnabledLabel(this.settings.hintsEnabled);
     this.hud.setRenderDistanceUI(this.settings.renderDistance);
+    this.hud.setResolutionScaleUI(this.settings.resolutionScale);
     this.hud.setSensitivityUI(this.settings.sensitivity);
+    this.hud.setTouchScaleUI(this.settings.touchScale);
+    this.hud.setAudioVolumesUI(this.settings.audio);
+    this.hud.setSkinMenuUI(this.settings.skin, this.skinTexture?.image);
   }
 
   _unloadWorldFromEngine() {
@@ -501,6 +649,8 @@ class MinecraftGame {
     this.bowChargeTime = 0;
     this.firstPersonHand.setBowCharge(0);
     this.isSleeping = false;
+    this.hardcoreDeadSpectating = false;
+    this._guiPausedFrameDone = false;
 
     if (this.world) {
       this.world.dispose();
@@ -607,8 +757,55 @@ class MinecraftGame {
     }
 
     this.hud?.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
-    this.hud?.showDeathScreen(sourceType, score);
-    this._scheduleSave();
+    this.hud?.showDeathScreen(sourceType, score, this.currentWorldHardcore);
+    this.saveNow();
+  }
+
+  _enterHardcoreSpectateMode() {
+    if (!this.player) return;
+    this.hardcoreDeadSpectating = true;
+    this.player.isDead = false;
+    this.player.creativeMode = true;
+    this.player.flyMode = true;
+    this.player.y = Math.max(this.player.y + 1.5, 4);
+    this.playerModel.setDead?.(false);
+    this.hud?.hideDeathScreen();
+    this.hud?.showToast('Режим наблюдателя (Хардкор)');
+    if (!this.settings.touchMode) {
+      this._requestPointerLockSafe();
+    }
+  }
+
+  _trySpawnBonusChest() {
+    if (!this.currentBonusChest || this.bonusChestPlaced || !this.world || !this.player) return;
+    const cx = Math.floor(this.player.x) + 2;
+    const cz = Math.floor(this.player.z) + 2;
+    const cy = Math.max(1, Math.min(WORLD_HEIGHT - 4, this.world.getSurfaceHeightAt(cx, cz)));
+    this.world.setBlock(cx, cy, cz, BLOCK_IDS.CHEST, true, true, 2);
+    const chest = this.blockEntities.getOrCreateChest(cx, cy, cz);
+    if (chest && Array.isArray(chest.slots)) {
+      const loot = [
+        ItemRegistry.createStack(ITEM_IDS.WOODEN_PICKAXE, 1),
+        ItemRegistry.createStack(ITEM_IDS.WOODEN_AXE, 1),
+        ItemRegistry.createStack(ITEM_IDS.APPLE, 4),
+        ItemRegistry.createStack(ITEM_IDS.BREAD, 3),
+        ItemRegistry.createStack(BLOCK_IDS.OAK_LOG, 6),
+        ItemRegistry.createStack(ITEM_IDS.STICK, 6),
+      ];
+      for (let i = 0; i < loot.length && i < chest.slots.length; i++) {
+        chest.slots[i] = loot[i];
+      }
+    }
+    const torchDirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dz] of torchDirs) {
+      const tx = cx + dx;
+      const tz = cz + dz;
+      const ty = Math.max(1, this.world.getSurfaceHeightAt(tx, tz));
+      if (this.world.getBlock(tx, ty, tz) === 0 && BlockRegistry.isSolid(this.world.getBlock(tx, ty - 1, tz))) {
+        this.world.setBlock(tx, ty, tz, BLOCK_IDS.TORCH, true, true, 0);
+      }
+    }
+    this.bonusChestPlaced = true;
   }
 
   _isBedSpotValid(spot) {
@@ -667,8 +864,14 @@ class MinecraftGame {
 
     const saved = await this.saveManager.loadWorld(worldId);
     this.activeWorldId = worldId;
-    this.activeWorldName = saved?.name || 'Мой мир';
+    this.activeWorldName = saved?.name || 'Мой Мир #1';
     this.currentWorldMode = saved?.gameMode === 'creative' ? 'creative' : 'survival';
+    this.currentWorldType = saved?.worldType === 'superflat' ? 'superflat' : 'default';
+    this.currentWorldHardcore = Boolean(saved?.hardcore);
+    if (this.currentWorldHardcore) this.currentWorldMode = 'survival';
+    this.currentBonusChest = Boolean(saved?.bonusChest);
+    this.bonusChestPlaced = Boolean(saved?.bonusChestPlaced);
+    this.hardcoreDeadSpectating = Boolean(this.currentWorldHardcore && saved?.dead);
     this.worldSeed = Number.isFinite(saved?.worldSeed) ? saved.worldSeed : randomWorldSeed();
     this.spawnPoint = saved?.spawnPoint || null;
     this.bedSpawnPoint = saved?.bedSpawnPoint || null;
@@ -679,6 +882,7 @@ class MinecraftGame {
     );
 
     this.world = new World(this.scene, this.atlas, this.worldSeed, this.settings.renderDistance, {
+      worldType: this.currentWorldType,
       unlimitedMemory: this.settings.unlimitedMemory,
       fogEnabled: this.settings.fogEnabled,
       fancyLeaves: this.settings.fancyLeaves,
@@ -725,7 +929,10 @@ class MinecraftGame {
       onConsumeHeld: (n) => this.inventory.consumeHeld(n),
       getArmorPoints: () => this.inventory.getTotalArmorPoints(),
       onPrimaryAttack: () => this._handlePrimaryAttack(),
-      onEatTick: (itemId) => this.particleManager.spawnFoodCrumbs(this.player, itemId, 3),
+      onEatTick: (itemId) => {
+        this.particleManager.spawnFoodCrumbs(this.player, itemId, 3);
+        this.soundManager.playEat();
+      },
       onPlaceAction: () => this._handlePlaceBlock(),
       onPickBlock: () => this._handlePickBlock(),
       onCameraModeChange: (mode) => this.hud?.onCameraModeChanged(mode),
@@ -748,7 +955,10 @@ class MinecraftGame {
           this._syncHeldAndArmorVisuals();
         }
       },
-      onDamage: () => {
+      onDamage: (info) => {
+        const amt = typeof info === 'object' ? (info?.finalDmg ?? info?.amount ?? 0) : Number(info || 0);
+        const src = typeof info === 'object' ? info?.sourceType : 'generic';
+        this.soundManager.playHurt(src === 'fall' || amt >= 6);
         this.hud?.triggerDamageFlash();
         this.hud?.updateSurvivalVitals(this.player, this.inventory.getTotalArmorPoints());
       },
@@ -776,6 +986,7 @@ class MinecraftGame {
       if (!this.spawnPoint) {
         this.spawnPoint = { x: this.player.x, y: this.player.y, z: this.player.z };
       }
+      this._trySpawnBonusChest();
     }
 
     this.inventory.creativeMode = isCreative;
@@ -796,8 +1007,11 @@ class MinecraftGame {
     this.skyRenderer.update(0.001, this.player.x, this.player.y, this.player.z, this.world);
     this.player.update(0.001);
     this.hud?.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
-    if (this.player.isDead) {
-      this.hud?.showDeathScreen(this.player.lastDamageSource || 'generic', this.player.score || 0);
+    if (this.currentWorldHardcore && saved?.dead) {
+      this.player.isDead = true;
+      this.hud?.showDeathScreen(this.player.lastDamageSource || 'generic', this.player.score || 0, true);
+    } else if (this.player.isDead) {
+      this.hud?.showDeathScreen(this.player.lastDamageSource || 'generic', this.player.score || 0, this.currentWorldHardcore);
     }
   }
 
@@ -901,7 +1115,7 @@ class MinecraftGame {
   }
 
   _handlePrimaryAttack() {
-    if (!this.world || !this.player || this.player.isDead || this.player.isPaused || this.player.guiOpen) return false;
+    if (!this.world || !this.player || this.player.isDead || this.hardcoreDeadSpectating || this.player.isPaused || this.player.guiOpen) return false;
     const eye = this.player.getEyeOrigin();
     const dir = this.player.getLookDirection();
     const reach = this.gameMode === 'creative' ? REACH_DISTANCE : MELEE_REACH;
@@ -911,6 +1125,7 @@ class MinecraftGame {
 
     const ok = this.entityManager.tryMeleeAttack(this.player, mobHit.entity, this.particleManager);
     if (ok) {
+      this.soundManager.playHit();
       this.hotbar.render();
       this._syncHeldAndArmorVisuals();
       this.miningElapsed = 0;
@@ -922,7 +1137,7 @@ class MinecraftGame {
 
   _handlePlaceBlock() {
     const hit = this.currentTargetHit;
-    if (!this.world || !this.player || this.player.isDead) return false;
+    if (!this.world || !this.player || this.player.isDead || this.hardcoreDeadSpectating) return false;
 
     const eye = this.player.getEyeOrigin();
     const dir = this.player.getLookDirection();
@@ -1263,6 +1478,7 @@ class MinecraftGame {
     }
 
     if (!this.world.setBlock(px, py, pz, slot.id, true, true, placeMeta)) return false;
+    this.soundManager.playBlockPlace(slot.id);
     if (this.gameMode !== 'creative') {
       this.hotbar.consumeSelected(1);
     }
@@ -1271,7 +1487,7 @@ class MinecraftGame {
   }
 
   _updateBow(dt) {
-    if (!this.player || this.player.isDead) {
+    if (!this.player || this.player.isDead || this.hardcoreDeadSpectating) {
       this.bowChargeTime = 0;
       this.firstPersonHand.setBowCharge(0);
       return;
@@ -1292,6 +1508,7 @@ class MinecraftGame {
       if (holdingBow && this.bowChargeTime >= 0.14 && this._consumeAnyArrow()) {
         const charge = Math.min(1.0, this.bowChargeTime / BOW_CHARGE_SEC);
         this.entityManager.shootPlayerArrow(this.player, charge);
+        this.soundManager.playBowShoot();
         if (this.gameMode !== 'creative') {
           this.inventory.damageHeldTool(1);
           this.hotbar.render();
@@ -1369,6 +1586,7 @@ class MinecraftGame {
       }
 
       this.hud?.updateSurvivalVitals(this.player, this.inventory.getTotalArmorPoints());
+      this.soundManager.playBurp();
       this.eatingElapsed = 0;
       this.eatingSlotIndex = -1;
       this.firstPersonHand.setEatingActive(false);
@@ -1380,7 +1598,7 @@ class MinecraftGame {
   _updateInteraction(dt) {
     if (!this.player || !this.world) return;
 
-    if (this.player.isDead) {
+    if (this.player.isDead || this.hardcoreDeadSpectating) {
       this.selectionBox.update(null, this.world);
       this.breakOverlay.update(null, 0);
       this.firstPersonHand.setMiningActive(false);
@@ -1429,6 +1647,7 @@ class MinecraftGame {
           this.hud.showToast('Редстоуновая руда светится!');
         }
         this.particleManager.spawnBlockBreak(hit.x, hit.y, hit.z, hit.blockId, 12);
+        this.soundManager.playBlockBreak(hit.blockId);
         this.world.setBlock(hit.x, hit.y, hit.z, 0, true, true);
         this.firstPersonHand.triggerSwing();
         this.creativeBreakTimer = CREATIVE_BREAK_COOLDOWN;
@@ -1477,6 +1696,7 @@ class MinecraftGame {
     if (progress >= 1.0) {
       const drops = BlockRegistry.getHarvestDrops(hit.blockId, heldDef);
       this.particleManager.spawnBlockBreak(hit.x, hit.y, hit.z, hit.blockId, 14);
+      this.soundManager.playBlockBreak(hit.blockId);
       this.world.setBlock(hit.x, hit.y, hit.z, 0, true, true);
       for (const drop of drops) {
         this.itemManager.spawnDrop(drop.id, hit.x + 0.5, hit.y + 0.35, hit.z + 0.5, drop.count);
@@ -1555,6 +1775,13 @@ class MinecraftGame {
   }
 
   _bindWindowEvents() {
+    const unlockAudio = () => {
+      this.soundManager?.unlock();
+    };
+    window.addEventListener('pointerdown', unlockAudio, { passive: true });
+    window.addEventListener('keydown', unlockAudio, { passive: true });
+    window.addEventListener('touchstart', unlockAudio, { passive: true });
+
     window.addEventListener('resize', () => {
       const w = window.innerWidth;
       const h = Math.max(1, window.innerHeight);
@@ -1564,6 +1791,7 @@ class MinecraftGame {
       this.firstPersonHand.resize(w, h);
       this._applyPixelRatio();
       this.renderer.setSize(w, h, false);
+      this._guiPausedFrameDone = false;
     });
 
     document.addEventListener('visibilitychange', () => {
@@ -1603,6 +1831,11 @@ class MinecraftGame {
     return this.saveManager.saveWorld(this.activeWorldId, {
       worldName: this.activeWorldName,
       gameMode: this.currentWorldMode,
+      worldType: this.currentWorldType,
+      hardcore: this.currentWorldHardcore,
+      bonusChest: this.currentBonusChest,
+      bonusChestPlaced: this.bonusChestPlaced,
+      dead: Boolean(this.player.isDead || this.hardcoreDeadSpectating),
       worldSeed: this.worldSeed,
       worldTime: this.skyRenderer.worldTime,
       dayCount: this.skyRenderer.dayCount,
@@ -1644,9 +1877,14 @@ class MinecraftGame {
     this.lastFrameTime = now;
 
     if (this.hud.inMainMenu) {
+      this.soundManager.updateMusic(dt, false);
       this.menuPanorama.render(this.renderer, dt);
       return;
     }
+
+    this.soundManager.updateMusic(dt, true);
+
+    const guiFrozen = Boolean(this.hud.isPaused || this.inventoryUI?.isOpen);
 
     if (!this.hud.isPaused && this.player && this.world) {
       this.tickAccumulator += dt * 1000;
@@ -1664,6 +1902,28 @@ class MinecraftGame {
           this.firstPersonHand.setEatingActive(false);
           this.firstPersonHand.setBowCharge(0);
         }
+      }
+
+      // Footsteps & water splash audio feedback
+      if (this.player.inWater && !this._wasHeadInWater) {
+        this.soundManager.playSplash();
+      }
+      this._wasHeadInWater = Boolean(this.player.inWater);
+
+      const hSpeed = Math.hypot(this.player.vx || 0, this.player.vz || 0);
+      if (this.player.onGround && !this.player.flyMode && hSpeed > 1.2 && !this.player.isDead) {
+        this._stepSoundTimer += dt * (hSpeed / 4.3);
+        if (this._stepSoundTimer >= 0.42) {
+          this._stepSoundTimer = 0;
+          const groundBlock = this.world.getBlock(
+            Math.floor(this.player.x),
+            Math.floor(this.player.y - 0.12),
+            Math.floor(this.player.z)
+          );
+          if (groundBlock > 0) this.soundManager.playStep(groundBlock);
+        }
+      } else {
+        this._stepSoundTimer = 0.25;
       }
 
       this.hud.updateSurvivalVitals(this.player, this.inventory.getArmorDefense());
@@ -1712,9 +1972,19 @@ class MinecraftGame {
       );
     }
 
-    // Render live 3D paper-doll Steve inside open Inventory (uses main WebGLRenderer)
-    if (this.inventoryUI?.isOpen && this.inventoryUI.mode === 'inventory') {
-      this.playerPreview.renderToTarget(this.renderer, this.player?.time || now * 0.001);
+    // Throttle world rendering while Pause or Inventory modal is open to eliminate GUI lag
+    if (guiFrozen) {
+      if (this.inventoryUI?.isOpen && this.inventoryUI.mode === 'inventory') {
+        this.playerPreview.renderToTarget(this.renderer, this.player?.time || now * 0.001);
+      }
+      const interval = this.inventoryUI?.isOpen ? 100 : 250;
+      if (this._guiPausedFrameDone && now - (this._lastGuiRenderTime || 0) < interval) {
+        return;
+      }
+      this._guiPausedFrameDone = true;
+      this._lastGuiRenderTime = now;
+    } else {
+      this._guiPausedFrameDone = false;
     }
 
     this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
@@ -1724,7 +1994,7 @@ class MinecraftGame {
 
     if (this.player && this.player.cameraMode === CAMERA_MODES.FIRST_PERSON) {
       this.firstPersonHand.render(this.renderer);
-      if (!this.hud.inMainMenu && !this.hud.isPaused && !this.inventoryUI?.isOpen && !this.player.isDead && !this.isSleeping) {
+      if (!this.hud.inMainMenu && !this.hud.isPaused && !this.inventoryUI?.isOpen && !this.player.isDead && !this.isSleeping && !this.hardcoreDeadSpectating) {
         this.firstPersonHand.renderCrosshair(this.renderer);
       }
     }
